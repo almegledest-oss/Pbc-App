@@ -32,30 +32,23 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
 
   // Fast localStorage cache check for immediate rendering
   const [cachedLogo, setCachedLogo] = useState<string | null>(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        const val = localStorage.getItem('pbc_cached_custom_logo');
-        if (val && val.length < 50000) return val;
-      }
-    } catch {}
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pbc_cached_custom_logo');
+    }
     return null;
   });
 
   useEffect(() => {
-    try {
-      if (contextLogoUrl) {
-        setCachedLogo(contextLogoUrl);
-        if (typeof window !== 'undefined' && contextLogoUrl.length < 50000) {
-          localStorage.setItem('pbc_cached_custom_logo', contextLogoUrl);
-        }
-      } else if (contextLogoUrl === '') {
-        setCachedLogo(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('pbc_cached_custom_logo');
-        }
+    if (contextLogoUrl) {
+      setCachedLogo(contextLogoUrl);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pbc_cached_custom_logo', contextLogoUrl);
       }
-    } catch (err) {
-      console.warn('PbcLogo cache notice:', err);
+    } else if (contextLogoUrl === '') {
+      setCachedLogo(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('pbc_cached_custom_logo');
+      }
     }
   }, [contextLogoUrl]);
 
