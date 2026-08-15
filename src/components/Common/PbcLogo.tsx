@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 
 interface PbcLogoProps {
@@ -9,7 +9,7 @@ interface PbcLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'custom';
 }
 
-const OFFICIAL_LOGO_FALLBACK = '/logo.png';
+const DEFAULT_OFFICIAL_LOGO = '/logo.png';
 
 export const PbcLogo: React.FC<PbcLogoProps> = ({ 
   className = "w-16 h-16", 
@@ -18,16 +18,54 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
   size
 }) => {
   const [imgError, setImgError] = useState(false);
-
-  let appLogoUrl = customLogoUrl;
+  
+  // Safely get context logo url if available
+  let contextLogoUrl = '';
   try {
     const { systemSettings } = useApp();
-    if (!appLogoUrl && systemSettings?.customLogoUrl) {
-      appLogoUrl = systemSettings.customLogoUrl;
+    if (systemSettings?.customLogoUrl) {
+      contextLogoUrl = systemSettings.customLogoUrl;
     }
   } catch {
     // Context might not be available in isolated renderers
   }
+
+  // Fast localStorage cache check for immediate rendering
+  const [cachedLogo, setCachedLogo] = useState<string | null>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const val = localStorage.getItem('pbc_cached_custom_logo');
+        if (val && val.length < 50000) return val;
+      }
+    } catch {}
+    return null;
+  });
+
+  useEffect(() => {
+    try {
+      if (contextLogoUrl) {
+        setCachedLogo(contextLogoUrl);
+        if (typeof window !== 'undefined' && contextLogoUrl.length < 50000) {
+          localStorage.setItem('pbc_cached_custom_logo', contextLogoUrl);
+        }
+      } else if (contextLogoUrl === '') {
+        setCachedLogo(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('pbc_cached_custom_logo');
+        }
+      }
+    } catch (err) {
+      console.warn('PbcLogo cache notice:', err);
+    }
+  }, [contextLogoUrl]);
+
+  // Priority: 
+  // 1. Direct prop (customLogoUrl)
+  // 2. Context / database logo (contextLogoUrl)
+  // 3. LocalStorage cached logo
+  // 4. Default instant /logo.png
+  const activeCustomLogo = customLogoUrl || contextLogoUrl || cachedLogo;
+  const displaySrc = (!imgError && activeCustomLogo) ? activeCustomLogo : DEFAULT_OFFICIAL_LOGO;
 
   const sizeClasses = size
     ? {
@@ -40,8 +78,6 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
       }[size] || 'w-10 h-10'
     : '';
 
-  const displaySrc = !imgError && appLogoUrl ? appLogoUrl : OFFICIAL_LOGO_FALLBACK;
-
   return (
     <div
       className={`relative inline-flex items-center justify-center shrink-0 select-none overflow-hidden ${
@@ -52,10 +88,11 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
       <img 
         src={displaySrc} 
         alt="PBC Club Official Logo" 
+        loading="eager"
         className="w-full h-full object-contain rounded-xl drop-shadow-md"
         referrerPolicy="no-referrer"
         onError={() => {
-          if (!imgError) {
+          if (!imgError && activeCustomLogo) {
             setImgError(true);
           }
         }}
@@ -65,4 +102,5 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
 };
 
 export default PbcLogo;
+
 

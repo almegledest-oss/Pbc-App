@@ -114,10 +114,52 @@ export function getCachedItem<T>(key: string, fallback: T): T {
 export function setCachedItem<T>(key: string, value: T): void {
   try {
     if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(key, JSON.stringify(value));
+      // If saving array of members or data, strip huge base64 images to prevent QuotaExceededError
+      let payloadToSave: any = value;
+      if (Array.isArray(value)) {
+        payloadToSave = value.map((item: any) => {
+          if (item && typeof item === 'object') {
+            const stripped = { ...item };
+            if (stripped.photoUrl && stripped.photoUrl.length > 5000) {
+              stripped.photoUrl = '';
+            }
+            if (stripped.idCardPhotoUrl && stripped.idCardPhotoUrl.length > 5000) {
+              stripped.idCardPhotoUrl = '';
+            }
+            if (stripped.idCardFrontPhotoUrl && stripped.idCardFrontPhotoUrl.length > 5000) {
+              stripped.idCardFrontPhotoUrl = '';
+            }
+            if (stripped.idCardBackPhotoUrl && stripped.idCardBackPhotoUrl.length > 5000) {
+              stripped.idCardBackPhotoUrl = '';
+            }
+            return stripped;
+          }
+          return item;
+        });
+      } else if (value && typeof value === 'object') {
+        const stripped: any = { ...value };
+        if (stripped.customLogoUrl && stripped.customLogoUrl.length > 5000) {
+          stripped.customLogoUrl = '';
+        }
+        if (stripped.defaultFrameOverlayUrl && stripped.defaultFrameOverlayUrl.length > 5000) {
+          stripped.defaultFrameOverlayUrl = '';
+        }
+        payloadToSave = stripped;
+      }
+
+      localStorage.setItem(key, JSON.stringify(payloadToSave));
     }
-  } catch (e) {
-    console.warn(`Could not write cached item ${key}:`, e);
+  } catch (e: any) {
+    console.warn(`LocalStorage quota handled safely for ${key}:`, e?.message || e);
+    // If QuotaExceededError happens, clear non-critical caches to free memory safely
+    if (e?.name === 'QuotaExceededError' || e?.code === 22 || (e?.message && e.message.includes('quota'))) {
+      try {
+        localStorage.removeItem('pbc_cached_activity_logs');
+        localStorage.removeItem('pbc_cached_trashed');
+        localStorage.removeItem('pbc_cached_reports');
+        localStorage.removeItem('pbc_cached_custom_logo');
+      } catch {}
+    }
   }
 }
 
