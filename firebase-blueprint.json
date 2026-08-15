@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profiles",
+      "description": "User accounts and permissions for app users",
+      "properties": {
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string" },
+        "memberId": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    },
+    "members": {
+      "title": "Club Members",
+      "description": "Expat club member directory",
+      "properties": {
+        "fullName": { "type": "string" },
+        "fullNameBn": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "joinDate": { "type": "string" },
+        "status": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "totalDeposit": { "type": "number" },
+        "qrCodeData": { "type": "string" },
+        "role": { "type": "string" }
+      },
+      "required": ["fullName", "email", "status"]
+    },
+    "deposits": {
+      "title": "Deposits",
+      "description": "Member financial deposits and allocations",
+      "properties": {
+        "memberId": { "type": "string" },
+        "memberName": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "depositDate": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "referenceNumber": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["memberId", "amount", "currency", "depositDate"]
+    },
+    "projects": {
+      "title": "Real Estate Projects",
+      "description": "Real estate investment assets",
+      "properties": {
+        "projectName": { "type": "string" },
+        "projectNameBn": { "type": "string" },
+        "country": { "type": "string" },
+        "city": { "type": "string" },
+        "propertyType": { "type": "string" },
+        "investmentAmount": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["projectName", "investmentAmount", "status"]
+    },
+    "reports": {
+      "title": "Financial Reports",
+      "description": "Generated club financial & portfolio reports",
+      "properties": {
+        "title": { "type": "string" },
+        "period": { "type": "string" },
+        "generatedAt": { "type": "string" },
+        "reportType": { "type": "string" }
+      },
+      "required": ["title", "period"]
+    },
+    "activity_logs": {
+      "title": "Activity Logs",
+      "description": "System action history for audit",
+      "properties": {
+        "userEmail": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["action", "details"]
+    },
+    "system_settings": {
+      "title": "System Settings",
+      "description": "Global application configuration",
+      "properties": {
+        "clubName": { "type": "string" },
+        "currencySymbol": { "type": "string" },
+        "minDepositAmount": { "type": "number" },
+        "allowNewRegistrations": { "type": "boolean" }
+      },
+      "required": ["clubName"]
+    }
+  }
+}

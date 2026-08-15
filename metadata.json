@@ -1,0 +1,6 @@
+{
+  "name": "PBC CLUB",
+  "description": "Probashi Business Club - Real Estate Investment & Member Fund Management System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "PBC CLUB",
+  "short_name": "PBC",
+  "description": "PBC Club - Official Digital Portal and Member Directory",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070D1B",
+  "theme_color": "#070D1B",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
