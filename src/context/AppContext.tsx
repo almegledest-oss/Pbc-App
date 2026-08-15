@@ -807,6 +807,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     await updateMemberDoc(id, { status: 'active' });
+    
+    // Sync users collection doc status
+    const targetMember = members.find(m => m.id === id);
+    if (targetMember?.email) {
+      const cleanEmail = targetMember.email.toLowerCase().trim();
+      const uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await setUserProfileDoc(uid, {
+        email: cleanEmail,
+        displayName: targetMember.fullName || cleanEmail.split('@')[0],
+        role: targetMember.role || 'member',
+        memberId: id,
+        status: 'active'
+      });
+    }
+
     await addActivityLog('Member Approved', `Admin approved member registration ${id}`);
     addNotification('Member Registration Approved', `Member ${id} is now Active.`, 'system');
   };
@@ -817,7 +832,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     await updateMemberDoc(id, { status: 'rejected' });
+
+    // Sync users collection doc status
+    const targetMember = members.find(m => m.id === id);
+    if (targetMember?.email) {
+      const cleanEmail = targetMember.email.toLowerCase().trim();
+      const uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      await setUserProfileDoc(uid, {
+        email: cleanEmail,
+        displayName: targetMember.fullName || cleanEmail.split('@')[0],
+        role: targetMember.role || 'member',
+        memberId: id,
+        status: 'rejected'
+      });
+    }
+
     await addActivityLog('Member Rejected', `Admin rejected member registration ${id}`);
+    addNotification('Member Registration Rejected', `Member ${id} registration was rejected.`, 'system');
   };
 
   // CRUD for Deposits

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff } from 'lucide-react';
+import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
+import { db } from '../../lib/firebase';
+import { collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 
 const COUNTRY_CITY_MAP: Record<string, string[]> = {
   'Saudi Arabia': ['Riyadh', 'Jeddah', 'Dammam', 'Mecca', 'Medina', 'Al Khobar', 'Jubail', 'Tabuk'],
@@ -142,35 +144,41 @@ export const AuthModal: React.FC = () => {
 
       if (mode === 'signup') {
         const cleanEmail = signupEmail.trim().toLowerCase();
-        if (!signupMemberId.trim()) {
-          throw new Error('Please enter your Member ID (মেম্বার আইডি লিখুন)।');
-        }
         if (!cleanEmail || !cleanEmail.includes('@')) {
-          throw new Error('Please enter a valid email address.');
+          throw new Error('Please enter a valid email address (একটি সঠিক ইমেইল ঠিকানা দিন)।');
         }
         if (!signupFullName.trim()) {
-          throw new Error('Please enter your full name (পুরো নাম লিখুন).');
+          throw new Error('Please enter your full name (পুরো নাম লিখুন)।');
         }
         if (!signupPhone.trim()) {
-          throw new Error('Please enter your phone number (ফোন নম্বর লিখুন).');
+          throw new Error('Please enter your phone number (ফোন নম্বর লিখুন)।');
         }
         if (!signupPassword) {
-          throw new Error('Please enter a password.');
+          throw new Error('Please enter a password (পাসওয়ার্ড দিন)।');
         }
         if (signupPassword.length < 6) {
-          throw new Error('Password must be at least 6 characters.');
+          throw new Error('Password must be at least 6 characters (পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে)।');
         }
         if (signupPassword !== signupConfirmPassword) {
-          throw new Error('Passwords do not match (পাসওয়ার্ড মিলছে না).');
+          throw new Error('Passwords do not match (পাসওয়ার্ড মিলছে না)।');
         }
 
-        // Check if member already exists with this email
-        const existingMember = members.find(m => m.email.toLowerCase().trim() === cleanEmail);
-        if (existingMember) {
-          throw new Error('An account with this email already exists. Please Sign In.');
+        // 1. Check if member or user document already exists with this email in memory or Firestore
+        let emailAlreadyExists = members.some(m => m.email.toLowerCase().trim() === cleanEmail);
+        if (!emailAlreadyExists) {
+          try {
+            const qEmail = query(collection(db, 'members'), where('email', '==', cleanEmail));
+            const snapEmail = await getDocs(qEmail);
+            if (!snapEmail.empty) emailAlreadyExists = true;
+          } catch (e) {
+            console.warn('Firestore email check notice:', e);
+          }
+        }
+        if (emailAlreadyExists) {
+          throw new Error('An account with this email already exists. Please Sign In (এই ইমেইল দিয়ে ইতোমধ্যে অ্যাকাউন্ট রয়েছে। অনুগ্রহ করে সাইন ইন করুন)।');
         }
 
-        // Determine Member ID (existing or new)
+        // 2. Determine and format Member ID
         let newMemberId = '';
         const userEnteredId = signupMemberId.trim().toUpperCase();
 
@@ -179,17 +187,24 @@ export const AuthModal: React.FC = () => {
             ? userEnteredId
             : `PBC-${userEnteredId.replace(/[^A-Z0-9]/g, '')}`;
 
-          // Check if this Member ID exists
-          const existingById = members.find(m => m.id.toUpperCase() === formattedId);
-          if (existingById) {
-            // Check if account already has an active password
-            if (existingById.password && existingById.password.trim() !== '') {
-              throw new Error(`Member ID (${formattedId}) is already registered and claimed. Please Sign In.`);
+          // Check if Member ID already exists
+          let idAlreadyExists = members.some(m => m.id.toUpperCase() === formattedId);
+          if (!idAlreadyExists) {
+            try {
+              const snapId = await getDoc(doc(db, 'members', formattedId));
+              if (snapId.exists()) idAlreadyExists = true;
+            } catch (e) {}
+          }
+
+          if (idAlreadyExists) {
+            const existingById = members.find(m => m.id.toUpperCase() === formattedId);
+            if (existingById?.password && existingById.password.trim() !== '') {
+              throw new Error(`Member ID (${formattedId}) is already registered. Please Sign In.`);
             }
           }
           newMemberId = formattedId;
         } else {
-          // Generate next unique Member ID automatically
+          // Auto-generate next unique Member ID
           let nextNum = 1001;
           members.forEach(m => {
             const num = parseInt(m.id.replace(/\D/g, ''), 10);
@@ -200,6 +215,7 @@ export const AuthModal: React.FC = () => {
           newMemberId = `PBC-${nextNum}`;
         }
 
+        // 3. Attempt Firebase Auth registration
         let uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
         try {
           const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, signupPassword);
@@ -210,9 +226,8 @@ export const AuthModal: React.FC = () => {
           console.warn('Firebase auth registration notice:', signupErr?.message);
         }
 
-        // Check if updating existing pre-added member or creating new
+        // 4. Create Member data structure
         const existingById = members.find(m => m.id.toUpperCase() === newMemberId.toUpperCase());
-
         const newMemberData: Member = {
           id: newMemberId,
           fullName: signupFullName.trim(),
@@ -231,10 +246,10 @@ export const AuthModal: React.FC = () => {
           notes: existingById?.notes ? `${existingById.notes} | Self-Registered` : 'Self-Registered Member (Pending Approval)'
         };
 
-        // Save member to Firestore / state with status 'pending'
+        // 5. Persist Member to Firestore permanently
         await addMemberDoc(newMemberId, newMemberData);
 
-        // Save user profile doc with status 'pending'
+        // 6. Persist User Profile to Firestore permanently
         await setUserProfileDoc(uid, {
           email: cleanEmail,
           displayName: signupFullName.trim(),
@@ -243,15 +258,16 @@ export const AuthModal: React.FC = () => {
           memberId: newMemberId
         });
 
+        // 7. System notification
         addNotification(
           'New Member Registration',
           `New member applicant ${signupFullName.trim()} (${newMemberId}) registered and is awaiting admin approval.`,
           'system'
         );
 
-        alert(`আপনার মেম্বার আইডি (${newMemberId}) রেজিস্ট্রেশন সফলভাবে জমা হয়েছে!\n\nআপনার অ্যাকাউন্টটি প্রশাসনিক অনুমোদনের (Admin Verification) জন্য পেন্ডিং তালিকায় জমা হয়েছে। এডমিন কর্তৃক অনুমোদিত হওয়ার পর আপনি লগইন করতে পারবেন।`);
+        alert(`অভিনন্দন! আপনার মেম্বার অ্যাকাউন্ট (${newMemberId}) সফলভাবে তৈরি ও ডাটাবেজে স্থায়ীভাবে জমা হয়েছে।\n\nনিরাপত্তার স্বার্থে অ্যাকাউন্টটি বর্তমানে প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে। এডমিন অনুমোদন করলেই আপনি এই ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করতে পারবেন।`);
 
-        // Reset form and switch back to login view
+        // Switch to login view
         setMode('login');
         setLoginInput(cleanEmail);
         setPassword('');
@@ -259,175 +275,235 @@ export const AuthModal: React.FC = () => {
         setLoading(false);
         return;
       } else {
-        // LOGIN MODE
+        // ----------------------------------------------------
+        // LOGIN MODE (Supports both Email and Member ID)
+        // ----------------------------------------------------
         const rawInput = loginInput.trim();
+        if (!rawInput) {
+          throw new Error('Please enter your Email Address or Member ID (ইমেইল বা মেম্বার আইডি লিখুন)।');
+        }
+
+        let cleanEmail = '';
+        let targetMember: Member | undefined = undefined;
+        let targetUser: any = undefined;
+
         const isEmailInput = rawInput.includes('@');
 
         if (isEmailInput) {
-          const cleanEmail = rawInput.toLowerCase();
-          
-          const memberMatch = members.find(m => m.email.toLowerCase().trim() === cleanEmail);
-          const userMatch = users.find(u => u.email.toLowerCase().trim() === cleanEmail);
+          cleanEmail = rawInput.toLowerCase();
+          // Find in memory
+          targetMember = members.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
+          targetUser = users.find(u => u.email && u.email.toLowerCase().trim() === cleanEmail);
 
-          const isSuperAdminOrAdminCandidate = 
-            cleanEmail === 'fokrulislammir9897@gmail.com' ||
-            cleanEmail === 'almegledest@gmail.com' ||
-            userMatch?.role === 'super_admin' ||
-            userMatch?.role === 'admin' ||
-            showAdminLoginForm;
-
-          // 1. Attempt Super Admin / Admin login FIRST if candidate or showAdminLoginForm is true
-          if (isSuperAdminOrAdminCandidate) {
-            let userCred: any = null;
+          // Direct Firestore query fallback if not found in memory yet
+          if (!targetMember) {
             try {
-              userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-            } catch (firebaseErr: any) {
-              const isSuperEmail = cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com';
-              const isPassOk = password === 'Pbc@12345' || password === 'admin123' || (userMatch && password === userMatch.password);
-
-              if (isSuperEmail && (password === 'Pbc@12345' || password === 'admin123')) {
-                userCred = {
-                  user: {
-                    uid: userMatch?.uid || 'super-admin-uid-fokrul',
-                    email: cleanEmail
-                  }
-                };
-              } else if (userMatch && isPassOk) {
-                userCred = {
-                  user: {
-                    uid: userMatch.uid,
-                    email: userMatch.email
-                  }
-                };
-              } else if (memberMatch && (cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com')) {
-                let mPassValid = false;
-                const inputPass = password.trim();
-                if (memberMatch.password && memberMatch.password.trim() !== '') {
-                  mPassValid = (inputPass === memberMatch.password.trim());
-                } else {
-                  mPassValid = (inputPass === 'Pbc@12345' || inputPass === 'admin123');
-                }
-                if (mPassValid) {
-                  userCred = {
-                    user: {
-                      uid: memberMatch.id,
-                      email: memberMatch.email
-                    }
-                  };
-                }
+              const qMembers = query(collection(db, 'members'), where('email', '==', cleanEmail));
+              const mSnap = await getDocs(qMembers);
+              if (!mSnap.empty) {
+                const docData = mSnap.docs[0].data();
+                targetMember = { id: mSnap.docs[0].id, ...docData } as Member;
               }
-            }
-
-            if (userCred && userCred.user) {
-              const user = userCred.user;
-              const { role: detectedRole, status, member } = await getUserRoleAndStatus(user.uid, user.email || cleanEmail);
-
-              const finalRole = (cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com')
-                ? 'super_admin'
-                : (detectedRole || userMatch?.role || 'admin');
-
-              if (status === 'pending' || status === 'rejected' || status === 'inactive' || status === 'suspended') {
-                await signOut(auth);
-                throw new Error('Your account is not approved or is suspended. Please contact the PBC Administrator.');
-              }
-
-              // Maintenance mode check: System Admin ALWAYS bypasses!
-              if (systemSettings.maintenanceMode && finalRole !== 'super_admin') {
-                await signOut(auth);
-                throw new Error('🛠️ অ্যাপে আপডেটের কাজ চলছে। বর্তমানে শুধু System Admin লগইন করার অনুমতি আছে।');
-              }
-
-              setRole(finalRole);
-              if (member || memberMatch) {
-                setCurrentMember(member || memberMatch);
-              }
-
-              setActiveTab('dashboard');
-
-              localStorage.setItem('pbc_role', finalRole);
-              localStorage.setItem('pbc_logged_in', 'true');
-              setIsLoggedIn(true);
-              setIsAuthModalOpen(false);
-              setShowAdminLoginForm(false);
-              return;
+            } catch (e) {
+              console.warn('Firestore member query notice:', e);
             }
           }
 
-          // 2. Regular Member Login Path
-          if (memberMatch) {
-            const isSuperEmail = cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com';
-            const effectiveRole = isSuperEmail ? 'super_admin' : (userMatch?.role || memberMatch.role || 'member');
-
-            if (systemSettings.maintenanceMode && effectiveRole !== 'super_admin') {
-              throw new Error('🛠️ অ্যাপে আপডেটের কাজ চলছে। বর্তমানে সাধারণ মেম্বারদের জন্য লগইন স্থগিত রাখা হয়েছে।');
+          if (!targetUser) {
+            try {
+              const qUsers = query(collection(db, 'users'), where('email', '==', cleanEmail));
+              const uSnap = await getDocs(qUsers);
+              if (!uSnap.empty) {
+                const docData = uSnap.docs[0].data();
+                targetUser = { uid: uSnap.docs[0].id, ...docData };
+              }
+            } catch (e) {
+              console.warn('Firestore user query notice:', e);
             }
+          }
+        } else {
+          // Input is Member ID (e.g. PBC-1001, PBC-1002, or 1002)
+          const formattedId = rawInput.toUpperCase().startsWith('PBC-')
+            ? rawInput.toUpperCase()
+            : `PBC-${rawInput.replace(/[^0-9A-Z]/gi, '')}`;
 
-            if (memberMatch.status === 'pending' || memberMatch.status === 'rejected' || memberMatch.status === 'suspended') {
-              throw new Error('Your member account is not approved. Please contact the PBC Administrator.');
+          targetMember = members.find(m => m.id.toUpperCase() === formattedId);
+
+          if (!targetMember) {
+            try {
+              const mDocSnap = await getDoc(doc(db, 'members', formattedId));
+              if (mDocSnap.exists()) {
+                targetMember = { id: mDocSnap.id, ...mDocSnap.data() } as Member;
+              }
+            } catch (e) {
+              console.warn('Firestore member doc query notice:', e);
             }
+          }
 
-            // Verify password for member logging in via email
-            let isPasswordValid = false;
-            const inputPass = password.trim();
-
-            if (memberMatch.password && memberMatch.password.trim() !== '') {
-              isPasswordValid = (inputPass === memberMatch.password.trim());
-            } else {
-              const mNum = memberMatch.id.trim().toUpperCase().replace(/^PBC-/, '');
-              const validDefaults = [
-                memberMatch.id.trim(),
-                mNum,
-                `PBC-${mNum}`,
-                'Pbc@12345'
-              ];
-              isPasswordValid = validDefaults.includes(inputPass);
-            }
-
-            // Also try Firebase Auth if enabled
-            if (!isPasswordValid) {
+          if (targetMember && targetMember.email) {
+            cleanEmail = targetMember.email.toLowerCase().trim();
+            targetUser = users.find(u => u.email && u.email.toLowerCase().trim() === cleanEmail);
+            if (!targetUser) {
               try {
-                await signInWithEmailAndPassword(auth, cleanEmail, password);
-                isPasswordValid = true;
-              } catch (e) {
-                // Ignore firebase error
+                const qUsers = query(collection(db, 'users'), where('email', '==', cleanEmail));
+                const uSnap = await getDocs(qUsers);
+                if (!uSnap.empty) {
+                  targetUser = { uid: uSnap.docs[0].id, ...uSnap.docs[0].data() };
+                }
+              } catch (e) {}
+            }
+          }
+        }
+
+        // 1. Check Super Admin Candidate
+        const isSuperAdminEmail = cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com';
+        const isSuperAdminOrAdminCandidate = isSuperAdminEmail || targetUser?.role === 'super_admin' || targetUser?.role === 'admin' || showAdminLoginForm;
+
+        if (isSuperAdminOrAdminCandidate && cleanEmail) {
+          let userCred: any = null;
+          try {
+            userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
+          } catch (firebaseErr: any) {
+            const isPassOk = password === 'Pbc@12345' || password === 'admin123' || (targetUser && password === targetUser.password);
+
+            if (isSuperAdminEmail && (password === 'Pbc@12345' || password === 'admin123')) {
+              userCred = {
+                user: {
+                  uid: targetUser?.uid || 'super-admin-uid-fokrul',
+                  email: cleanEmail
+                }
+              };
+            } else if (targetUser && isPassOk) {
+              userCred = {
+                user: {
+                  uid: targetUser.uid,
+                  email: targetUser.email
+                }
+              };
+            } else if (targetMember && isSuperAdminEmail) {
+              let mPassValid = false;
+              const inputPass = password.trim();
+              if (targetMember.password && targetMember.password.trim() !== '') {
+                mPassValid = (inputPass === targetMember.password.trim());
+              } else {
+                mPassValid = (inputPass === 'Pbc@12345' || inputPass === 'admin123');
+              }
+              if (mPassValid) {
+                userCred = {
+                  user: {
+                    uid: targetMember.id,
+                    email: targetMember.email
+                  }
+                };
               }
             }
+          }
 
-            if (!isPasswordValid) {
-              throw new Error('Invalid email or password.');
+          if (userCred && userCred.user) {
+            const user = userCred.user;
+            const { role: detectedRole, status, member } = await getUserRoleAndStatus(user.uid, user.email || cleanEmail);
+
+            const finalRole = isSuperAdminEmail ? 'super_admin' : (detectedRole || targetUser?.role || 'admin');
+
+            if (status === 'pending') {
+              await signOut(auth);
+              throw new Error('আপনার অ্যাকাউন্টটি প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে।');
+            }
+            if (status === 'rejected' || status === 'inactive' || status === 'suspended') {
+              await signOut(auth);
+              throw new Error('Your account is inactive or suspended. Please contact the PBC Administrator.');
             }
 
-            // Log in member or super admin
-            setRole(effectiveRole);
-            setCurrentMember(memberMatch);
+            if (systemSettings.maintenanceMode && finalRole !== 'super_admin') {
+              await signOut(auth);
+              throw new Error('🛠️ অ্যাপে আপডেটের কাজ চলছে। বর্তমানে শুধু System Admin লগইন করার অনুমতি আছে।');
+            }
+
+            setRole(finalRole);
+            if (member || targetMember) {
+              setCurrentMember(member || targetMember!);
+            }
+
             setActiveTab('dashboard');
-            localStorage.setItem('pbc_role', effectiveRole);
+            localStorage.setItem('pbc_role', finalRole);
             localStorage.setItem('pbc_logged_in', 'true');
             setIsLoggedIn(true);
             setIsAuthModalOpen(false);
             setShowAdminLoginForm(false);
             return;
           }
+        }
 
-          // 3. Super Admin Direct Fallback
-          if (cleanEmail === 'fokrulislammir9897@gmail.com' || cleanEmail === 'almegledest@gmail.com') {
-            if (password === 'Pbc@12345' || password === 'admin123') {
-              setRole('super_admin');
-              setActiveTab('dashboard');
-              localStorage.setItem('pbc_role', 'super_admin');
-              localStorage.setItem('pbc_logged_in', 'true');
-              setIsLoggedIn(true);
-              setIsAuthModalOpen(false);
-              setShowAdminLoginForm(false);
-              return;
-            }
+        // 2. Regular Member Login Path
+        if (targetMember) {
+          const effectiveRole = isSuperAdminEmail ? 'super_admin' : (targetUser?.role || targetMember.role || 'member');
+
+          if (systemSettings.maintenanceMode && effectiveRole !== 'super_admin') {
+            throw new Error('🛠️ অ্যাপে আপডেটের কাজ চলছে। বর্তমানে সাধারণ মেম্বারদের জন্য সাময়িকভাবে লগইন স্থগিত রাখা হয়েছে।');
           }
 
-          throw new Error('Invalid email or password.');
-        } else {
-          // MEMBER ID LOGIN IS DISABLED
-          throw new Error('Login with Member ID is disabled. Please sign in using your registered Email Address and Password (ইমেইল ঠিকানা এবং পাসওয়ার্ড দিয়ে লগইন করুন)।');
+          if (targetMember.status === 'pending') {
+            throw new Error('আপনার অ্যাকাউন্টটি প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে। এডমিন অনুমোদন করলেই লগইন করতে পারবেন।');
+          }
+          if (targetMember.status === 'rejected' || targetMember.status === 'suspended') {
+            throw new Error('আপনার মেম্বারশিপ অ্যাকাউন্টটি সক্রিয় নয়। বিস্তারিত জানতে PBC এডমিনের সাথে যোগাযোগ করুন।');
+          }
+
+          // Verify password
+          let isPasswordValid = false;
+          const inputPass = password.trim();
+
+          if (targetMember.password && targetMember.password.trim() !== '') {
+            isPasswordValid = (inputPass === targetMember.password.trim());
+          } else {
+            const mNum = targetMember.id.trim().toUpperCase().replace(/^PBC-/, '');
+            const validDefaults = [
+              targetMember.id.trim(),
+              mNum,
+              `PBC-${mNum}`,
+              'Pbc@12345'
+            ];
+            isPasswordValid = validDefaults.includes(inputPass);
+          }
+
+          // Try Firebase Auth if email is available
+          if (!isPasswordValid && cleanEmail) {
+            try {
+              await signInWithEmailAndPassword(auth, cleanEmail, password);
+              isPasswordValid = true;
+            } catch (e) {}
+          }
+
+          if (!isPasswordValid) {
+            throw new Error('ভুল পাসওয়ার্ড দেওয়া হয়েছে। সঠিক পাসওয়ার্ড দিয়ে পুনরায় চেষ্টা করুন।');
+          }
+
+          setRole(effectiveRole);
+          setCurrentMember(targetMember);
+          setActiveTab('dashboard');
+          localStorage.setItem('pbc_role', effectiveRole);
+          localStorage.setItem('pbc_logged_in', 'true');
+          setIsLoggedIn(true);
+          setIsAuthModalOpen(false);
+          setShowAdminLoginForm(false);
+          return;
         }
+
+        // 3. Super Admin Direct Fallback
+        if (isSuperAdminEmail) {
+          if (password === 'Pbc@12345' || password === 'admin123') {
+            setRole('super_admin');
+            setActiveTab('dashboard');
+            localStorage.setItem('pbc_role', 'super_admin');
+            localStorage.setItem('pbc_logged_in', 'true');
+            setIsLoggedIn(true);
+            setIsAuthModalOpen(false);
+            setShowAdminLoginForm(false);
+            return;
+          }
+        }
+
+        throw new Error('অ্যাকাউন্ট খুঁজে পাওয়া যায়নি। অনুগ্রহ করে সঠিক ইমেইল অথবা মেম্বার আইডি লিখুন।');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid credentials.');
@@ -449,7 +525,6 @@ export const AuthModal: React.FC = () => {
         setIsForgotOpen(false);
       }, 3000);
     } catch (err: any) {
-      // Even if error occurs in demo sandbox, show user friendly status
       setResetEmailSent(true);
       setTimeout(() => {
         setResetEmailSent(false);
@@ -526,7 +601,7 @@ export const AuthModal: React.FC = () => {
               <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
                 <div>
                   <label className="block text-slate-200 font-bold mb-1.5 flex items-center justify-between">
-                    <span>Email Address / ইমেইল ঠিকানা</span>
+                    <span>Email Address or Member ID / ইমেইল বা মেম্বার আইডি</span>
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
@@ -535,7 +610,7 @@ export const AuthModal: React.FC = () => {
                       required
                       value={loginInput}
                       onChange={e => setLoginInput(e.target.value)}
-                      placeholder="e.g. member@pbcclub.org"
+                      placeholder="e.g. member@pbcclub.org or PBC-1001"
                       className="w-full pl-10 pr-3.5 py-3 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
                     />
                   </div>
