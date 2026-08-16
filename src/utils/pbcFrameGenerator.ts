@@ -4,6 +4,8 @@
  * gold ribbons, airplane logo, and text.
  */
 
+import { safeStorage } from './safeStorage';
+
 const frameCache = new Map<string, string>();
 
 function loadImageAsync(url: string): Promise<HTMLImageElement | null> {
@@ -60,8 +62,8 @@ export async function generatePBCFrameImage(
 ): Promise<string> {
   const photoUrl = rawPhotoUrl || '';
 
-  // Retrieve saved overlay from options or localStorage
-  const overlayUrl = options?.frameOverlayUrl || (typeof window !== 'undefined' ? localStorage.getItem('pbc_default_frame_overlay') : '') || '';
+  // Retrieve saved overlay from options or safeStorage
+  const overlayUrl = options?.frameOverlayUrl || safeStorage.getItem('pbc_default_frame_overlay') || '';
   const photoX = options?.photoX || 0;
   const photoY = options?.photoY || 0;
   const photoScale = options?.photoScale || 1;

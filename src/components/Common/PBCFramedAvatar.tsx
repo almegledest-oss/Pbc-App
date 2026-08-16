@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { safeStorage } from '../../utils/safeStorage';
 
 interface PBCFramedAvatarProps {
   photoUrl?: string;
@@ -24,7 +25,7 @@ export const PBCFramedAvatar: React.FC<PBCFramedAvatarProps> = ({
   // Retrieve saved overlay from systemSettings or localStorage or generated default PNG
   const frameOverlayUrl =
     systemSettings?.defaultFrameOverlayUrl ||
-    (typeof window !== 'undefined' ? localStorage.getItem('pbc_default_frame_overlay') : '') ||
+    safeStorage.getItem('pbc_default_frame_overlay') ||
     '';
 
   const getInitials = (n?: string) => {

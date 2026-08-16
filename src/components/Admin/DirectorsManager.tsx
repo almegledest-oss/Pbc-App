@@ -5,6 +5,7 @@ import { compressImageFile, compressDataUrl } from '../../utils/imageCompressor'
 import { generatePBCFrameImage } from '../../utils/pbcFrameGenerator';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
+import { safeStorage } from '../../utils/safeStorage';
 import { 
   Users, 
   Plus, 
@@ -58,21 +59,21 @@ export const DirectorsManager: React.FC = () => {
   const [directorToDelete, setDirectorToDelete] = useState<BoardDirector | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [slideIntervalMs, setSlideIntervalMs] = useState<number>(() => {
-    const saved = localStorage.getItem('pbc_director_slide_interval');
+    const saved = safeStorage.getItem('pbc_director_slide_interval');
     return saved ? parseInt(saved, 10) : 4500;
   });
   const [slideEffect, setSlideEffect] = useState<string>(() => {
-    return localStorage.getItem('pbc_director_slide_effect') || 'slide';
+    return safeStorage.getItem('pbc_director_slide_effect') || 'slide';
   });
 
   const handleSpeedChange = (ms: number) => {
     setSlideIntervalMs(ms);
-    localStorage.setItem('pbc_director_slide_interval', ms.toString());
+    safeStorage.setItem('pbc_director_slide_interval', ms.toString());
   };
 
   const handleEffectChange = (effect: string) => {
     setSlideEffect(effect);
-    localStorage.setItem('pbc_director_slide_effect', effect);
+    safeStorage.setItem('pbc_director_slide_effect', effect);
   };
 
   // Form State for 11 fields + photo

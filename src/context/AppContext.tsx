@@ -4,6 +4,7 @@ import { Member, Deposit, RealEstateProject, ClubStats, UserRole, Language, Noti
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
+import { safeStorage } from '../utils/safeStorage';
 import {
   seedFirestoreIfEmpty,
   subscribeMembers,
@@ -167,7 +168,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRoleState] = useState<UserRole>(() => {
-    return (localStorage.getItem('pbc_role') as UserRole) || 'member';
+    return (safeStorage.getItem('pbc_role') as UserRole) || 'member';
   });
 
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
@@ -179,7 +180,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [directors, setDirectors] = useState<BoardDirector[]>(INITIAL_DIRECTORS);
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
     try {
-      const saved = localStorage.getItem('pbc_system_settings');
+      const saved = safeStorage.getItem('pbc_system_settings');
       if (saved) return JSON.parse(saved);
     } catch (e) {
       console.warn('Could not read cached system settings:', e);
@@ -218,10 +219,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem('pbc_lang') as Language) || 'en';
+    return (safeStorage.getItem('pbc_lang') as Language) || 'en';
   });
   const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('pbc_theme');
+    const saved = safeStorage.getItem('pbc_theme');
     if (saved === 'light' || saved === 'dark') return saved;
     return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   });
@@ -254,8 +255,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err) {
       console.warn('SignOut notice:', err);
     }
-    localStorage.removeItem('pbc_logged_in');
-    localStorage.removeItem('pbc_role');
+    safeStorage.removeItem('pbc_logged_in');
+    safeStorage.removeItem('pbc_role');
     setIsLoggedIn(false);
     setIsAuthModalOpen(true);
   };
@@ -281,11 +282,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Clean up any stale logo cache from local storage on startup
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.removeItem('pbc_cached_custom_logo');
-      } catch {}
-    }
+    safeStorage.removeItem('pbc_cached_custom_logo');
   }, []);
 
   // Initialize Firebase Seeding & Real-time Listeners
@@ -346,7 +343,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data) {
           setSystemSettings(data);
           try {
-            localStorage.setItem('pbc_system_settings', JSON.stringify(data));
+            safeStorage.setItem('pbc_system_settings', JSON.stringify(data));
           } catch (e) {
             console.warn('Could not cache system settings:', e);
           }
@@ -365,8 +362,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (notFound) {
             console.warn(`Access denied: No user document found in Firestore for ${user.email}`);
             await signOut(auth);
-            localStorage.removeItem('pbc_role');
-            localStorage.removeItem('pbc_logged_in');
+            safeStorage.removeItem('pbc_role');
+            safeStorage.removeItem('pbc_logged_in');
             setIsLoggedIn(false);
             setIsAuthModalOpen(true);
             return;
@@ -375,16 +372,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (status === 'pending' || status === 'rejected' || status === 'inactive' || status === 'suspended') {
             console.warn(`Blocked login for ${user.email} with status: ${status}`);
             await signOut(auth);
-            localStorage.removeItem('pbc_role');
-            localStorage.removeItem('pbc_logged_in');
+            safeStorage.removeItem('pbc_role');
+            safeStorage.removeItem('pbc_logged_in');
             setIsLoggedIn(false);
             setIsAuthModalOpen(true);
             return;
           }
 
           setRoleState(detectedRole);
-          localStorage.setItem('pbc_role', detectedRole);
-          localStorage.setItem('pbc_logged_in', 'true');
+          safeStorage.setItem('pbc_role', detectedRole);
+          safeStorage.setItem('pbc_logged_in', 'true');
 
           if (member) {
             setCurrentMember(member);
@@ -397,8 +394,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           addActivityLogDoc(user.email || 'user@pbcclub.org', 'Login', `User authenticated as ${detectedRole}`);
         } else {
           // No active firebase user -> force login modal
-          localStorage.removeItem('pbc_role');
-          localStorage.removeItem('pbc_logged_in');
+          safeStorage.removeItem('pbc_role');
+          safeStorage.removeItem('pbc_logged_in');
           setIsLoggedIn(false);
           setIsAuthModalOpen(true);
         }
@@ -479,10 +476,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const effectiveRole = targetMember.role === 'super_admin' ? 'super_admin' : (targetMember.role === 'admin' ? 'admin' : 'member');
         if (effectiveRole === 'admin' && role === 'member') {
           setRoleState('admin');
-          localStorage.setItem('pbc_role', 'admin');
+          safeStorage.setItem('pbc_role', 'admin');
         } else if (effectiveRole === 'member' && role === 'admin' && loggedInEmail !== 'fokrulislammir9897@gmail.com') {
           setRoleState('member');
-          localStorage.setItem('pbc_role', 'member');
+          safeStorage.setItem('pbc_role', 'member');
         }
       } else {
         if (members[0]) {
@@ -500,11 +497,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const switchRoleMode = (targetMode: UserRole) => {
     if (targetMode === 'member') {
       setRoleState('member');
-      localStorage.setItem('pbc_role', 'member');
+      safeStorage.setItem('pbc_role', 'member');
     } else {
       const modeToSet = accountRole === 'super_admin' ? 'super_admin' : 'admin';
       setRoleState(modeToSet);
-      localStorage.setItem('pbc_role', modeToSet);
+      safeStorage.setItem('pbc_role', modeToSet);
     }
   };
 
@@ -534,12 +531,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem('pbc_lang', lang);
+    safeStorage.setItem('pbc_lang', lang);
   };
 
   const setTheme = (t: 'light' | 'dark') => {
     setThemeState(t);
-    localStorage.setItem('pbc_theme', t);
+    safeStorage.setItem('pbc_theme', t);
   };
 
   // Calculate live stats dynamically
@@ -575,7 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const updated = { ...systemSettings, ...settings };
     setSystemSettings(updated);
     try {
-      localStorage.setItem('pbc_system_settings', JSON.stringify(updated));
+      safeStorage.setItem('pbc_system_settings', JSON.stringify(updated));
     } catch (e) {
       console.warn('Could not cache updated system settings:', e);
     }
@@ -685,7 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alert('Security Restriction: Members cannot add new member records.');
       return;
     }
-    const customId = m.id && m.id.trim() !== '' ? m.id.trim() : `PBC-${1000 + members.length + 1}`;
+    const customId = m.id && m.id.trim() !== '' ? m.id.trim() : `PBC-${10000 + members.length + 1}`;
     const cleanEmail = (m.email || '').toLowerCase().trim();
     const finalRole: UserRole = (m.role as UserRole) || 'member';
     
@@ -757,7 +754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const loggedInEmail = (authUser?.email || currentMember?.email || '').toLowerCase().trim();
       if (emailToUse === loggedInEmail || currentMember?.id === id) {
         setRoleState(data.role as any);
-        localStorage.setItem('pbc_role', data.role);
+        safeStorage.setItem('pbc_role', data.role);
       }
     }
 

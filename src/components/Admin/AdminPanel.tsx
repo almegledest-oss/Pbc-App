@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
+import { safeStorage } from '../../utils/safeStorage';
 
 export const AdminPanel: React.FC = () => {
   const { 
@@ -774,8 +775,8 @@ export const AdminPanel: React.FC = () => {
                             }
                             try {
                               const compressedUrl = await compressImageToDataUrl(file, 300, 0.82);
-                              if (typeof window !== 'undefined') {
-                                localStorage.setItem('pbc_cached_custom_logo', compressedUrl);
+                              if (compressedUrl && compressedUrl.length < 100 * 1024) {
+                                safeStorage.setItem('pbc_cached_custom_logo', compressedUrl);
                               }
                               await updateSystemSettings({ customLogoUrl: compressedUrl });
                             } catch (err) {
@@ -796,9 +797,7 @@ export const AdminPanel: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (typeof window !== 'undefined') {
-                              localStorage.removeItem('pbc_cached_custom_logo');
-                            }
+                            safeStorage.removeItem('pbc_cached_custom_logo');
                             updateSystemSettings({ customLogoUrl: '' });
                           }}
                           className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"

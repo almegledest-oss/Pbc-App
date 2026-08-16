@@ -5,6 +5,7 @@ import { BoardDirector } from '../../types';
 import { PBCDirectorFrame } from '../Common/PBCDirectorFrame';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { generatePBCFrameImage } from '../../utils/pbcFrameGenerator';
+import { safeStorage } from '../../utils/safeStorage';
 import { 
   Users, 
   ChevronLeft, 
@@ -31,11 +32,11 @@ export const BoardOfDirectorsBanner: React.FC = () => {
   const [selectedDirector, setSelectedDirector] = useState<BoardDirector | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [slideIntervalMs, setSlideIntervalMs] = useState<number>(() => {
-    const saved = localStorage.getItem('pbc_director_slide_interval');
+    const saved = safeStorage.getItem('pbc_director_slide_interval');
     return saved ? parseInt(saved, 10) : 4500;
   });
   const [slideEffect, setSlideEffect] = useState<string>(() => {
-    return localStorage.getItem('pbc_director_slide_effect') || 'slide';
+    return safeStorage.getItem('pbc_director_slide_effect') || 'slide';
   });
 
   // Filter active directors only for the live banner
@@ -45,11 +46,11 @@ export const BoardOfDirectorsBanner: React.FC = () => {
   // Sync slide interval & effect if changed in settings/storage
   useEffect(() => {
     const handleStorageChange = () => {
-      const savedInterval = localStorage.getItem('pbc_director_slide_interval');
+      const savedInterval = safeStorage.getItem('pbc_director_slide_interval');
       if (savedInterval) {
         setSlideIntervalMs(parseInt(savedInterval, 10));
       }
-      const savedEffect = localStorage.getItem('pbc_director_slide_effect');
+      const savedEffect = safeStorage.getItem('pbc_director_slide_effect');
       if (savedEffect) {
         setSlideEffect(savedEffect);
       }

@@ -30,6 +30,7 @@ import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, Syst
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
+import { safeStorage } from '../utils/safeStorage';
 
 export interface UserProfile {
   uid: string;
@@ -101,10 +102,8 @@ export function isQuotaExceededError(err: any): boolean {
 
 export function getCachedItem<T>(key: string, fallback: T): T {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const saved = localStorage.getItem(key);
-      if (saved) return JSON.parse(saved);
-    }
+    const saved = safeStorage.getItem(key);
+    if (saved) return JSON.parse(saved);
   } catch (e) {
     console.warn(`Could not read cached item ${key}:`, e);
   }
@@ -113,9 +112,23 @@ export function getCachedItem<T>(key: string, fallback: T): T {
 
 export function setCachedItem<T>(key: string, value: T): void {
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(key, JSON.stringify(value));
+    if (value === undefined || value === null) return;
+    
+    // For large collections, trim array items to avoid exceeding quota
+    let serialized: string;
+    if (Array.isArray(value) && value.length > 60) {
+      serialized = JSON.stringify(value.slice(0, 60));
+    } else {
+      serialized = JSON.stringify(value);
     }
+
+    // Do not cache oversized blobs (>150KB) in single keys
+    if (serialized.length > 150 * 1024) {
+      console.warn(`[SafeStorage] Skipping cache for "${key}" as payload exceeds 150KB limit.`);
+      return;
+    }
+
+    safeStorage.setItem(key, serialized);
   } catch (e) {
     console.warn(`Could not write cached item ${key}:`, e);
   }
@@ -543,7 +556,7 @@ export function subscribeMembers(callback: (members: Member[]) => void) {
 
 export async function addMemberDoc(id: string, memberData: Omit<Member, 'id'>) {
   if (isGlobalQuotaExceeded) return;
-  const finalId = id && id.trim() !== '' ? id.trim() : `PBC-${1000 + Math.floor(Math.random() * 9000)}`;
+  const finalId = id && id.trim() !== '' ? id.trim() : `PBC-${10000 + Math.floor(Math.random() * 90000)}`;
   const qrCodeData = memberData.qrCodeData || `PBC-MEMBER:${finalId}:${memberData.fullName}:${memberData.status}`;
   const barcodeData = memberData.barcodeData || `PBC-BC-${finalId}`;
 

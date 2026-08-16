@@ -79,3 +79,39 @@ export async function compressDataUrl(
     img.src = dataUrl;
   });
 }
+
+/**
+ * Uploads an image to ImgBB / Cloud hosting with client-side compression and instant fallback.
+ */
+export async function uploadImageToCloudOrCompressed(file: File): Promise<string> {
+  const compressedDataUrl = await compressImageFile(file, 1000, 1000, 0.78);
+
+  try {
+    const base64Data = compressedDataUrl.replace(/^data:image\/[a-z]+;base64,/, '');
+    const formData = new FormData();
+    formData.append('image', base64Data);
+
+    const apiKey = (import.meta as any).env?.VITE_IMGBB_API_KEY || '2d44933fa1853d6118b08709f6e52002';
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data?.url) {
+        return data.data.url;
+      }
+    }
+  } catch (err) {
+    console.warn('ImgBB upload notice, using compressed image directly:', err);
+  }
+
+  return compressedDataUrl;
+}
+

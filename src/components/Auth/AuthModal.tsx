@@ -5,6 +5,7 @@ import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Ph
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
+import { safeStorage } from '../../utils/safeStorage';
 import { db } from '../../lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
 
@@ -178,42 +179,32 @@ export const AuthModal: React.FC = () => {
           throw new Error('An account with this email already exists. Please Sign In (এই ইমেইল দিয়ে ইতোমধ্যে অ্যাকাউন্ট রয়েছে। অনুগ্রহ করে সাইন ইন করুন)।');
         }
 
-        // 2. Determine and format Member ID
+        // 2. Validate and format Member ID (Exactly 5 Digits)
         let newMemberId = '';
-        const userEnteredId = signupMemberId.trim().toUpperCase();
+        const rawMemberIdDigits = signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').trim();
 
-        if (userEnteredId) {
-          const formattedId = userEnteredId.startsWith('PBC-')
-            ? userEnteredId
-            : `PBC-${userEnteredId.replace(/[^A-Z0-9]/g, '')}`;
-
-          // Check if Member ID already exists
-          let idAlreadyExists = members.some(m => m.id.toUpperCase() === formattedId);
-          if (!idAlreadyExists) {
-            try {
-              const snapId = await getDoc(doc(db, 'members', formattedId));
-              if (snapId.exists()) idAlreadyExists = true;
-            } catch (e) {}
-          }
-
-          if (idAlreadyExists) {
-            const existingById = members.find(m => m.id.toUpperCase() === formattedId);
-            if (existingById?.password && existingById.password.trim() !== '') {
-              throw new Error(`Member ID (${formattedId}) is already registered. Please Sign In.`);
-            }
-          }
-          newMemberId = formattedId;
-        } else {
-          // Auto-generate next unique Member ID
-          let nextNum = 1001;
-          members.forEach(m => {
-            const num = parseInt(m.id.replace(/\D/g, ''), 10);
-            if (!isNaN(num) && num >= nextNum) {
-              nextNum = num + 1;
-            }
-          });
-          newMemberId = `PBC-${nextNum}`;
+        if (!rawMemberIdDigits || rawMemberIdDigits.length !== 5) {
+          throw new Error('Member ID must be exactly 5 digits (e.g. PBC-10001) / সদস্য আইডি অবশ্যই ঠিক ৫ ডিজিটের হতে হবে।');
         }
+
+        const formattedId = `PBC-${rawMemberIdDigits}`;
+
+        // Check if Member ID already exists
+        let idAlreadyExists = members.some(m => m.id.toUpperCase() === formattedId);
+        if (!idAlreadyExists) {
+          try {
+            const snapId = await getDoc(doc(db, 'members', formattedId));
+            if (snapId.exists()) idAlreadyExists = true;
+          } catch (e) {}
+        }
+
+        if (idAlreadyExists) {
+          const existingById = members.find(m => m.id.toUpperCase() === formattedId);
+          if (existingById?.password && existingById.password.trim() !== '') {
+            throw new Error(`Member ID (${formattedId}) is already registered. Please Sign In.`);
+          }
+        }
+        newMemberId = formattedId;
 
         // 3. Attempt Firebase Auth registration
         let uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -425,8 +416,8 @@ export const AuthModal: React.FC = () => {
             }
 
             setActiveTab('dashboard');
-            localStorage.setItem('pbc_role', finalRole);
-            localStorage.setItem('pbc_logged_in', 'true');
+            safeStorage.setItem('pbc_role', finalRole);
+            safeStorage.setItem('pbc_logged_in', 'true');
             setIsLoggedIn(true);
             setIsAuthModalOpen(false);
             setShowAdminLoginForm(false);
@@ -481,8 +472,8 @@ export const AuthModal: React.FC = () => {
           setRole(effectiveRole);
           setCurrentMember(targetMember);
           setActiveTab('dashboard');
-          localStorage.setItem('pbc_role', effectiveRole);
-          localStorage.setItem('pbc_logged_in', 'true');
+          safeStorage.setItem('pbc_role', effectiveRole);
+          safeStorage.setItem('pbc_logged_in', 'true');
           setIsLoggedIn(true);
           setIsAuthModalOpen(false);
           setShowAdminLoginForm(false);
@@ -494,8 +485,8 @@ export const AuthModal: React.FC = () => {
           if (password === 'Pbc@12345' || password === 'admin123') {
             setRole('super_admin');
             setActiveTab('dashboard');
-            localStorage.setItem('pbc_role', 'super_admin');
-            localStorage.setItem('pbc_logged_in', 'true');
+            safeStorage.setItem('pbc_role', 'super_admin');
+            safeStorage.setItem('pbc_logged_in', 'true');
             setIsLoggedIn(true);
             setIsAuthModalOpen(false);
             setShowAdminLoginForm(false);
@@ -675,20 +666,29 @@ export const AuthModal: React.FC = () => {
               /* MEMBER SELF-REGISTRATION FORM */
               <form onSubmit={handleLoginSubmit} className="space-y-3.5 text-xs">
                 <div>
-                  <label className="block text-slate-200 font-bold mb-1">
-                    Member ID / মেম্বার আইডি *
+                  <label className="block text-slate-200 font-bold mb-1 flex items-center justify-between">
+                    <span>Member ID / মেম্বার আইডি *</span>
+                    <span className="text-[10px] text-amber-400 font-mono">Exactly 5 Digits</span>
                   </label>
-                  <div className="relative">
-                    <Building2 className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                  <div className="flex items-center">
+                    <span className="inline-flex items-center px-3.5 py-2.5 bg-[#0A1120] border border-r-0 border-amber-500/30 rounded-l-xl text-amber-400 font-mono font-bold text-sm select-none">
+                      PBC-
+                    </span>
                     <input
                       type="text"
+                      inputMode="numeric"
+                      maxLength={5}
                       required
-                      value={signupMemberId}
-                      onChange={e => setSignupMemberId(e.target.value)}
-                      placeholder="e.g. PBC-1001"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                      value={signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5)}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 5);
+                        setSignupMemberId(digits ? `PBC-${digits}` : '');
+                      }}
+                      placeholder="10001"
+                      className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-r-xl text-white font-mono font-bold tracking-wider placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
                     />
                   </div>
+                  <p className="text-[10px] text-slate-400 mt-1 font-sans">৫ সংখ্যার আইডি নম্বর দিন (যেমন: ১০১০১)</p>
                 </div>
 
                 <div>

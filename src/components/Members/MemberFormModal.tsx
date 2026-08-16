@@ -101,7 +101,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         familyInfoAddress: memberToEdit.familyInfoAddress || memberToEdit.nomineeAddress || ''
       });
     } else {
-      const nextId = `PBC-${1000 + members.length + 1}`;
+      const nextId = `PBC-${10000 + members.length + 1}`;
       const autoPass = `PBC-${Math.floor(100000 + Math.random() * 900000)}`;
       setFormData({
         id: nextId,
@@ -139,7 +139,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   if (!isOpen) return null;
 
   const validate = () => {
-    const errs: { email?: string; phone?: string; fullName?: string } = {};
+    const errs: { email?: string; phone?: string; fullName?: string; id?: string } = {};
+
+    const cleanIdDigits = (formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+    if (!cleanIdDigits || cleanIdDigits.length !== 5) {
+      errs.id = 'Member ID must be exactly 5 digits (e.g. PBC-10001) / সদস্য আইডি অবশ্যই ঠিক ৫ ডিজিট হতে হবে।';
+    }
 
     if (!formData.fullName.trim()) {
       errs.fullName = 'Full Name is required';
@@ -205,12 +210,13 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
   };
 
   const handleAutoGenerateCodes = () => {
-    const memberId = formData.id.trim() || `PBC-${1000 + members.length + 1}`;
+    const cleanDigits = (formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5);
+    const memberId = cleanDigits.length === 5 ? `PBC-${cleanDigits}` : `PBC-${10000 + members.length + 1}`;
     const qr = `PBC-MEMBER:${memberId}:${formData.fullName}:${formData.status}`;
     const barcode = `PBC-BC-${memberId}`;
     setFormData(prev => ({
       ...prev,
-      id: prev.id || memberId,
+      id: memberId,
       qrCodeData: qr,
       barcodeData: barcode
     }));
@@ -222,7 +228,8 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      const finalMemberId = formData.id.trim() || `PBC-${1000 + members.length + 1}`;
+      const cleanDigits = (formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5);
+      const finalMemberId = `PBC-${cleanDigits}`;
       const finalQr = formData.qrCodeData.trim() || `PBC-MEMBER:${finalMemberId}:${formData.fullName}:${formData.status}`;
       const finalBarcode = formData.barcodeData.trim() || `PBC-BC-${finalMemberId}`;
 
@@ -333,16 +340,31 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
-                  <span>Member ID</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Auto</span>
+                  <span>Member ID *</span>
+                  <span className="text-[10px] text-amber-400 font-mono">5 Digits</span>
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. PBC-1005"
-                  value={formData.id}
-                  onChange={e => setFormData({ ...formData, id: e.target.value })}
-                  className="w-full px-3 py-2.5 font-mono font-bold bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-amber-300 focus:outline-none focus:border-amber-400"
-                />
+                <div className="flex items-center">
+                  <span className="inline-flex items-center px-3.5 py-2.5 bg-[#0A1120] border border-r-0 border-[#D4AF37]/30 rounded-l-xl text-amber-400 font-mono font-bold text-sm select-none">
+                    PBC-
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={5}
+                    placeholder="10005"
+                    value={(formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5)}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 5);
+                      setFormData({ ...formData, id: digits ? `PBC-${digits}` : '' });
+                    }}
+                    className={`w-full px-3 py-2.5 font-mono font-bold bg-[#070D1B] border ${
+                      errors.id ? 'border-rose-500' : 'border-[#D4AF37]/30'
+                    } rounded-r-xl text-amber-300 placeholder:text-slate-600 focus:outline-none focus:border-amber-400`}
+                  />
+                </div>
+                {errors.id && (
+                  <p className="text-[10px] text-rose-400 mt-1 font-medium">{errors.id}</p>
+                )}
               </div>
 
               <div>

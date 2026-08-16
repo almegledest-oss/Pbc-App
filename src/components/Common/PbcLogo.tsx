@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { safeStorage } from '../../utils/safeStorage';
 
 interface PbcLogoProps {
   className?: string;
@@ -32,23 +33,19 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
 
   // Fast localStorage cache check for immediate rendering
   const [cachedLogo, setCachedLogo] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pbc_cached_custom_logo');
-    }
-    return null;
+    return safeStorage.getItem('pbc_cached_custom_logo');
   });
 
   useEffect(() => {
     if (contextLogoUrl) {
       setCachedLogo(contextLogoUrl);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pbc_cached_custom_logo', contextLogoUrl);
+      // Only cache if not an enormous base64 data string (>100KB)
+      if (contextLogoUrl.length < 100 * 1024) {
+        safeStorage.setItem('pbc_cached_custom_logo', contextLogoUrl);
       }
     } else if (contextLogoUrl === '') {
       setCachedLogo(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('pbc_cached_custom_logo');
-      }
+      safeStorage.removeItem('pbc_cached_custom_logo');
     }
   }, [contextLogoUrl]);
 
