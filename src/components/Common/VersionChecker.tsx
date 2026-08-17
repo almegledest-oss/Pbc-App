@@ -1,15 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { RefreshCw, Sparkles } from 'lucide-react';
 
 declare const __APP_BUILD_TIME__: string | undefined;
 
+const VERSION_STORAGE_KEY = 'pbc_installed_version';
+const LAST_RELOAD_KEY = 'pbc_last_chunk_reload';
+
 export const VersionChecker: React.FC = () => {
   const [hasNewVersion, setHasNewVersion] = useState(false);
+  const [latestServerVersion, setLatestServerVersion] = useState<string>('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const currentRunningVersionRef = useRef<string>('');
 
   useEffect(() => {
-    // Current runtime build identifier (injected during Vite compilation or fallback to initial fetch)
-    let currentVersion = typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : '';
+    // Determine the active compiled version
+    const compiledVersion = typeof __APP_BUILD_TIME__ !== 'undefined' && __APP_BUILD_TIME__
+      ? __APP_BUILD_TIME__
+      : '';
+
+    const storedVersion = localStorage.getItem(VERSION_STORAGE_KEY) || '';
+
+    // The current active version is the compiled bundle build time, or the previously acknowledged version
+    const currentActive = compiledVersion || storedVersion;
+    currentRunningVersionRef.current = currentActive;
+
+    // If compiledVersion is known and differs from stored, sync storage on fresh load
+    if (compiledVersion && compiledVersion !== storedVersion) {
+      localStorage.setItem(VERSION_STORAGE_KEY, compiledVersion);
+      currentRunningVersionRef.current = compiledVersion;
+    }
 
     const checkVersion = async () => {
       try {
@@ -26,11 +45,23 @@ export const VersionChecker: React.FC = () => {
 
         const data = await response.json();
         if (data && data.version) {
-          if (!currentVersion) {
-            currentVersion = data.version;
-          } else if (data.version !== currentVersion) {
-            // New version detected
+          const serverVer = String(data.version).trim();
+          const activeVer = String(currentRunningVersionRef.current).trim();
+
+          // First run initialization if no active version was set yet
+          if (!activeVer) {
+            currentRunningVersionRef.current = serverVer;
+            localStorage.setItem(VERSION_STORAGE_KEY, serverVer);
+            setHasNewVersion(false);
+            return;
+          }
+
+          // Strict comparison: Only show banner if server version is genuinely different from active version
+          if (serverVer && serverVer !== activeVer) {
+            setLatestServerVersion(serverVer);
             setHasNewVersion(true);
+          } else {
+            setHasNewVersion(false);
           }
         }
       } catch {
@@ -38,13 +69,13 @@ export const VersionChecker: React.FC = () => {
       }
     };
 
-    // 1. Initial check after 3 seconds
+    // 1. Initial check after 3 seconds of load
     const initialTimer = setTimeout(() => {
       checkVersion();
     }, 3000);
 
-    // 2. Periodic background check every 2 minutes
-    const interval = setInterval(checkVersion, 2 * 60 * 1000);
+    // 2. Periodic background check every 3 minutes
+    const interval = setInterval(checkVersion, 3 * 60 * 1000);
 
     // 3. Tab visibility check (when user switches back to this tab)
     const handleVisibilityChange = () => {
@@ -62,12 +93,11 @@ export const VersionChecker: React.FC = () => {
         errorMsg.includes('Importing a module script failed') ||
         errorMsg.includes('Loading chunk')
       ) {
-        // Force refresh to clear stale script references
-        const reloadKey = 'pbc_last_chunk_reload';
-        const lastReload = sessionStorage.getItem(reloadKey);
+        // Force clean refresh to clear stale script references
+        const lastReload = sessionStorage.getItem(LAST_RELOAD_KEY);
         const now = Date.now();
         if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
-          sessionStorage.setItem(reloadKey, String(now));
+          sessionStorage.setItem(LAST_RELOAD_KEY, String(now));
           window.location.reload();
         }
       }
@@ -85,12 +115,28 @@ export const VersionChecker: React.FC = () => {
     };
   }, []);
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     setIsUpdating(true);
-    // Perform clean reload
+    try {
+      // 1. Persist the new server version so upon reload currentVersion === serverVersion
+      if (latestServerVersion) {
+        localStorage.setItem(VERSION_STORAGE_KEY, latestServerVersion);
+        currentRunningVersionRef.current = latestServerVersion;
+      }
+
+      // 2. Clear caches if CacheStorage API is available
+      if ('caches' in window) {
+        const cacheKeys = await window.caches.keys();
+        await Promise.all(cacheKeys.map(key => window.caches.delete(key)));
+      }
+    } catch {
+      // Ignore cache clearing errors
+    }
+
+    // 3. Clean reload with cache bypass
     setTimeout(() => {
       window.location.reload();
-    }, 200);
+    }, 250);
   };
 
   if (!hasNewVersion) return null;
