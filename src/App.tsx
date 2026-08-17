@@ -18,6 +18,7 @@ import { TrashBoxModal } from './components/Admin/TrashBoxModal';
 import { MobileFrame } from './components/Common/MobileFrame';
 import { MaintenanceNoticeScreen } from './components/Common/MaintenanceNoticeScreen';
 import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
+import { VersionChecker } from './components/Common/VersionChecker';
 
 const MainContent: React.FC = () => {
   const {
@@ -129,6 +130,7 @@ export default function App() {
 
   return (
     <AppProvider>
+      <VersionChecker />
       {!isSplashComplete ? (
         <Splash onComplete={() => setIsSplashComplete(true)} />
       ) : (
