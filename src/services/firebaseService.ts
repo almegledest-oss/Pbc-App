@@ -519,7 +519,7 @@ export function subscribeMembers(callback: (members: Member[]) => void) {
     const list: Member[] = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
       return {
-        id: docSnap.id,
+        id: data.id || data.memberId || docSnap.id,
         fullName: data.fullName || '',
         fullNameBn: data.fullNameBn || '',
         phone: data.phone || '',

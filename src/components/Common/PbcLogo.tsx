@@ -10,7 +10,7 @@ interface PbcLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'custom';
 }
 
-const DEFAULT_OFFICIAL_LOGO = '/logo.png';
+const DEFAULT_OFFICIAL_LOGO = '/logo.svg';
 
 export const PbcLogo: React.FC<PbcLogoProps> = ({ 
   className = "w-16 h-16", 
@@ -53,7 +53,7 @@ export const PbcLogo: React.FC<PbcLogoProps> = ({
   // 1. Direct prop (customLogoUrl)
   // 2. Context / database logo (contextLogoUrl)
   // 3. LocalStorage cached logo
-  // 4. Default instant /logo.png
+  // 4. Default instant /logo.svg
   const activeCustomLogo = customLogoUrl || contextLogoUrl || cachedLogo;
   const displaySrc = (!imgError && activeCustomLogo) ? activeCustomLogo : DEFAULT_OFFICIAL_LOGO;
 

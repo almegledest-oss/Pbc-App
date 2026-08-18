@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 105" width="540" height="105" fill="none">
+  <defs>
+    <linearGradient id="pbcGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF4B8" />
+      <stop offset="30%" stop-color="#E8C14C" />
+      <stop offset="70%" stop-color="#DFB338" />
+      <stop offset="100%" stop-color="#9C7010" />
+    </linearGradient>
+    <linearGradient id="pbcTextGold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FFF8D0" />
+      <stop offset="100%" stop-color="#DFB338" />
+    </linearGradient>
+  </defs>
+
+  <!-- PBC Bold Stylized Monogram (Width: 260, Height: 90) -->
+  <!-- 'P' with Airplane -->
+  <path d="M 10 10 L 80 10 C 115 10 115 58 80 58 L 46 58 L 46 95 L 10 95 Z M 46 28 L 72 28 C 82 28 82 40 72 40 L 46 40 Z" fill="url(#pbcGold)" />
+  <!-- Airplane inside/overlapping P -->
+  <path d="M 42 34 L 56 34 L 66 22 L 72 22 L 68 34 L 84 34 L 88 30 L 92 30 L 90 35 L 92 40 L 88 40 L 84 36 L 68 36 L 72 48 L 66 48 L 56 36 L 42 36 Z" fill="#040D1B" />
+
+  <!-- 'B' with connecting tech slash -->
+  <path d="M 125 10 L 180 10 C 205 10 205 48 185 50 C 210 52 210 95 180 95 L 125 95 Z M 160 26 L 175 26 C 182 26 182 38 175 38 L 160 38 Z M 160 52 L 175 52 C 184 52 184 79 175 79 L 160 79 Z" fill="url(#pbcGold)" />
+
+  <!-- 'C' -->
+  <path d="M 285 30 L 255 30 C 220 30 220 75 255 75 L 285 75 L 285 95 L 255 95 C 190 95 190 10 255 10 L 285 10 Z" fill="url(#pbcGold)" />
+
+  <!-- Vertical Divider Line -->
+  <line x1="308" y1="10" x2="308" y2="95" stroke="url(#pbcGold)" stroke-width="4" stroke-linecap="round" />
+
+  <!-- PROBASHI BUSINESS CLUB Text in 3 Crisp Rows -->
+  <text x="325" y="34" fill="#FFFFFF" font-family="'Montserrat', 'Arial Black', sans-serif" font-size="24" font-weight="900" letter-spacing="1.5">PROBASHI</text>
+  <text x="325" y="62" fill="#FFFFFF" font-family="'Montserrat', 'Arial Black', sans-serif" font-size="24" font-weight="900" letter-spacing="1.5">BUSINESS</text>
+  <text x="325" y="90" fill="#FFFFFF" font-family="'Montserrat', 'Arial Black', sans-serif" font-size="24" font-weight="900" letter-spacing="1.5">CLUB</text>
+</svg>

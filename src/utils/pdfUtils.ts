@@ -105,9 +105,10 @@ export function replaceOklabInString(str: string): string {
 /**
  * Sanitizes all <style> elements and inline style attributes in cloned html2canvas document
  * so html2canvas's color parser does not crash on oklab/oklch color functions.
+ * Optimized to ONLY inspect target element and avoid expensive full-document layout reflows.
  */
-export function sanitizeOklabInDoc(clonedDoc: Document) {
-  // 1. Sanitize all <style> tags in cloned document
+export function sanitizeOklabInDoc(clonedDoc: Document, targetEl?: HTMLElement | null) {
+  // 1. Sanitize all <style> tags in cloned document (fast regex replacement)
   const styleElements = clonedDoc.querySelectorAll('style');
   styleElements.forEach((style) => {
     if (style.textContent && (style.textContent.includes('oklab') || style.textContent.includes('oklch') || style.textContent.includes('color-mix'))) {
@@ -115,36 +116,66 @@ export function sanitizeOklabInDoc(clonedDoc: Document) {
     }
   });
 
-  // 2. Walk elements to convert computed/inline styles containing oklab/oklch
-  const allElements = clonedDoc.querySelectorAll('*');
-  allElements.forEach((el) => {
+  // 2. Only inspect elements inside targetEl (not entire cloned document tree)
+  const container = targetEl || clonedDoc.body;
+  if (!container) return;
+
+  const elements = container.querySelectorAll('*');
+  elements.forEach((el) => {
     const htmlEl = el as HTMLElement;
-    if (!htmlEl.style) return;
+    if (!htmlEl.getAttribute) return;
 
     const styleAttr = htmlEl.getAttribute('style');
     if (styleAttr && (styleAttr.includes('oklab') || styleAttr.includes('oklch') || styleAttr.includes('color-mix'))) {
       htmlEl.setAttribute('style', replaceOklabInString(styleAttr));
     }
+  });
+}
 
-    try {
-      const computed = window.getComputedStyle(htmlEl);
-      ['color', 'background-color', 'border-color', 'outline-color', 'fill', 'stroke'].forEach((prop) => {
-        const val = computed.getPropertyValue(prop);
-        if (val && (val.includes('oklab') || val.includes('oklch') || val.includes('color-mix'))) {
-          const rgbVal = colorToRgb(val);
-          if (rgbVal) {
-            htmlEl.style.setProperty(prop, rgbVal, 'important');
-          }
-        }
-      });
-    } catch {
-      // ignore
+/**
+ * Fixes text clipping, letter-spacing distortion, and text-gradient bugs in cloned DOM for html2canvas.
+ * Targeted only on the captured element to maintain ultra-fast performance.
+ */
+export function sanitizeTextForCanvas(clonedDoc: Document, targetEl?: HTMLElement | null) {
+  const container = targetEl || clonedDoc.body;
+  if (!container) return;
+
+  const textElements = container.querySelectorAll('span, p, h1, h2, h3, h4, h5, h6, div, label, strong, b');
+  
+  textElements.forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    if (!htmlEl.style) return;
+    
+    // Fix letter spacing bug in html2canvas which slices characters horizontally
+    htmlEl.style.letterSpacing = '0px';
+    htmlEl.style.textRendering = 'geometricPrecision';
+    
+    // Keep mono font for codes/numbers if present, otherwise clean sans-serif
+    if (htmlEl.classList && (htmlEl.classList.contains('font-mono') || htmlEl.style.fontFamily.includes('mono'))) {
+      htmlEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+    }
+    
+    // Fix ONLY explicitly transparent bg-clip-text elements (do NOT overwrite normal dark/colored texts)
+    const isTextClip = (
+      (htmlEl.classList && (htmlEl.classList.contains('text-transparent') || htmlEl.classList.contains('bg-clip-text'))) ||
+      htmlEl.style.webkitBackgroundClip === 'text' ||
+      htmlEl.style.color === 'transparent'
+    );
+      
+    if (isTextClip) {
+      if (htmlEl.classList) {
+        htmlEl.classList.remove('text-transparent', 'bg-clip-text');
+      }
+      htmlEl.style.webkitBackgroundClip = 'initial';
+      htmlEl.style.backgroundClip = 'initial';
+      htmlEl.style.color = '#FDF0A6';
     }
   });
 }
 
 /**
- * Captures a DOM element to HTML5 canvas with automated oklab/oklch color sanitization.
+ * Captures a DOM element to HTML5 canvas with automated text and color sanitization.
+ * Uses high-performance settings (scale: 3 for ~300 DPI) to prevent browser lockup.
  */
 export async function captureElementToCanvas(
   el: HTMLElement, 
@@ -157,11 +188,14 @@ export async function captureElementToCanvas(
     logging: false,
     scrollY: 0,
     scrollX: 0,
+    backgroundColor: '#071220',
+    imageTimeout: 5000,
     ...options,
     onclone: (clonedDoc, element) => {
-      sanitizeOklabInDoc(clonedDoc);
+      sanitizeOklabInDoc(clonedDoc, element);
+      sanitizeTextForCanvas(clonedDoc, element);
 
-      // Strip 3D flip rotation classes globally from clonedDoc for clean unmirrored rendering
+      // Strip 3D flip rotation classes from clonedDoc for clean unmirrored rendering
       const rotatedEls = clonedDoc.querySelectorAll('.rotate-y-180, .transform-style-3d, .perspective-1000');
       rotatedEls.forEach((rEl) => {
         const htmlR = rEl as HTMLElement;
@@ -194,6 +228,7 @@ export async function captureElementToCanvas(
             if (htmlChild.style.opacity === '0') {
               htmlChild.style.opacity = '1';
             }
+            htmlChild.style.letterSpacing = '0px';
           }
         });
       }
