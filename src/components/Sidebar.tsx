@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useVersion } from '../context/VersionContext';
 import { t } from '../utils/translations';
 import { PbcLogo } from './Common/PbcLogo';
 import { PBCFramedAvatar } from './Common/PBCFramedAvatar';
+import { AppUpdateSettingCard } from './Common/AppUpdateSettingCard';
 import { 
   LayoutDashboard, 
   Users, 
@@ -48,6 +50,7 @@ export const Sidebar: React.FC = () => {
     activeSessions = []
   } = useApp();
   
+  const { hasNewVersion } = useVersion();
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const labels = t[language];
 
@@ -186,6 +189,12 @@ export const Sidebar: React.FC = () => {
                   <span className="text-[11px] text-slate-300 font-medium">System Online</span>
                 </div>
               </div>
+
+              {/* Desktop App Version Card */}
+              <div className="py-1">
+                <AppUpdateSettingCard compact />
+              </div>
+
               <button 
                 onClick={() => logout()}
                 className="w-full py-2 px-3 bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-rose-500/30 cursor-pointer shadow-xs active:scale-95"
@@ -226,16 +235,24 @@ export const Sidebar: React.FC = () => {
           );
         })}
 
-        {/* 5th Button: MORE (মোর) */}
+        {/* 5th Button: MORE (মোর) with Update Badge */}
         <button
           onClick={() => setIsMoreOpen(!isMoreOpen)}
-          className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
+          className={`relative flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
             isMoreOpen
               ? 'bg-amber-500/25 text-amber-300 font-extrabold border border-amber-400/60 shadow-md shadow-amber-500/30'
               : 'text-slate-400 hover:text-amber-200'
           }`}
         >
-          <MoreHorizontal className={`w-5 h-5 ${isMoreOpen ? 'text-amber-300 animate-bounce' : 'text-slate-400'}`} />
+          <div className="relative">
+            <MoreHorizontal className={`w-5 h-5 ${isMoreOpen ? 'text-amber-300 animate-bounce' : 'text-slate-400'}`} />
+            {hasNewVersion && (
+              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+            )}
+          </div>
           <span className="text-[10px] tracking-tight whitespace-nowrap font-bold">
             {language === 'bn' ? 'আরো' : 'More'}
           </span>
@@ -567,7 +584,15 @@ export const Sidebar: React.FC = () => {
               </div>
             </div>
 
-            {/* Section 3: Sign Out Action */}
+            {/* Section 3: App Version & Updates */}
+            <div>
+              <p className="text-[11px] font-extrabold text-amber-400/80 uppercase tracking-wider mb-2">
+                {language === 'bn' ? 'অ্যাপ ভার্সন ও আপডেট সেটিংস' : 'App Version & Update'}
+              </p>
+              <AppUpdateSettingCard />
+            </div>
+
+            {/* Section 4: Sign Out Action */}
             <div className="pt-2">
               <button
                 onClick={() => {

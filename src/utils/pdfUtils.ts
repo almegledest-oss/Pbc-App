@@ -67,52 +67,94 @@ export function oklchToRgb(oklchStr: string): string | null {
 }
 
 /**
- * Converts modern CSS colors (oklab, oklch, color-mix) into standard rgb/hex colors
+ * Converts modern CSS colors (oklab, oklch, color-mix, color, lab, lch, hwb, light-dark) into standard rgb/hex colors
  * supported by html2canvas CSS parser.
  */
 export function colorToRgb(colorStr: string): string {
   if (!colorStr) return '';
-  if (!colorStr.includes('oklab') && !colorStr.includes('oklch') && !colorStr.includes('color-mix')) {
+  const trimmed = colorStr.trim();
+  if (
+    !trimmed.includes('oklab') &&
+    !trimmed.includes('oklch') &&
+    !trimmed.includes('color-mix') &&
+    !trimmed.includes('color(') &&
+    !trimmed.includes('lab(') &&
+    !trimmed.includes('lch(') &&
+    !trimmed.includes('hwb(') &&
+    !trimmed.includes('light-dark(')
+  ) {
     return colorStr;
   }
 
-  // Try math parser first
-  const mathConverted = oklchToRgb(colorStr);
+  // Try math parser first for oklch
+  const mathConverted = oklchToRgb(trimmed);
   if (mathConverted) return mathConverted;
 
   if (canvasCtx) {
     try {
       canvasCtx.fillStyle = '#000000';
-      canvasCtx.fillStyle = colorStr;
+      canvasCtx.fillStyle = trimmed;
       const resolved = canvasCtx.fillStyle;
-      if (resolved && resolved !== '#000000' && !resolved.includes('oklab') && !resolved.includes('oklch')) {
+      if (
+        resolved &&
+        resolved !== '#000000' &&
+        !resolved.includes('oklab') &&
+        !resolved.includes('oklch') &&
+        !resolved.includes('color(') &&
+        !resolved.includes('lab(') &&
+        !resolved.includes('color-mix')
+      ) {
         return resolved;
       }
     } catch {
       // ignore
     }
   }
-  return '';
+
+  if (trimmed.includes('transparent') || trimmed.includes('/ 0')) {
+    return 'rgba(0,0,0,0)';
+  }
+  return '#888888';
 }
 
-export function replaceOklabInString(str: string): string {
+/**
+ * Replaces modern color functions in any CSS string with standard sRGB/RGBA.
+ * Handles nested parentheses up to 3 levels deep (e.g., color-mix(in srgb, color(display-p3 ...))).
+ */
+export function replaceModernColorsInString(str: string): string {
   if (!str) return str;
-  return str.replace(/(oklab|oklch|color-mix)\([^)]+\)/gi, (match) => {
+  if (
+    !str.includes('oklab') &&
+    !str.includes('oklch') &&
+    !str.includes('color-mix') &&
+    !str.includes('color(') &&
+    !str.includes('lab(') &&
+    !str.includes('lch(') &&
+    !str.includes('hwb(') &&
+    !str.includes('light-dark(')
+  ) {
+    return str;
+  }
+
+  const modernColorRegex = /\b(oklab|oklch|color-mix|color|lab|lch|hwb|light-dark)\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/gi;
+  return str.replace(modernColorRegex, (match) => {
     return colorToRgb(match) || '#888888';
   });
 }
 
+export const replaceOklabInString = replaceModernColorsInString;
+
 /**
  * Sanitizes all <style> elements and inline style attributes in cloned html2canvas document
- * so html2canvas's color parser does not crash on oklab/oklch color functions.
+ * so html2canvas's color parser does not crash on oklab/oklch/color color functions.
  * Optimized to ONLY inspect target element and avoid expensive full-document layout reflows.
  */
 export function sanitizeOklabInDoc(clonedDoc: Document, targetEl?: HTMLElement | null) {
   // 1. Sanitize all <style> tags in cloned document (fast regex replacement)
   const styleElements = clonedDoc.querySelectorAll('style');
   styleElements.forEach((style) => {
-    if (style.textContent && (style.textContent.includes('oklab') || style.textContent.includes('oklch') || style.textContent.includes('color-mix'))) {
-      style.textContent = replaceOklabInString(style.textContent);
+    if (style.textContent) {
+      style.textContent = replaceModernColorsInString(style.textContent);
     }
   });
 
@@ -126,8 +168,11 @@ export function sanitizeOklabInDoc(clonedDoc: Document, targetEl?: HTMLElement |
     if (!htmlEl.getAttribute) return;
 
     const styleAttr = htmlEl.getAttribute('style');
-    if (styleAttr && (styleAttr.includes('oklab') || styleAttr.includes('oklch') || styleAttr.includes('color-mix'))) {
-      htmlEl.setAttribute('style', replaceOklabInString(styleAttr));
+    if (styleAttr) {
+      const sanitized = replaceModernColorsInString(styleAttr);
+      if (sanitized !== styleAttr) {
+        htmlEl.setAttribute('style', sanitized);
+      }
     }
   });
 }
@@ -140,7 +185,7 @@ export function sanitizeTextForCanvas(clonedDoc: Document, targetEl?: HTMLElemen
   const container = targetEl || clonedDoc.body;
   if (!container) return;
 
-  const textElements = container.querySelectorAll('span, p, h1, h2, h3, h4, h5, h6, div, label, strong, b');
+  const textElements = container.querySelectorAll('span, p, h1, h2, h3, h4, h5, h6, label, strong, b');
   
   textElements.forEach((el) => {
     const htmlEl = el as HTMLElement;
@@ -149,17 +194,21 @@ export function sanitizeTextForCanvas(clonedDoc: Document, targetEl?: HTMLElemen
     // Fix letter spacing bug in html2canvas which slices characters horizontally
     htmlEl.style.letterSpacing = '0px';
     htmlEl.style.textRendering = 'geometricPrecision';
+    htmlEl.style.overflow = 'visible';
+    
+    // Ensure sufficient line-height so descenders/ascenders are NEVER clipped
+    if (!htmlEl.style.lineHeight || htmlEl.style.lineHeight === 'normal' || htmlEl.style.lineHeight === '1') {
+      htmlEl.style.lineHeight = '1.35';
+    }
     
     // Keep mono font for codes/numbers if present, otherwise clean sans-serif
-    if (htmlEl.classList && (htmlEl.classList.contains('font-mono') || htmlEl.style.fontFamily.includes('mono'))) {
+    if (htmlEl.classList && (htmlEl.classList.contains('font-mono') || (htmlEl.style.fontFamily && htmlEl.style.fontFamily.includes('mono')))) {
       htmlEl.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
     }
     
     // Fix ONLY explicitly transparent bg-clip-text elements (do NOT overwrite normal dark/colored texts)
     const isTextClip = (
-      (htmlEl.classList && (htmlEl.classList.contains('text-transparent') || htmlEl.classList.contains('bg-clip-text'))) ||
-      htmlEl.style.webkitBackgroundClip === 'text' ||
-      htmlEl.style.color === 'transparent'
+      (htmlEl.classList && htmlEl.classList.contains('text-transparent') && (htmlEl.classList.contains('bg-clip-text') || htmlEl.classList.contains('bg-gradient-to-r')))
     );
       
     if (isTextClip) {
@@ -174,22 +223,95 @@ export function sanitizeTextForCanvas(clonedDoc: Document, targetEl?: HTMLElemen
 }
 
 /**
+ * Safely converts an image URL (Firebase, remote, or blob) into a local base64 Data URL.
+ * Prevents canvas tainting (SecurityError) on mobile Safari and Chrome.
+ */
+export async function urlToSafeDataUrl(url?: string): Promise<string> {
+  if (!url) return '';
+  if (url.startsWith('data:image/')) return url;
+
+  try {
+    const res = await fetch(url, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      return await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string || url);
+        reader.onerror = () => resolve(url);
+        reader.readAsDataURL(blob);
+      });
+    }
+  } catch {
+    // Network fetch fallback
+  }
+
+  // Canvas drawing fallback
+  return new Promise<string>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = img.naturalWidth || img.width || 200;
+        c.height = img.naturalHeight || img.height || 200;
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          resolve(c.toDataURL('image/png'));
+          return;
+        }
+      } catch {
+        // Tainted canvas fallback
+      }
+      resolve(url);
+    };
+    img.onerror = () => resolve(url);
+    img.src = url;
+  });
+}
+
+/**
+ * Universally triggers file download using Blob URLs.
+ * Fully compatible with iOS Safari, Android Chrome, and all desktop browsers.
+ */
+export function triggerFileDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    try {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Clean up silently
+    }
+  }, 1500);
+}
+
+/**
  * Captures a DOM element to HTML5 canvas with automated text and color sanitization.
- * Uses high-performance settings (scale: 3 for ~300 DPI) to prevent browser lockup.
+ * Prevents canvas tainting so toDataURL never throws SecurityError.
  */
 export async function captureElementToCanvas(
   el: HTMLElement, 
   options: Partial<Parameters<typeof html2canvas>[1]> = {}
 ) {
+  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const defaultScale = isMobile ? 2.5 : 3;
+
   return await html2canvas(el, {
-    scale: 3,
+    scale: defaultScale,
     useCORS: true,
-    allowTaint: true,
+    allowTaint: false,
     logging: false,
     scrollY: 0,
     scrollX: 0,
-    backgroundColor: '#071220',
-    imageTimeout: 5000,
+    backgroundColor: '#040D1B',
+    imageTimeout: 8000,
     ...options,
     onclone: (clonedDoc, element) => {
       sanitizeOklabInDoc(clonedDoc, element);
@@ -210,6 +332,10 @@ export async function captureElementToCanvas(
         element.style.transform = 'none';
         element.style.webkitTransform = 'none';
         element.style.opacity = '1';
+        element.style.position = 'relative';
+        element.style.left = '0px';
+        element.style.top = '0px';
+        element.style.visibility = 'visible';
         element.classList.remove('rotate-y-180', 'opacity-0', 'pointer-events-none');
 
         const children = element.querySelectorAll('*');

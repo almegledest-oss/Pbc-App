@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Member } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
 import { 
@@ -21,10 +21,11 @@ import {
   PbcAirplaneHeaderLogo, 
   PbcCircularLogo,
   PbcShieldCrest, 
-  PbcGoldSealMedallion 
+  PbcGoldSealMedallion,
+  PbcWatermarkLogo
 } from './PbcCardGraphics';
 import jsPDF from 'jspdf';
-import { captureElementToCanvas } from '../../utils/pdfUtils';
+import { captureElementToCanvas, urlToSafeDataUrl, triggerFileDownload } from '../../utils/pdfUtils';
 
 interface DigitalCardProps {
   member: Member;
@@ -36,6 +37,24 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
   const [downloading, setDownloading] = useState(false);
   const [downloadingA4, setDownloadingA4] = useState(false);
   const [downloadingImage, setDownloadingImage] = useState(false);
+  const [safeMemberPhoto, setSafeMemberPhoto] = useState<string>(member.photoUrl || '');
+
+  // Pre-convert member photo to safe base64 Data URL to prevent mobile CORS / taint canvas crashes
+  useEffect(() => {
+    let isMounted = true;
+    if (member.photoUrl) {
+      urlToSafeDataUrl(member.photoUrl).then((safeUrl) => {
+        if (isMounted && safeUrl) {
+          setSafeMemberPhoto(safeUrl);
+        }
+      });
+    } else {
+      setSafeMemberPhoto('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80');
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [member.photoUrl]);
 
   const handlePrint = () => {
     window.print();
@@ -47,10 +66,18 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloading(true);
 
     try {
+      // Ensure photo is converted if not already
+      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
+        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
+        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      }
+
       const frontEl = document.getElementById(`export-front-${member.id}`);
       const backEl = document.getElementById(`export-back-${member.id}`);
 
-      if (!frontEl || !backEl) return;
+      if (!frontEl || !backEl) {
+        throw new Error('Export elements not found');
+      }
 
       // CR80 Portrait Card format: 53.98mm × 85.60mm
       const pdf = new jsPDF({
@@ -59,27 +86,19 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         format: [53.98, 85.60]
       });
 
-      // Ultra-HD Retina Canvas Capture (Scale 3: ~300 DPI - optimal crispness without browser hang)
-      const canvasFront = await captureElementToCanvas(frontEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#040D1B'
-      });
+      // Canvas Capture (Mobile-optimized crisp resolution without memory overflow)
+      const canvasFront = await captureElementToCanvas(frontEl);
       const imgFront = canvasFront.toDataURL('image/png', 0.95);
       pdf.addImage(imgFront, 'PNG', 0, 0, 53.98, 85.60, undefined, 'FAST');
 
       pdf.addPage([53.98, 85.60], 'portrait');
-      const canvasBack = await captureElementToCanvas(backEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#040D1B'
-      });
+      const canvasBack = await captureElementToCanvas(backEl);
       const imgBack = canvasBack.toDataURL('image/png', 0.95);
       pdf.addImage(imgBack, 'PNG', 0, 0, 53.98, 85.60, undefined, 'FAST');
 
-      pdf.save(`PBC_Member_Card_${displayMemberId}.pdf`);
+      // Universal Mobile & Desktop Blob Download
+      const pdfBlob = pdf.output('blob');
+      triggerFileDownload(pdfBlob, `PBC_Member_Card_${displayMemberId}.pdf`);
     } catch (err) {
       console.error('Failed to download ID card PDF:', err);
       alert('Could not generate PDF. Please try again.');
@@ -94,10 +113,17 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloadingA4(true);
 
     try {
+      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
+        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
+        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      }
+
       const frontEl = document.getElementById(`export-front-${member.id}`);
       const backEl = document.getElementById(`export-back-${member.id}`);
 
-      if (!frontEl || !backEl) return;
+      if (!frontEl || !backEl) {
+        throw new Error('Export elements not found');
+      }
 
       // A4 format: 210mm × 297mm
       const pdf = new jsPDF({
@@ -106,20 +132,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         format: 'a4'
       });
 
-      const canvasFront = await captureElementToCanvas(frontEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#040D1B'
-      });
+      const canvasFront = await captureElementToCanvas(frontEl);
       const imgFront = canvasFront.toDataURL('image/png', 0.95);
 
-      const canvasBack = await captureElementToCanvas(backEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#040D1B'
-      });
+      const canvasBack = await captureElementToCanvas(backEl);
       const imgBack = canvasBack.toDataURL('image/png', 0.95);
 
       // Card Dimensions in mm
@@ -197,7 +213,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
       pdf.setTextColor(180, 83, 9);
       pdf.text('FOLD HERE (ভাজের দাগ) ⮯', xFold + cardW, yFold - 4, { align: 'center' });
 
-      pdf.save(`PBC_Member_Card_A4_PrintSheet_${displayMemberId}.pdf`);
+      const pdfBlob = pdf.output('blob');
+      triggerFileDownload(pdfBlob, `PBC_Member_Card_A4_PrintSheet_${displayMemberId}.pdf`);
     } catch (err) {
       console.error('Failed to download A4 Print Sheet:', err);
       alert('Could not generate A4 sheet. Please try again.');
@@ -212,23 +229,32 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloadingImage(true);
 
     try {
+      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
+        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
+        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      }
+
       const activeEl = isFlipped 
         ? document.getElementById(`export-back-${member.id}`)
         : document.getElementById(`export-front-${member.id}`);
 
-      if (!activeEl) return;
+      if (!activeEl) {
+        throw new Error('Active export element not found');
+      }
 
-      const canvas = await captureElementToCanvas(activeEl, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#040D1B'
-      });
+      const canvas = await captureElementToCanvas(activeEl);
 
-      const link = document.createElement('a');
-      link.download = `PBC_Member_Card_${isFlipped ? 'Back' : 'Front'}_${displayMemberId}.png`;
-      link.href = canvas.toDataURL('image/png', 0.95);
-      link.click();
+      canvas.toBlob((blob) => {
+        if (blob) {
+          triggerFileDownload(blob, `PBC_Member_Card_${isFlipped ? 'Back' : 'Front'}_${displayMemberId}.png`);
+        } else {
+          const dataUrl = canvas.toDataURL('image/png', 0.95);
+          const link = document.createElement('a');
+          link.download = `PBC_Member_Card_${isFlipped ? 'Back' : 'Front'}_${displayMemberId}.png`;
+          link.href = dataUrl;
+          link.click();
+        }
+      }, 'image/png', 0.95);
     } catch (err) {
       console.error('Failed to download ID card image:', err);
       alert('Could not generate image. Please try again.');
@@ -271,8 +297,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     return dateStr;
   };
 
-  // Safe fallback photo
-  const memberPhotoSrc = member.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+  // Safe fallback photo with pre-converted Base64 URL support
+  const memberPhotoSrc = safeMemberPhoto || member.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
 
   return (
     <div className="flex flex-col items-center space-y-4 my-2 select-none w-full max-w-sm">
@@ -362,10 +388,15 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               className="absolute bottom-6 left-10 w-36 h-36 rounded-full border border-amber-400/20 pointer-events-none"
             />
 
+            {/* Official PBC Circular Watermark Logo behind Member Details (Image 1 placement) */}
+            <div className="absolute top-[310px] left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-0 flex items-center justify-center">
+              <PbcWatermarkLogo className="w-full h-full" opacity={0.16} />
+            </div>
+
             {/* 1. TOP HEADER */}
             <div className="relative z-10 text-center pb-1">
               <div className="flex items-center justify-center">
-                <PbcAirplaneHeaderLogo className="w-[195px] h-[40px]" />
+                <PbcAirplaneHeaderLogo className="w-[260px] max-w-[92%] h-[52px]" />
               </div>
 
               {/* TOGETHER WE RISE Slogan with flanking lines */}
@@ -430,16 +461,18 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
             </div>
 
-            {/* 3. MEMBER NAME (Centered & Large, Active Member text removed) */}
-            <div className="relative z-10 text-left my-1">
-              <h2 className="text-[17.5px] font-black text-white uppercase tracking-wide pb-0.5 block leading-tight truncate" style={{ letterSpacing: '0.5px' }}>
+            {/* 3. MEMBER NAME (Centered & Large with clear margin and line clearance) */}
+            <div className="relative z-10 text-left my-1 pb-1 border-b-[1.5px] border-[#DFB338]">
+              <h2 
+                className="text-[17.5px] font-black text-white uppercase tracking-wide block leading-normal truncate" 
+                style={{ letterSpacing: '0.5px', lineHeight: '1.3' }}
+              >
                 {member.fullName || 'RAKIB HOSSAIN'}
               </h2>
-              <div className="w-full h-[1.5px] bg-gradient-to-r from-[#DFB338] via-[#FFF0A5] to-transparent rounded-full mt-0.5"></div>
             </div>
 
-            {/* 4. MEMBER DETAILS LIST TABLE (Larger, beautifully spaced & centered) */}
-            <div className="relative z-10 my-1 text-[10px] flex flex-col space-y-0.5">
+            {/* 4. MEMBER DETAILS LIST TABLE (Larger, beautifully spaced & vertically centered) */}
+            <div className="relative z-10 my-0.5 text-[10px] flex flex-col space-y-0.5">
               
               {/* Country */}
               <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
@@ -447,10 +480,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                     <Globe className="w-2.5 h-2.5 text-[#FDF0A6]" />
                   </div>
-                  <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>COUNTRY</span>
+                  <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>COUNTRY</span>
                 </div>
-                <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+                <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                   {member.country || 'Saudi Arabia'}
                 </span>
               </div>
@@ -461,10 +494,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                     <Droplet className="w-2.5 h-2.5 text-[#FDF0A6]" />
                   </div>
-                  <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>BLOOD GROUP</span>
+                  <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>BLOOD GROUP</span>
                 </div>
-                <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-snug block" style={{ letterSpacing: '0px' }}>
+                <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
                   {member.bloodGroup || 'O+'}
                 </span>
               </div>
@@ -475,10 +508,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                     <Calendar className="w-2.5 h-2.5 text-[#FDF0A6]" />
                   </div>
-                  <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>DATE OF BIRTH</span>
+                  <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>DATE OF BIRTH</span>
                 </div>
-                <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-snug block" style={{ letterSpacing: '0px' }}>
+                <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
                   {formatDateDisplay(member.dateOfBirth)}
                 </span>
               </div>
@@ -489,10 +522,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                     <Phone className="w-2.5 h-2.5 text-[#FDF0A6]" />
                   </div>
-                  <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>MOBILE</span>
+                  <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>MOBILE</span>
                 </div>
-                <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-                <span className="font-mono font-bold text-white flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+                <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                   {member.phone || '0503342655'}
                 </span>
               </div>
@@ -503,10 +536,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                     <Mail className="w-2.5 h-2.5 text-[#FDF0A6]" />
                   </div>
-                  <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>EMAIL</span>
+                  <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>EMAIL</span>
                 </div>
-                <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-                <span className="font-mono text-[9px] font-semibold text-[#E2E8F0] flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+                <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                   {member.email || 'rakib.ahamed318749@gmail.com'}
                 </span>
               </div>
@@ -518,7 +551,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               
               {/* PBC Official Circular Logo */}
               <div className="shrink-0">
-                <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/60 p-0.5 bg-[#061224]" />
+                <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
               </div>
 
               <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
@@ -551,9 +584,9 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               boxSizing: 'border-box'
             }}
           >
-            {/* Top Right Faint Watermark Logo */}
-            <div className="absolute top-10 right-3 opacity-15 pointer-events-none">
-              <PbcCircularLogo className="w-36 h-36" />
+            {/* Official PBC Circular Watermark Logo in lower-middle area (Image 2 placement) */}
+            <div className="absolute top-[320px] left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-0 flex items-center justify-center">
+              <PbcWatermarkLogo className="w-full h-full" opacity={0.16} />
             </div>
 
             <div className="p-[16px] pb-0 flex flex-col justify-between h-full relative z-10 box-border">
@@ -561,7 +594,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               {/* 1. TOP HEADER (Identical to Front) */}
               <div className="text-center pb-1">
                 <div className="flex items-center justify-center">
-                  <PbcAirplaneHeaderLogo className="w-[195px] h-[40px]" />
+                  <PbcAirplaneHeaderLogo className="w-[260px] max-w-[92%] h-[52px]" />
                 </div>
 
                 {/* TOGETHER WE RISE Slogan */}
@@ -577,24 +610,34 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               {/* 2. FAMILY INFORMATION SECTION */}
               <div className="my-0.5 space-y-1.5">
                 
-                {/* Gold Capsule Header Badge with crisp dark text */}
+                {/* Gold Capsule Header Badge with guaranteed high-contrast dark text */}
                 <div 
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full shadow-md"
+                  className="inline-flex items-center px-3 py-1 rounded-full shadow-md border border-[#DFB338] relative"
                   style={{
                     background: 'linear-gradient(90deg, #DFB338 0%, #FFF0A5 50%, #C89722 100%)',
-                    color: '#040D1B'
+                    backgroundColor: '#DFB338'
                   }}
                 >
-                  <div className="w-4 h-4 rounded-full bg-[#040D1B] flex items-center justify-center shrink-0">
-                    <Users className="w-2.5 h-2.5 text-[#FDF0A6]" />
+                  <div 
+                    className="w-4 h-4 rounded-full bg-[#040D1B] flex items-center justify-center shrink-0 mr-1.5"
+                    style={{ backgroundColor: '#040D1B' }}
+                  >
+                    <Users className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                   </div>
-                  <span className="text-[9.5px] font-black uppercase leading-tight text-[#040D1B]" style={{ letterSpacing: '0.5px' }}>
+                  <span 
+                    className="text-[10px] font-black uppercase tracking-wide inline-block leading-normal" 
+                    style={{ 
+                      color: '#040D1B', 
+                      letterSpacing: '0.5px',
+                      fontWeight: 900
+                    }}
+                  >
                     FAMILY INFORMATION
                   </span>
                 </div>
 
                 {/* White Rounded Info Card */}
-                <div className="bg-white rounded-2xl border-2 border-[#DFB338] p-3 text-slate-900 shadow-xl space-y-1.5">
+                <div className="bg-white rounded-2xl border-2 border-[#DFB338] p-3.5 text-slate-900 shadow-xl space-y-1">
                   
                   {/* Nominee Name */}
                   <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
@@ -602,10 +645,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                       <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                         <User className="w-2.5 h-2.5 text-white" />
                       </div>
-                      <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>N. NAME</span>
+                      <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>N. NAME</span>
                     </div>
-                    <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                    <span className="font-bold text-slate-900 leading-snug flex-1 truncate" style={{ letterSpacing: '0px' }}>
+                    <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                    <span className="font-extrabold text-slate-900 leading-normal flex-1 truncate text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                       {member.familyInfoName || member.nomineeName || 'Bristi Akter'}
                     </span>
                   </div>
@@ -616,10 +659,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                       <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                         <Users className="w-2.5 h-2.5 text-white" />
                       </div>
-                      <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>RELATION</span>
+                      <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>RELATION</span>
                     </div>
-                    <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                    <span className="font-bold text-slate-900 leading-snug flex-1" style={{ letterSpacing: '0px' }}>
+                    <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                    <span className="font-extrabold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                       {member.familyInfoRelation || member.nomineeRelation || 'Wife'}
                     </span>
                   </div>
@@ -630,10 +673,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                       <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                         <Phone className="w-2.5 h-2.5 text-white" />
                       </div>
-                      <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>MOBILE</span>
+                      <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>MOBILE</span>
                     </div>
-                    <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                    <span className="font-mono font-bold text-slate-900 leading-snug flex-1" style={{ letterSpacing: '0px' }}>
+                    <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                    <span className="font-mono font-bold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                       {member.familyInfoMobile || member.nomineeMobile || '01871713907'}
                     </span>
                   </div>
@@ -644,10 +687,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                       <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                         <Home className="w-2.5 h-2.5 text-white" />
                       </div>
-                      <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>ADDRESS</span>
+                      <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>ADDRESS</span>
                     </div>
-                    <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                    <span className="font-semibold text-slate-800 text-[9.5px] leading-snug flex-1 truncate" style={{ letterSpacing: '0px' }}>
+                    <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                    <span className="font-bold text-slate-800 text-[10px] leading-normal flex-1 truncate" style={{ letterSpacing: '0px', color: '#1E293B' }}>
                       {member.familyInfoAddress || member.nomineeAddress || 'Gojaria,Nawabgonj,Dhaka'}
                     </span>
                   </div>
@@ -676,7 +719,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 {/* Official PBC Circular Logo Badge with EST. 2025 */}
                 <div className="flex items-center gap-2">
                   <div className="shrink-0">
-                    <PbcCircularLogo className="w-11 h-11 rounded-full shadow-md border-2 border-[#DFB338] p-0.5 bg-[#061224]" />
+                    <PbcCircularLogo className="w-11 h-11 rounded-full shadow-md border-2 border-[#DFB338] bg-[#061224]" />
                   </div>
                   <div className="text-left">
                     <span className="text-[8px] font-bold text-[#CBD5E1] block leading-none">EST.</span>
@@ -774,8 +817,9 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         {/* EXPORT FRONT */}
         <div 
           id={`export-front-${member.id}`}
-          className="w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
+          className="relative w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
           style={{
+            position: 'relative',
             backgroundColor: '#040D1B',
             backgroundImage: 'radial-gradient(circle at 85% 10%, #0D2342 0%, #040D1B 70%)',
             fontFamily: 'Arial, Helvetica, sans-serif',
@@ -814,10 +858,15 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             }}
           />
 
+          {/* Official PBC Circular Watermark Logo behind Member Details (Image 1 placement) */}
+          <div className="absolute top-[310px] left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-0 flex items-center justify-center">
+            <PbcWatermarkLogo className="w-full h-full" opacity={0.16} />
+          </div>
+
           {/* 1. TOP HEADER */}
           <div className="relative z-10 text-center pb-1">
             <div className="flex items-center justify-center">
-              <PbcAirplaneHeaderLogo className="w-[195px] h-[40px]" />
+              <PbcAirplaneHeaderLogo className="w-[260px] max-w-[92%] h-[52px]" />
             </div>
 
             {/* TOGETHER WE RISE Slogan with flanking lines */}
@@ -882,16 +931,18 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
           </div>
 
-          {/* 3. MEMBER NAME (Centered & Large, Active Member text removed) */}
-          <div className="relative z-10 text-left my-1">
-            <h2 className="text-[17.5px] font-black text-white uppercase tracking-wide pb-0.5 block leading-tight truncate" style={{ letterSpacing: '0.5px' }}>
+          {/* 3. MEMBER NAME (Centered & Large with clear margin and line clearance) */}
+          <div className="relative z-10 text-left my-1 pb-1 border-b-[1.5px] border-[#DFB338]">
+            <h2 
+              className="text-[17.5px] font-black text-white uppercase tracking-wide block leading-normal truncate" 
+              style={{ letterSpacing: '0.5px', lineHeight: '1.3' }}
+            >
               {member.fullName || 'RAKIB HOSSAIN'}
             </h2>
-            <div className="w-full h-[1.5px] bg-gradient-to-r from-[#DFB338] via-[#FFF0A5] to-transparent rounded-full mt-0.5"></div>
           </div>
 
-          {/* 4. MEMBER DETAILS LIST TABLE (Larger, beautifully spaced & centered) */}
-          <div className="relative z-10 my-1 text-[10px] flex flex-col space-y-0.5">
+          {/* 4. MEMBER DETAILS LIST TABLE (Larger, beautifully spaced & vertically centered) */}
+          <div className="relative z-10 my-0.5 text-[10px] flex flex-col space-y-0.5">
             
             {/* Country */}
             <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
@@ -899,10 +950,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                   <Globe className="w-2.5 h-2.5 text-[#FDF0A6]" />
                 </div>
-                <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>COUNTRY</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>COUNTRY</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                 {member.country || 'Saudi Arabia'}
               </span>
             </div>
@@ -913,10 +964,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                   <Droplet className="w-2.5 h-2.5 text-[#FDF0A6]" />
                 </div>
-                <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>BLOOD GROUP</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>BLOOD GROUP</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-snug block" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
                 {member.bloodGroup || 'O+'}
               </span>
             </div>
@@ -927,10 +978,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                   <Calendar className="w-2.5 h-2.5 text-[#FDF0A6]" />
                 </div>
-                <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>DATE OF BIRTH</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>DATE OF BIRTH</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-snug block" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
                 {formatDateDisplay(member.dateOfBirth)}
               </span>
             </div>
@@ -941,10 +992,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                   <Phone className="w-2.5 h-2.5 text-[#FDF0A6]" />
                 </div>
-                <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>MOBILE</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>MOBILE</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-              <span className="font-mono font-bold text-white flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+              <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                 {member.phone || '0503342655'}
               </span>
             </div>
@@ -955,10 +1006,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
                   <Mail className="w-2.5 h-2.5 text-[#FDF0A6]" />
                 </div>
-                <span className="font-bold text-[#FDF0A6] uppercase leading-snug block" style={{ letterSpacing: '0px' }}>EMAIL</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>EMAIL</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-snug">:</span>
-              <span className="font-mono text-[9px] font-semibold text-[#E2E8F0] flex-1 text-left leading-snug block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
+              <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
                 {member.email || 'rakib.ahamed318749@gmail.com'}
               </span>
             </div>
@@ -970,7 +1021,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             
             {/* PBC Official Circular Logo */}
             <div className="shrink-0">
-              <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/60 p-0.5 bg-[#061224]" />
+              <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
             </div>
 
             <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
@@ -991,17 +1042,18 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         {/* EXPORT BACK */}
         <div 
           id={`export-back-${member.id}`}
-          className="w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
+          className="relative w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
           style={{
+            position: 'relative',
             backgroundColor: '#040D1B',
             backgroundImage: 'radial-gradient(circle at 20% 20%, #0D2342 0%, #040D1B 75%)',
             fontFamily: 'Arial, Helvetica, sans-serif',
             boxSizing: 'border-box'
           }}
         >
-          {/* Top Right Faint Watermark Logo */}
-          <div className="absolute top-10 right-3 opacity-15">
-            <PbcCircularLogo className="w-36 h-36" />
+          {/* Official PBC Circular Watermark Logo in lower-middle area (Image 2 placement) */}
+          <div className="absolute top-[320px] left-1/2 -translate-x-1/2 w-44 h-44 pointer-events-none z-0 flex items-center justify-center">
+            <PbcWatermarkLogo className="w-full h-full" opacity={0.16} />
           </div>
 
           <div className="p-[16px] pb-0 flex flex-col justify-between h-full relative z-10 box-border">
@@ -1009,7 +1061,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             {/* 1. TOP HEADER (Identical to Front) */}
             <div className="text-center pb-1">
               <div className="flex items-center justify-center">
-                <PbcAirplaneHeaderLogo className="w-[195px] h-[40px]" />
+                <PbcAirplaneHeaderLogo className="w-[260px] max-w-[92%] h-[52px]" />
               </div>
 
               {/* TOGETHER WE RISE Slogan */}
@@ -1025,24 +1077,34 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             {/* 2. FAMILY INFORMATION SECTION */}
             <div className="my-0.5 space-y-1.5">
               
-              {/* Gold Capsule Header Badge */}
+              {/* Gold Capsule Header Badge with guaranteed high-contrast dark text */}
               <div 
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full shadow-md"
+                className="inline-flex items-center px-3 py-1 rounded-full shadow-md border border-[#DFB338] relative"
                 style={{
                   background: 'linear-gradient(90deg, #DFB338 0%, #FFF0A5 50%, #C89722 100%)',
-                  color: '#040D1B'
+                  backgroundColor: '#DFB338'
                 }}
               >
-                <div className="w-4 h-4 rounded-full bg-[#040D1B] flex items-center justify-center shrink-0">
-                  <Users className="w-2.5 h-2.5 text-[#FDF0A6]" />
+                <div 
+                  className="w-4 h-4 rounded-full bg-[#040D1B] flex items-center justify-center shrink-0 mr-1.5"
+                  style={{ backgroundColor: '#040D1B' }}
+                >
+                  <Users className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="text-[9.5px] font-black uppercase leading-tight text-[#040D1B]" style={{ letterSpacing: '0.5px' }}>
+                <span 
+                  className="text-[10px] font-black uppercase tracking-wide inline-block leading-normal" 
+                  style={{ 
+                    color: '#040D1B', 
+                    letterSpacing: '0.5px',
+                    fontWeight: 900
+                  }}
+                >
                   FAMILY INFORMATION
                 </span>
               </div>
 
               {/* White Rounded Info Card */}
-              <div className="bg-white rounded-2xl border-2 border-[#DFB338] p-3 text-slate-900 shadow-xl space-y-1.5">
+              <div className="bg-white rounded-2xl border-2 border-[#DFB338] p-3.5 text-slate-900 shadow-xl space-y-1">
                 
                 {/* Nominee Name */}
                 <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
@@ -1050,10 +1112,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                       <User className="w-2.5 h-2.5 text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>N. NAME</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>N. NAME</span>
                   </div>
-                  <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                  <span className="font-bold text-slate-900 leading-snug flex-1 truncate" style={{ letterSpacing: '0px' }}>
+                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                  <span className="font-extrabold text-slate-900 leading-normal flex-1 truncate text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                     {member.familyInfoName || member.nomineeName || 'Bristi Akter'}
                   </span>
                 </div>
@@ -1064,10 +1126,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                       <Users className="w-2.5 h-2.5 text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>RELATION</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>RELATION</span>
                   </div>
-                  <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                  <span className="font-bold text-slate-900 leading-snug flex-1" style={{ letterSpacing: '0px' }}>
+                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                  <span className="font-extrabold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                     {member.familyInfoRelation || member.nomineeRelation || 'Wife'}
                   </span>
                 </div>
@@ -1078,10 +1140,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                       <Phone className="w-2.5 h-2.5 text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>MOBILE</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>MOBILE</span>
                   </div>
-                  <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                  <span className="font-mono font-bold text-slate-900 leading-snug flex-1" style={{ letterSpacing: '0px' }}>
+                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                  <span className="font-mono font-bold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
                     {member.familyInfoMobile || member.nomineeMobile || '01871713907'}
                   </span>
                 </div>
@@ -1092,10 +1154,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
                       <Home className="w-2.5 h-2.5 text-white" />
                     </div>
-                    <span className="font-bold text-slate-800 uppercase leading-snug" style={{ letterSpacing: '0px' }}>ADDRESS</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>ADDRESS</span>
                   </div>
-                  <span className="font-bold text-slate-700 leading-snug px-1.5">:</span>
-                  <span className="font-semibold text-slate-800 text-[9.5px] leading-snug flex-1 truncate" style={{ letterSpacing: '0px' }}>
+                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
+                  <span className="font-bold text-slate-800 text-[10px] leading-normal flex-1 truncate" style={{ letterSpacing: '0px', color: '#1E293B' }}>
                     {member.familyInfoAddress || member.nomineeAddress || 'Gojaria,Nawabgonj,Dhaka'}
                   </span>
                 </div>
@@ -1124,7 +1186,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               {/* Official PBC Circular Logo Badge with EST. 2025 */}
               <div className="flex items-center gap-2">
                 <div className="shrink-0">
-                  <PbcCircularLogo className="w-11 h-11 rounded-full shadow-md border-2 border-[#DFB338] p-0.5 bg-[#061224]" />
+                  <PbcCircularLogo className="w-11 h-11 rounded-full shadow-md border-2 border-[#DFB338] bg-[#061224]" />
                 </div>
                 <div className="text-left">
                   <span className="text-[8px] font-bold text-[#CBD5E1] block leading-none">EST.</span>

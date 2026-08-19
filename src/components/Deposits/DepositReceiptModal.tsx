@@ -3,7 +3,7 @@ import { Deposit } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { X, Printer, Download, Receipt, CheckCircle, Loader2, Eye, ShieldCheck } from 'lucide-react';
 import jsPDF from 'jspdf';
-import { captureElementToCanvas } from '../../utils/pdfUtils';
+import { captureElementToCanvas, urlToSafeDataUrl } from '../../utils/pdfUtils';
 import { PbcLogo } from '../Common/PbcLogo';
 
 interface DepositReceiptModalProps {
@@ -33,15 +33,27 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
         window.print();
         return;
       }
+
+      // Convert attached receipt and signature to safe base64 if needed
+      let safeReceiptUrl = deposit.receiptUrl;
+      let safeSignatureUrl = deposit.approvedByAdminSignature;
+
+      if (deposit.receiptUrl && !deposit.receiptUrl.startsWith('data:image/')) {
+        safeReceiptUrl = await urlToSafeDataUrl(deposit.receiptUrl);
+      }
+      if (deposit.approvedByAdminSignature && !deposit.approvedByAdminSignature.startsWith('data:image/')) {
+        safeSignatureUrl = await urlToSafeDataUrl(deposit.approvedByAdminSignature);
+      }
+
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
       const canvas = await captureElementToCanvas(voucherEl, {
-        scale: 3,
+        scale: 2.5,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         backgroundColor: '#070D1B',
         scrollY: 0,
         scrollX: 0,
@@ -61,6 +73,12 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
             const attachedImg = clonedVoucher.querySelector('img[alt="Bank Deposit Receipt Voucher"]') as HTMLImageElement;
             if (attachedImg) {
               attachedImg.style.maxHeight = '140px';
+              if (safeReceiptUrl) attachedImg.src = safeReceiptUrl;
+            }
+
+            const sigImg = clonedVoucher.querySelector('img[alt="Authorized Admin Signature"]') as HTMLImageElement;
+            if (sigImg && safeSignatureUrl) {
+              sigImg.src = safeSignatureUrl;
             }
 
             if (clonedVoucher.parentElement) {

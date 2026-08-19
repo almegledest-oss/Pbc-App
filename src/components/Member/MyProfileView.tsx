@@ -4,6 +4,7 @@ import { t } from '../../utils/translations';
 import { DigitalCard } from '../Members/DigitalCard';
 import { uploadMemberPhoto } from '../../services/firebaseService';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
+import { AppUpdateSettingCard } from '../Common/AppUpdateSettingCard';
 import { 
   User, 
   Wallet, 
@@ -277,6 +278,11 @@ export const MyProfileView: React.FC = () => {
               <p className="text-xs text-slate-400 py-4 text-center">No deposit receipts recorded for this member profile yet.</p>
             )}
           </div>
+        </div>
+
+        {/* App Version & System Updates */}
+        <div className="pt-1">
+          <AppUpdateSettingCard />
         </div>
 
       </div>

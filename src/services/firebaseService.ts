@@ -224,6 +224,13 @@ export async function updateSystemSettingsDoc(settings: Partial<SystemSettings>)
       console.warn('Could not compress custom logo image:', e);
     }
   }
+  if (settingsData.customCardLogoUrl && settingsData.customCardLogoUrl.startsWith('data:image')) {
+    try {
+      settingsData.customCardLogoUrl = await compressDataUrlIfNeeded(settingsData.customCardLogoUrl, 600, 0.85);
+    } catch (e) {
+      console.warn('Could not compress custom card logo image:', e);
+    }
+  }
   if (settingsData.defaultFrameOverlayUrl && settingsData.defaultFrameOverlayUrl.startsWith('data:image')) {
     try {
       settingsData.defaultFrameOverlayUrl = await compressDataUrlIfNeeded(settingsData.defaultFrameOverlayUrl, 1000, 0.85);
@@ -1119,8 +1126,19 @@ export async function saveCardTemplateDoc(template: CardTemplateConfig): Promise
 // ----------------------------------------------------------------------
 // FIREBASE STORAGE UPLOAD FOR MEMBER PHOTOS & BACKGROUNDS
 // ----------------------------------------------------------------------
-export function compressImageToDataUrl(file: File, maxDim = 800, quality = 0.82): Promise<string> {
+export function compressImageToDataUrl(file: File, maxDim = 1200, quality = 0.9): Promise<string> {
   return new Promise((resolve, reject) => {
+    // If already an SVG, preserve 100% vector sharpness without rasterizing
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = (err) => reject(err);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const isPng = file.type === 'image/png' || file.name.toLowerCase().endsWith('.png');
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const rawUrl = e.target?.result as string;
@@ -1147,8 +1165,15 @@ export function compressImageToDataUrl(file: File, maxDim = 800, quality = 0.82)
           canvas.height = height;
           const ctx = canvas.getContext('2d');
           if (ctx) {
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
+            // Preserve PNG transparency and quality for logos
+            if (isPng) {
+              resolve(canvas.toDataURL('image/png'));
+            } else {
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            }
           } else {
             resolve(rawUrl);
           }
@@ -1164,14 +1189,21 @@ export function compressImageToDataUrl(file: File, maxDim = 800, quality = 0.82)
   });
 }
 
-export function compressDataUrlIfNeeded(dataUrl: string, maxDim = 800, quality = 0.7): Promise<string> {
+export function compressDataUrlIfNeeded(dataUrl: string, maxDim = 1200, quality = 0.85): Promise<string> {
   if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) {
     return Promise.resolve(dataUrl || '');
   }
 
-  if (dataUrl.length < 250000) {
+  // Preserve SVGs completely
+  if (dataUrl.startsWith('data:image/svg+xml')) {
     return Promise.resolve(dataUrl);
   }
+
+  if (dataUrl.length < 350000) {
+    return Promise.resolve(dataUrl);
+  }
+
+  const isPng = dataUrl.startsWith('data:image/png');
 
   return new Promise((resolve) => {
     const img = new Image();
@@ -1193,8 +1225,14 @@ export function compressDataUrlIfNeeded(dataUrl: string, maxDim = 800, quality =
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          if (isPng) {
+            resolve(canvas.toDataURL('image/png'));
+          } else {
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          }
         } else {
           resolve(dataUrl);
         }

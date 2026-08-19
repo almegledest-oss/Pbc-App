@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { VersionProvider } from './context/VersionContext';
 import { Splash } from './components/Splash';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -18,7 +19,6 @@ import { TrashBoxModal } from './components/Admin/TrashBoxModal';
 import { MobileFrame } from './components/Common/MobileFrame';
 import { MaintenanceNoticeScreen } from './components/Common/MaintenanceNoticeScreen';
 import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
-import { VersionChecker } from './components/Common/VersionChecker';
 
 const MainContent: React.FC = () => {
   const {
@@ -129,13 +129,14 @@ export default function App() {
   const [isSplashComplete, setIsSplashComplete] = useState(false);
 
   return (
-    <AppProvider>
-      <VersionChecker />
-      {!isSplashComplete ? (
-        <Splash onComplete={() => setIsSplashComplete(true)} />
-      ) : (
-        <MainContent />
-      )}
-    </AppProvider>
+    <VersionProvider>
+      <AppProvider>
+        {!isSplashComplete ? (
+          <Splash onComplete={() => setIsSplashComplete(true)} />
+        ) : (
+          <MainContent />
+        )}
+      </AppProvider>
+    </VersionProvider>
   );
 }

@@ -4,6 +4,7 @@ import { t } from '../../utils/translations';
 import { DepositReceiptModal } from '../Deposits/DepositReceiptModal';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { AdminSignatureModal } from './AdminSignatureModal';
+import { AppUpdateSettingCard } from '../Common/AppUpdateSettingCard';
 import { Deposit } from '../../types';
 import { 
   ShieldCheck, 
@@ -30,10 +31,12 @@ import {
   Clock,
   Eye,
   X,
+  CreditCard,
   Image as ImageIcon
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
+import { PbcAirplaneHeaderLogo } from '../Members/PbcCardGraphics';
 import { safeStorage } from '../../utils/safeStorage';
 
 export const AdminPanel: React.FC = () => {
@@ -806,7 +809,87 @@ export const AdminPanel: React.FC = () => {
                         </button>
                       ) : (
                         <span className="text-[11px] text-emerald-400 font-medium">
-                          ✓ Currently using default vector badge logo
+                          ✓ Currently using default official circular emblem (/logo.svg)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Dedicated ID Card Header Logo (Horizontal Luxury Banner) */}
+              <div className="p-4 bg-[#070D1B] border border-[#D4AF37]/30 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-amber-400" />
+                      <span>Dedicated ID Card Header Logo (আইডি কার্ডের বিশেষ লোগো)</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Only used for the luxury horizontal header at the top of the Member PVC ID Card (Airplane + PBC Monogram + PROBASHI BUSINESS CLUB).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
+                  {/* Card Logo Preview */}
+                  <div className="flex flex-col items-center gap-2 shrink-0">
+                    <div className="p-3 bg-[#040D1B] rounded-2xl shadow-md border border-[#D4AF37]/40 w-52 h-16 flex items-center justify-center">
+                      <PbcAirplaneHeaderLogo className="w-44 h-10" />
+                    </div>
+                    <span className="text-[10px] font-semibold text-slate-400">ID Card Header Preview</span>
+                  </div>
+
+                  {/* Upload Controls */}
+                  <div className="flex-1 space-y-3 w-full">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-1">
+                        Select Custom ID Card Logo (PNG / SVG / WebP)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert('Please select an image smaller than 5MB');
+                              return;
+                            }
+                            try {
+                              const compressedUrl = await compressImageToDataUrl(file, 1200, 0.95);
+                              if (compressedUrl && compressedUrl.length < 250 * 1024) {
+                                safeStorage.setItem('pbc_cached_custom_card_logo', compressedUrl);
+                              }
+                              await updateSystemSettings({ customCardLogoUrl: compressedUrl });
+                            } catch (err) {
+                              console.error('Failed to compress ID card logo:', err);
+                              alert('Failed to process image.');
+                            }
+                          }
+                        }}
+                        className="block w-full text-xs text-slate-300
+                          file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
+                          file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300
+                          hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      {systemSettings.customCardLogoUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            safeStorage.removeItem('pbc_cached_custom_card_logo');
+                            updateSystemSettings({ customCardLogoUrl: '' });
+                          }}
+                          className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"
+                        >
+                          Reset to Built-in Vector Header
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-emerald-400 font-medium">
+                          ✓ Currently using built-in high-definition Golden Airplane & PBC monogram vector
                         </span>
                       )}
                     </div>
@@ -910,6 +993,12 @@ export const AdminPanel: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Application Version & Update Control */}
+                <div className="pt-2">
+                  <AppUpdateSettingCard />
+                </div>
+
               </div>
             </div>
           )}

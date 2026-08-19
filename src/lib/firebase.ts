@@ -3,8 +3,6 @@ import { getAuth } from 'firebase/auth';
 import {
   initializeFirestore,
   getFirestore,
-  doc,
-  getDocFromServer,
   persistentLocalCache,
   persistentMultipleTabManager
 } from 'firebase/firestore';
@@ -21,7 +19,7 @@ const databaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestor
 let firestoreDb;
 try {
   firestoreDb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
     localCache: persistentLocalCache({
       tabManager: persistentMultipleTabManager()
     })
@@ -33,24 +31,5 @@ try {
 
 export const db = firestoreDb;
 export const storage = getStorage(app);
-
-// Connection test helper with graceful fallback
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    // Normal when initializing or when offline/unavailable
-    if (error instanceof Error && (error.message.includes('offline') || (error as any).code === 'unavailable')) {
-      console.info('Firestore operating with resilient local cache / offline queue.');
-    }
-  }
-}
-
-// Run test connection without blocking application startup
-if (typeof window !== 'undefined') {
-  setTimeout(() => {
-    testConnection().catch(() => {});
-  }, 1000);
-}
 
 export default app;

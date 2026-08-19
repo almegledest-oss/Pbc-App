@@ -21,6 +21,7 @@ export interface SystemSettings {
   requireAdminApproval?: boolean;
   noticeBoardText?: string;
   customLogoUrl?: string;
+  customCardLogoUrl?: string;
   defaultFrameOverlayUrl?: string;
   trashBoxAccessAdmins?: string[];
   maintenanceMode?: boolean;
