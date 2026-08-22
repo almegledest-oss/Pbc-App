@@ -66,10 +66,11 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloading(true);
 
     try {
-      // Ensure photo is converted if not already
-      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
-        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
-        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      // Pre-convert photo to base64 Data URL to guarantee 0% CORS / canvas tainting issues
+      const photoToConvert = member.photoUrl || member.idCardPhotoUrl || member.idCardFrontPhotoUrl;
+      const safePhoto = await urlToSafeDataUrl(photoToConvert);
+      if (safePhoto && safePhoto !== safeMemberPhoto) {
+        setSafeMemberPhoto(safePhoto);
       }
 
       const frontEl = document.getElementById(`export-front-${member.id}`);
@@ -77,6 +78,22 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
       if (!frontEl || !backEl) {
         throw new Error('Export elements not found');
+      }
+
+      // Synchronously ensure only the member portrait photo is updated before canvas capture
+      if (safePhoto) {
+        const photoEl = frontEl.querySelector<HTMLImageElement>(`#export-member-photo-${member.id}`) ||
+                        frontEl.querySelector<HTMLImageElement>('img[data-member-photo="true"]');
+        if (photoEl) {
+          photoEl.src = safePhoto;
+          if (!photoEl.complete) {
+            await new Promise<void>((res) => {
+              photoEl.onload = () => res();
+              photoEl.onerror = () => res();
+              setTimeout(res, 600);
+            });
+          }
+        }
       }
 
       // CR80 Portrait Card format: 53.98mm × 85.60mm
@@ -113,9 +130,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloadingA4(true);
 
     try {
-      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
-        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
-        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      const photoToConvert = member.photoUrl || member.idCardPhotoUrl || member.idCardFrontPhotoUrl;
+      const safePhoto = await urlToSafeDataUrl(photoToConvert);
+      if (safePhoto && safePhoto !== safeMemberPhoto) {
+        setSafeMemberPhoto(safePhoto);
       }
 
       const frontEl = document.getElementById(`export-front-${member.id}`);
@@ -123,6 +141,22 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
       if (!frontEl || !backEl) {
         throw new Error('Export elements not found');
+      }
+
+      // Synchronously ensure only the member portrait photo is updated before canvas capture
+      if (safePhoto) {
+        const photoEl = frontEl.querySelector<HTMLImageElement>(`#export-member-photo-${member.id}`) ||
+                        frontEl.querySelector<HTMLImageElement>('img[data-member-photo="true"]');
+        if (photoEl) {
+          photoEl.src = safePhoto;
+          if (!photoEl.complete) {
+            await new Promise<void>((res) => {
+              photoEl.onload = () => res();
+              photoEl.onerror = () => res();
+              setTimeout(res, 600);
+            });
+          }
+        }
       }
 
       // A4 format: 210mm × 297mm
@@ -229,9 +263,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
     setDownloadingImage(true);
 
     try {
-      if (member.photoUrl && !safeMemberPhoto.startsWith('data:image/')) {
-        const prePhoto = await urlToSafeDataUrl(member.photoUrl);
-        if (prePhoto) setSafeMemberPhoto(prePhoto);
+      const photoToConvert = member.photoUrl || member.idCardPhotoUrl || member.idCardFrontPhotoUrl;
+      const safePhoto = await urlToSafeDataUrl(photoToConvert);
+      if (safePhoto && safePhoto !== safeMemberPhoto) {
+        setSafeMemberPhoto(safePhoto);
       }
 
       const activeEl = isFlipped 
@@ -240,6 +275,21 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
       if (!activeEl) {
         throw new Error('Active export element not found');
+      }
+
+      if (!isFlipped && safePhoto) {
+        const photoEl = activeEl.querySelector<HTMLImageElement>(`#export-member-photo-${member.id}`) ||
+                        activeEl.querySelector<HTMLImageElement>('img[data-member-photo="true"]');
+        if (photoEl) {
+          photoEl.src = safePhoto;
+          if (!photoEl.complete) {
+            await new Promise<void>((res) => {
+              photoEl.onload = () => res();
+              photoEl.onerror = () => res();
+              setTimeout(res, 600);
+            });
+          }
+        }
       }
 
       const canvas = await captureElementToCanvas(activeEl);
@@ -299,6 +349,19 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
   // Safe fallback photo with pre-converted Base64 URL support
   const memberPhotoSrc = safeMemberPhoto || member.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80';
+
+  // Clean, structured text QR payload that every smartphone camera and scanner recognizes instantly
+  const qrCodePayload = member.qrCodeData || [
+    `PROBASHI BUSINESS CLUB (PBC)`,
+    `MEMBER: ${member.fullName || 'Member'}`,
+    `ID: ${displayMemberId}`,
+    member.batchNumber ? `BATCH: ${member.batchNumber}` : '',
+    member.country ? `COUNTRY: ${member.country}` : '',
+    member.bloodGroup ? `BLOOD: ${member.bloodGroup}` : '',
+    member.phone ? `PHONE: ${member.phone}` : '',
+    member.email ? `EMAIL: ${member.email}` : '',
+    `STATUS: VERIFIED ACTIVE MEMBER`
+  ].filter(Boolean).join('\n');
 
   return (
     <div className="flex flex-col items-center space-y-4 my-2 select-none w-full max-w-sm">
@@ -433,9 +496,9 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 {/* QR CODE BOX */}
                 <div className="bg-white p-1.5 rounded-xl border-2 border-[#DFB338] shadow-xl flex items-center justify-center w-[86px] h-[86px] shrink-0">
                   <QRCodeSVG 
-                    value={member.qrCodeData || `PBC-MEMBER:${member.id}:${member.fullName}:active`} 
+                    value={qrCodePayload} 
                     size={74} 
-                    level="H"
+                    level="M"
                     className="w-full h-full"
                   />
                 </div>
@@ -546,24 +609,38 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
 
             </div>
 
-            {/* 5. BOTTOM FOOTER (With Official Logo) */}
-            <div className="relative z-10 flex items-center gap-2.5 pt-1.5 border-t border-[#DFB338]/40 pb-0.5">
+            {/* 5. BOTTOM FOOTER (With Official Logo & Dynamic Batch Number) */}
+            <div className="relative z-10 flex items-center justify-between pt-1.5 border-t border-[#DFB338]/40 pb-0.5">
               
-              {/* PBC Official Circular Logo */}
-              <div className="shrink-0">
-                <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
+              <div className="flex items-center gap-2.5">
+                {/* PBC Official Circular Logo */}
+                <div className="shrink-0">
+                  <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
+                </div>
+
+                <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
+
+                <div className="text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9.5px] font-black text-[#FDF0A6] block leading-tight uppercase" style={{ letterSpacing: '0.5px' }}>
+                      {member.batchNumber ? `BATCH: ${member.batchNumber}` : 'PBC FAMILY'}
+                    </span>
+                  </div>
+                  <span className="text-[8px] font-bold text-[#E2E8F0] block leading-tight uppercase tracking-wider" style={{ letterSpacing: '0.5px' }}>
+                    ONE CLUB • ONE FAMILY
+                  </span>
+                </div>
               </div>
 
-              <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
-
-              <div className="text-left">
-                <span className="text-[9.5px] font-black text-[#FDF0A6] block leading-tight uppercase" style={{ letterSpacing: '0.5px' }}>
-                  PBC FAMILY
-                </span>
-                <span className="text-[8px] font-bold text-[#E2E8F0] block leading-tight uppercase tracking-wider" style={{ letterSpacing: '0.5px' }}>
-                  ONE CLUB • ONE FAMILY
-                </span>
-              </div>
+              {/* Small Batch Badge Indicator if specified */}
+              {member.batchNumber && (
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#DFB338]/20 to-[#DFB338]/40 border border-[#DFB338]/60 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#FDF0A6] animate-pulse"></span>
+                  <span className="text-[8.5px] font-black font-mono text-[#FDF0A6] uppercase tracking-wider">
+                    {member.batchNumber}
+                  </span>
+                </div>
+              )}
 
             </div>
 
@@ -649,7 +726,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     </div>
                     <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
                     <span className="font-extrabold text-slate-900 leading-normal flex-1 truncate text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                      {member.familyInfoName || member.nomineeName || 'Bristi Akter'}
+                      {member.familyInfoName || member.nomineeName || '-'}
                     </span>
                   </div>
 
@@ -663,7 +740,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     </div>
                     <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
                     <span className="font-extrabold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                      {member.familyInfoRelation || member.nomineeRelation || 'Wife'}
+                      {member.familyInfoRelation || member.nomineeRelation || '-'}
                     </span>
                   </div>
 
@@ -677,7 +754,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     </div>
                     <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
                     <span className="font-mono font-bold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                      {member.familyInfoMobile || member.nomineeMobile || '01871713907'}
+                      {member.familyInfoMobile || member.nomineeMobile || '-'}
                     </span>
                   </div>
 
@@ -691,7 +768,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     </div>
                     <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
                     <span className="font-bold text-slate-800 text-[10px] leading-normal flex-1 truncate" style={{ letterSpacing: '0px', color: '#1E293B' }}>
-                      {member.familyInfoAddress || member.nomineeAddress || 'Gojaria,Nawabgonj,Dhaka'}
+                      {member.familyInfoAddress || member.nomineeAddress || '-'}
                     </span>
                   </div>
 
@@ -807,12 +884,21 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
       </div>
 
       {/* ========================================================================= */}
-      {/* HIDDEN OFF-SCREEN PERFECT RENDER NODES (Guaranteed 0% Transform distortion) */}
+      {/* EXPORT RENDER NODES (Non-zero dimensions, zero opacity, no visual flicker) */}
       {/* ========================================================================= */}
       <div 
-        className="fixed top-0 left-[-9999px] pointer-events-none opacity-100" 
+        className="fixed top-0 left-0 pointer-events-none opacity-0" 
         aria-hidden="true"
-        style={{ zIndex: -9999 }}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          opacity: 0,
+          pointerEvents: 'none',
+          zIndex: -50,
+          width: '340px',
+          height: 'auto'
+        }}
       >
         {/* EXPORT FRONT */}
         <div 
@@ -889,7 +975,9 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             >
               <div className="w-full h-full bg-[#040D1B] rounded-[13px] overflow-hidden">
                 <img
-                  src={memberPhotoSrc}
+                  id={`export-member-photo-${member.id}`}
+                  data-member-photo="true"
+                  src={safeMemberPhoto || memberPhotoSrc}
                   alt={member.fullName}
                   className="w-full h-full object-cover object-top"
                   crossOrigin="anonymous"
@@ -903,9 +991,9 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               {/* QR CODE BOX */}
               <div className="bg-white p-1.5 rounded-xl border-2 border-[#DFB338] flex items-center justify-center w-[86px] h-[86px] shrink-0">
                 <QRCodeSVG 
-                  value={member.qrCodeData || `PBC-MEMBER:${member.id}:${member.fullName}:active`} 
+                  value={qrCodePayload} 
                   size={74} 
-                  level="H"
+                  level="M"
                   className="w-full h-full"
                 />
               </div>
@@ -945,95 +1033,109 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
           <div className="relative z-10 my-0.5 text-[10px] flex flex-col space-y-0.5">
             
             {/* Country */}
-            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
-              <div className="flex items-center gap-2 min-w-[115px] shrink-0">
-                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
-                  <Globe className="w-2.5 h-2.5 text-[#FDF0A6]" />
+            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(223, 179, 56, 0.3)' }}>
+              <div className="flex items-center gap-2 min-w-[115px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '115px', flexShrink: 0 }}>
+                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]" style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid #DFB338', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Globe className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>COUNTRY</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ color: '#FDF0A6', fontWeight: 800, letterSpacing: '0.3px', display: 'block', fontSize: '10px' }}>COUNTRY</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal" style={{ color: '#DFB338', fontWeight: 900, padding: '0 6px' }}>:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ color: '#FFFFFF', fontWeight: 700, flex: 1, textAlign: 'left', letterSpacing: '0px', display: 'block', fontSize: '10px' }}>
                 {member.country || 'Saudi Arabia'}
               </span>
             </div>
 
             {/* Blood Group */}
-            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
-              <div className="flex items-center gap-2 min-w-[115px] shrink-0">
-                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
-                  <Droplet className="w-2.5 h-2.5 text-[#FDF0A6]" />
+            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(223, 179, 56, 0.3)' }}>
+              <div className="flex items-center gap-2 min-w-[115px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '115px', flexShrink: 0 }}>
+                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]" style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid #DFB338', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Droplet className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>BLOOD GROUP</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ color: '#FDF0A6', fontWeight: 800, letterSpacing: '0.3px', display: 'block', fontSize: '10px' }}>BLOOD GROUP</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal" style={{ color: '#DFB338', fontWeight: 900, padding: '0 6px' }}>:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ color: '#FFFFFF', fontWeight: 700, flex: 1, textAlign: 'left', letterSpacing: '0px', display: 'block', fontSize: '10px' }}>
                 {member.bloodGroup || 'O+'}
               </span>
             </div>
 
             {/* Date of Birth */}
-            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
-              <div className="flex items-center gap-2 min-w-[115px] shrink-0">
-                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
-                  <Calendar className="w-2.5 h-2.5 text-[#FDF0A6]" />
+            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(223, 179, 56, 0.3)' }}>
+              <div className="flex items-center gap-2 min-w-[115px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '115px', flexShrink: 0 }}>
+                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]" style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid #DFB338', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Calendar className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>DATE OF BIRTH</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ color: '#FDF0A6', fontWeight: 800, letterSpacing: '0.3px', display: 'block', fontSize: '10px' }}>DATE OF BIRTH</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal" style={{ color: '#DFB338', fontWeight: 900, padding: '0 6px' }}>:</span>
+              <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ color: '#FFFFFF', fontWeight: 700, flex: 1, textAlign: 'left', letterSpacing: '0px', display: 'block', fontSize: '10px' }}>
                 {formatDateDisplay(member.dateOfBirth)}
               </span>
             </div>
 
             {/* Mobile */}
-            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30">
-              <div className="flex items-center gap-2 min-w-[115px] shrink-0">
-                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
-                  <Phone className="w-2.5 h-2.5 text-[#FDF0A6]" />
+            <div className="flex items-center justify-between py-1.5 border-b border-[#DFB338]/30" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(223, 179, 56, 0.3)' }}>
+              <div className="flex items-center gap-2 min-w-[115px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '115px', flexShrink: 0 }}>
+                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]" style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid #DFB338', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Phone className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>MOBILE</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ color: '#FDF0A6', fontWeight: 800, letterSpacing: '0.3px', display: 'block', fontSize: '10px' }}>MOBILE</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-              <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal" style={{ color: '#DFB338', fontWeight: 900, padding: '0 6px' }}>:</span>
+              <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ color: '#FFFFFF', fontWeight: 700, flex: 1, textAlign: 'left', letterSpacing: '0px', display: 'block', fontSize: '10px' }}>
                 {member.phone || '0503342655'}
               </span>
             </div>
 
             {/* Email */}
-            <div className="flex items-center justify-between py-1.5">
-              <div className="flex items-center gap-2 min-w-[115px] shrink-0">
-                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]">
-                  <Mail className="w-2.5 h-2.5 text-[#FDF0A6]" />
+            <div className="flex items-center justify-between py-1.5" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+              <div className="flex items-center gap-2 min-w-[115px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '115px', flexShrink: 0 }}>
+                <div className="w-4 h-4 rounded-[4px] border border-[#DFB338] flex items-center justify-center shrink-0 bg-[#061224]" style={{ width: '16px', height: '16px', borderRadius: '4px', border: '1px solid #DFB338', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Mail className="w-2.5 h-2.5 text-[#FDF0A6]" style={{ color: '#FDF0A6' }} />
                 </div>
-                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>EMAIL</span>
+                <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ color: '#FDF0A6', fontWeight: 800, letterSpacing: '0.3px', display: 'block', fontSize: '10px' }}>EMAIL</span>
               </div>
-              <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-              <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+              <span className="text-[#DFB338] font-black px-1.5 leading-normal" style={{ color: '#DFB338', fontWeight: 900, padding: '0 6px' }}>:</span>
+              <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ color: '#F1F5F9', fontWeight: 600, flex: 1, textAlign: 'left', letterSpacing: '0px', display: 'block', fontSize: '9.5px' }}>
                 {member.email || 'rakib.ahamed318749@gmail.com'}
               </span>
             </div>
 
           </div>
 
-          {/* 5. BOTTOM FOOTER (With Official Logo) */}
-          <div className="relative z-10 flex items-center gap-2.5 pt-1.5 border-t border-[#DFB338]/40 pb-0.5">
+          {/* 5. BOTTOM FOOTER (With Official Logo & Dynamic Batch Number) */}
+          <div className="relative z-10 flex items-center justify-between pt-1.5 border-t border-[#DFB338]/40 pb-0.5">
             
-            {/* PBC Official Circular Logo */}
-            <div className="shrink-0">
-              <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
+            <div className="flex items-center gap-2.5">
+              {/* PBC Official Circular Logo */}
+              <div className="shrink-0">
+                <PbcCircularLogo className="w-8 h-8 rounded-full shadow-md border border-[#DFB338]/80 bg-[#061224]" />
+              </div>
+
+              <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
+
+              <div className="text-left">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9.5px] font-black text-[#FDF0A6] block leading-tight uppercase" style={{ letterSpacing: '0.5px' }}>
+                    {member.batchNumber ? `BATCH: ${member.batchNumber}` : 'PBC FAMILY'}
+                  </span>
+                </div>
+                <span className="text-[8px] font-bold text-[#E2E8F0] block leading-tight uppercase tracking-wider" style={{ letterSpacing: '0.5px' }}>
+                  ONE CLUB • ONE FAMILY
+                </span>
+              </div>
             </div>
 
-            <div className="w-[1.5px] h-7 bg-gradient-to-b from-[#DFB338] to-transparent"></div>
-
-            <div className="text-left">
-              <span className="text-[9.5px] font-black text-[#FDF0A6] block leading-tight uppercase" style={{ letterSpacing: '0.5px' }}>
-                PBC FAMILY
-              </span>
-              <span className="text-[8px] font-bold text-[#E2E8F0] block leading-tight uppercase tracking-wider" style={{ letterSpacing: '0.5px' }}>
-                ONE CLUB • ONE FAMILY
-              </span>
-            </div>
+            {/* Small Batch Badge Indicator if specified */}
+            {member.batchNumber && (
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gradient-to-r from-[#DFB338]/20 to-[#DFB338]/40 border border-[#DFB338]/60 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#FDF0A6]"></span>
+                <span className="text-[8.5px] font-black font-mono text-[#FDF0A6] uppercase tracking-wider">
+                  {member.batchNumber}
+                </span>
+              </div>
+            )}
 
           </div>
 
@@ -1107,58 +1209,58 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
               <div className="bg-white rounded-2xl border-2 border-[#DFB338] p-3.5 text-slate-900 shadow-xl space-y-1">
                 
                 {/* Nominee Name */}
-                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
-                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                      <User className="w-2.5 h-2.5 text-white" />
+                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200" style={{ display: 'flex', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '90px', flexShrink: 0 }}>
+                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <User className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                     </div>
-                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>N. NAME</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A', fontWeight: 800, fontSize: '10px' }}>N. NAME</span>
                   </div>
-                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
-                  <span className="font-extrabold text-slate-900 leading-normal flex-1 truncate text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                    {member.familyInfoName || member.nomineeName || 'Bristi Akter'}
+                  <span className="font-bold text-slate-500 leading-normal px-1.5" style={{ color: '#64748B', fontWeight: 700, padding: '0 6px' }}>:</span>
+                  <span className="font-extrabold text-slate-900 leading-normal flex-1 truncate text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B', fontWeight: 800, fontSize: '10.5px', flex: 1, textAlign: 'left' }}>
+                    {member.familyInfoName || member.nomineeName || '-'}
                   </span>
                 </div>
 
                 {/* Relation */}
-                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
-                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                      <Users className="w-2.5 h-2.5 text-white" />
+                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200" style={{ display: 'flex', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '90px', flexShrink: 0 }}>
+                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Users className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                     </div>
-                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>RELATION</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A', fontWeight: 800, fontSize: '10px' }}>RELATION</span>
                   </div>
-                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
-                  <span className="font-extrabold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                    {member.familyInfoRelation || member.nomineeRelation || 'Wife'}
+                  <span className="font-bold text-slate-500 leading-normal px-1.5" style={{ color: '#64748B', fontWeight: 700, padding: '0 6px' }}>:</span>
+                  <span className="font-extrabold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B', fontWeight: 800, fontSize: '10.5px', flex: 1, textAlign: 'left' }}>
+                    {member.familyInfoRelation || member.nomineeRelation || '-'}
                   </span>
                 </div>
 
                 {/* Mobile */}
-                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
-                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                      <Phone className="w-2.5 h-2.5 text-white" />
+                <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200" style={{ display: 'flex', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #E2E8F0' }}>
+                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '90px', flexShrink: 0 }}>
+                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Phone className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                     </div>
-                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>MOBILE</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A', fontWeight: 800, fontSize: '10px' }}>MOBILE</span>
                   </div>
-                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
-                  <span className="font-mono font-bold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B' }}>
-                    {member.familyInfoMobile || member.nomineeMobile || '01871713907'}
+                  <span className="font-bold text-slate-500 leading-normal px-1.5" style={{ color: '#64748B', fontWeight: 700, padding: '0 6px' }}>:</span>
+                  <span className="font-mono font-bold text-slate-900 leading-normal flex-1 text-[10.5px]" style={{ letterSpacing: '0px', color: '#040D1B', fontWeight: 700, fontSize: '10.5px', flex: 1, textAlign: 'left' }}>
+                    {member.familyInfoMobile || member.nomineeMobile || '-'}
                   </span>
                 </div>
 
                 {/* Address */}
-                <div className="flex items-center text-[10px] pt-1.5">
-                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                      <Home className="w-2.5 h-2.5 text-white" />
+                <div className="flex items-center text-[10px] pt-1.5" style={{ display: 'flex', alignItems: 'center', padding: '6px 0 0 0' }}>
+                  <div className="flex items-center gap-1.5 min-w-[90px] shrink-0" style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: '90px', flexShrink: 0 }}>
+                    <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ width: '16px', height: '16px', borderRadius: '4px', backgroundColor: '#061224', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Home className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                     </div>
-                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>ADDRESS</span>
+                    <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A', fontWeight: 800, fontSize: '10px' }}>ADDRESS</span>
                   </div>
-                  <span className="font-bold text-slate-500 leading-normal px-1.5">:</span>
-                  <span className="font-bold text-slate-800 text-[10px] leading-normal flex-1 truncate" style={{ letterSpacing: '0px', color: '#1E293B' }}>
-                    {member.familyInfoAddress || member.nomineeAddress || 'Gojaria,Nawabgonj,Dhaka'}
+                  <span className="font-bold text-slate-500 leading-normal px-1.5" style={{ color: '#64748B', fontWeight: 700, padding: '0 6px' }}>:</span>
+                  <span className="font-bold text-slate-800 text-[10px] leading-normal flex-1 truncate" style={{ letterSpacing: '0px', color: '#1E293B', fontWeight: 700, fontSize: '10px', flex: 1, textAlign: 'left' }}>
+                    {member.familyInfoAddress || member.nomineeAddress || '-'}
                   </span>
                 </div>
 

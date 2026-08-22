@@ -19,14 +19,14 @@ export const PbcAirplaneHeaderLogo: React.FC<{ className?: string; color?: strin
   let cardLogoUrl = '';
   try {
     const { systemSettings } = useApp();
-    if (systemSettings?.customCardLogoUrl) {
+    if (systemSettings?.customCardLogoUrl && systemSettings.customCardLogoUrl.trim() !== '') {
       cardLogoUrl = systemSettings.customCardLogoUrl;
     }
   } catch {
     // AppContext might not be wrapped in isolated renderers
   }
 
-  // Fast local cache check for instant rendering without waiting for network
+  // Fast local cache check for custom uploaded logo
   const [cachedCardLogo, setCachedCardLogo] = useState<string | null>(() => {
     return safeStorage.getItem('pbc_cached_custom_card_logo');
   });
@@ -43,15 +43,13 @@ export const PbcAirplaneHeaderLogo: React.FC<{ className?: string; color?: strin
     }
   }, [cardLogoUrl]);
 
-  // Priority: 1. Admin custom uploaded logo, 2. Cached logo, 3. Default /header_logo.png from public folder
-  const activeCardLogo = cardLogoUrl || cachedCardLogo || DEFAULT_HEADER_LOGO;
-
-  // If a valid image is active (either custom upload or default public/header_logo.png)
-  if (activeCardLogo && !imgError && activeCardLogo !== '/logo.svg') {
+  // If a valid custom uploaded image is active
+  const activeCustomLogo = cardLogoUrl || cachedCardLogo;
+  if (activeCustomLogo && !imgError && activeCustomLogo !== '/logo.svg' && activeCustomLogo !== DEFAULT_HEADER_LOGO) {
     return (
       <div className={`flex items-center justify-center ${className}`}>
         <img 
-          src={activeCardLogo} 
+          src={activeCustomLogo} 
           alt="Probashi Business Club" 
           crossOrigin="anonymous"
           className="w-full h-full object-contain block mx-auto drop-shadow-md"

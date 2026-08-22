@@ -45,6 +45,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     bloodGroup: 'B+',
     passportNumber: '',
     idCardNumber: '',
+    batchNumber: '',
     joinDate: new Date().toISOString().split('T')[0],
     status: 'active' as StatusType,
     photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -83,6 +84,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         bloodGroup: memberToEdit.bloodGroup || 'B+',
         passportNumber: memberToEdit.passportNumber || '',
         idCardNumber: memberToEdit.idCardNumber || '',
+        batchNumber: memberToEdit.batchNumber || '',
         joinDate: memberToEdit.joinDate || new Date().toISOString().split('T')[0],
         status: memberToEdit.status || 'active',
         photoUrl: memberToEdit.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -115,6 +117,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         bloodGroup: 'B+',
         passportNumber: '',
         idCardNumber: '',
+        batchNumber: '',
         joinDate: new Date().toISOString().split('T')[0],
         status: 'active',
         photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
@@ -245,6 +248,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         bloodGroup: formData.bloodGroup,
         passportNumber: formData.passportNumber.trim(),
         idCardNumber: formData.idCardNumber.trim(),
+        batchNumber: formData.batchNumber.trim(),
         joinDate: formData.joinDate,
         status: formData.status,
         photoUrl: formData.photoUrl,
@@ -544,12 +548,12 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">National ID / Passport Number</label>
+                <label className="block text-slate-300 font-semibold mb-1">National ID / Passport</label>
                 <input
                   type="text"
-                  placeholder="e.g. A01928374 / 1988273645"
+                  placeholder="e.g. A01928374"
                   value={formData.passportNumber}
                   onChange={e => setFormData({ ...formData, passportNumber: e.target.value })}
                   className="w-full px-3 py-2.5 font-mono bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
@@ -564,6 +568,20 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   value={formData.idCardNumber}
                   onChange={e => setFormData({ ...formData, idCardNumber: e.target.value })}
                   className="w-full px-3 py-2.5 font-mono bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                  <span>Batch Number</span>
+                  <span className="text-[10px] text-amber-300 font-bold">ব্যাচ নং</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 01, 02, Batch-24"
+                  value={formData.batchNumber}
+                  onChange={e => setFormData({ ...formData, batchNumber: e.target.value })}
+                  className="w-full px-3 py-2.5 font-mono font-bold bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-amber-300 placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
             </div>

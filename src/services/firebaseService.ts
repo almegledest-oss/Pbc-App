@@ -78,7 +78,23 @@ function cleanUndefined<T>(obj: T): T {
   return cleaned as T;
 }
 
-let isGlobalQuotaExceeded = false;
+let isGlobalQuotaExceeded = (() => {
+  try {
+    const timestampStr = safeStorage.getItem('pbc_firestore_quota_exceeded_timestamp');
+    if (timestampStr) {
+      const time = parseInt(timestampStr, 10);
+      // If quota exceeded within the last 30 minutes, keep safe mode enabled
+      if (Date.now() - time < 30 * 60 * 1000) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
+})();
+
+export function getIsGlobalQuotaExceeded(): boolean {
+  return isGlobalQuotaExceeded;
+}
 
 // Helper to detect Firestore quota limit exceeded or resource exhausted errors
 export function isQuotaExceededError(err: any): boolean {
@@ -92,10 +108,14 @@ export function isQuotaExceededError(err: any): boolean {
     msg.includes('quota exceeded') ||
     msg.includes('resource_exhausted') ||
     msg.includes('free daily read units') ||
-    msg.includes('free daily write units')
+    msg.includes('free daily write units') ||
+    msg.includes('maximum backoff delay')
   );
   if (hit) {
     isGlobalQuotaExceeded = true;
+    try {
+      safeStorage.setItem('pbc_firestore_quota_exceeded_timestamp', Date.now().toString());
+    } catch {}
   }
   return hit;
 }
@@ -137,6 +157,9 @@ export function setCachedItem<T>(key: string, value: T): void {
 export function notifyQuotaExceeded(err: any): void {
   if (isQuotaExceededError(err)) {
     isGlobalQuotaExceeded = true;
+    try {
+      safeStorage.setItem('pbc_firestore_quota_exceeded_timestamp', Date.now().toString());
+    } catch {}
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('pbc_firestore_quota_exceeded', { detail: err }));
     }
@@ -262,16 +285,6 @@ export function subscribeBoardDirectors(callback: (directors: BoardDirector[]) =
   const colRef = collection(db, 'board_directors');
   return onSnapshot(colRef, (snapshot) => {
     if (snapshot.empty) {
-      if (!isGlobalQuotaExceeded) {
-        INITIAL_DIRECTORS.forEach(async (dir) => {
-          try {
-            await setDoc(doc(db, 'board_directors', dir.id), cleanUndefined(dir));
-          } catch (e) {
-            notifyQuotaExceeded(e);
-            console.warn('Error seeding initial director:', e);
-          }
-        });
-      }
       setCachedItem('pbc_cached_directors', INITIAL_DIRECTORS);
       callback(INITIAL_DIRECTORS);
       return;
@@ -289,9 +302,8 @@ export function subscribeBoardDirectors(callback: (directors: BoardDirector[]) =
       const data = docSnap.data();
       const name = (data.name || '').trim();
       
-      // Auto-clean old demo directors from database if found
+      // Filter out old demo directors from the in-memory display list
       if (demoNamesToRemove.some(demoName => name.toLowerCase().includes(demoName.toLowerCase()))) {
-        if (!isGlobalQuotaExceeded) deleteDoc(doc(db, 'board_directors', docSnap.id)).catch(() => {});
         return;
       }
 
@@ -318,16 +330,6 @@ export function subscribeBoardDirectors(callback: (directors: BoardDirector[]) =
     });
 
     if (list.length === 0) {
-      if (!isGlobalQuotaExceeded) {
-        INITIAL_DIRECTORS.forEach(async (dir) => {
-          try {
-            await setDoc(doc(db, 'board_directors', dir.id), cleanUndefined(dir));
-          } catch (e) {
-            notifyQuotaExceeded(e);
-            console.warn('Error seeding initial director:', e);
-          }
-        });
-      }
       setCachedItem('pbc_cached_directors', INITIAL_DIRECTORS);
       callback(INITIAL_DIRECTORS);
       return;
@@ -526,6 +528,7 @@ export function subscribeMembers(callback: (members: Member[]) => void) {
     const list: Member[] = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
       return {
+        ...data,
         id: data.id || data.memberId || docSnap.id,
         fullName: data.fullName || '',
         fullNameBn: data.fullNameBn || '',
@@ -547,6 +550,14 @@ export function subscribeMembers(callback: (members: Member[]) => void) {
         dateOfBirth: data.dateOfBirth || '',
         bloodGroup: data.bloodGroup || '',
         emergencyContact: data.emergencyContact || '',
+        familyInfoName: data.familyInfoName || data.nomineeName || '',
+        familyInfoRelation: data.familyInfoRelation || data.nomineeRelation || '',
+        familyInfoMobile: data.familyInfoMobile || data.nomineeMobile || '',
+        familyInfoAddress: data.familyInfoAddress || data.nomineeAddress || '',
+        nomineeName: data.nomineeName || data.familyInfoName || '',
+        nomineeRelation: data.nomineeRelation || data.familyInfoRelation || '',
+        nomineeMobile: data.nomineeMobile || data.familyInfoMobile || '',
+        nomineeAddress: data.nomineeAddress || data.familyInfoAddress || '',
         role: data.role || 'member',
         notes: data.notes || '',
         password: data.password || ''
@@ -1008,13 +1019,7 @@ export function subscribeUsers(callback: (users: UserProfile[]) => void) {
       }
     }
 
-    // Automatically remove duplicate user documents from Firestore in background
-    if (duplicateDocIdsToDelete.length > 0) {
-      duplicateDocIdsToDelete.forEach(dupId => {
-        deleteDoc(doc(db, 'users', dupId)).catch(() => {});
-      });
-    }
-
+    // Set de-duplicated users to state
     const finalUsers = Array.from(seenEmails.values());
     setCachedItem('pbc_cached_users', finalUsers);
     callback(finalUsers);

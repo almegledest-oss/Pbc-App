@@ -144,21 +144,112 @@ export function replaceModernColorsInString(str: string): string {
 
 export const replaceOklabInString = replaceModernColorsInString;
 
+let cachedSanitizedCss = '';
+
 /**
- * Sanitizes all <style> elements and inline style attributes in cloned html2canvas document
- * so html2canvas's color parser does not crash on oklab/oklch/color color functions.
- * Optimized to ONLY inspect target element and avoid expensive full-document layout reflows.
+ * Preloads and compiles all application styles (from stylesheets, links, and style tags)
+ * into a single sanitized CSS string where modern color functions (oklch/oklab) are converted to sRGB/HEX.
+ * This guarantees 100% preserved Tailwind CSS layouts, fonts, borders, and colors in html2canvas.
+ */
+export async function preloadAndSanitizeAppStyles(): Promise<string> {
+  if (cachedSanitizedCss) return cachedSanitizedCss;
+
+  let combinedCss = '';
+
+  if (typeof document !== 'undefined') {
+    // 1. Gather all CSS rules from document.styleSheets
+    try {
+      for (let i = 0; i < document.styleSheets.length; i++) {
+        const sheet = document.styleSheets[i];
+        try {
+          if (sheet.cssRules) {
+            for (let j = 0; j < sheet.cssRules.length; j++) {
+              combinedCss += sheet.cssRules[j].cssText + '\n';
+            }
+          }
+        } catch {
+          // If cross-origin/CORS restriction prevents cssRules access, fetch directly
+          if (sheet.href) {
+            try {
+              const res = await fetch(sheet.href);
+              if (res.ok) {
+                const text = await res.text();
+                combinedCss += text + '\n';
+              }
+            } catch {
+              // Silently ignore
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently ignore
+    }
+
+    // 2. Also check any <link rel="stylesheet"> in document
+    const links = document.querySelectorAll('link[rel="stylesheet"]');
+    for (const link of Array.from(links)) {
+      const href = (link as HTMLLinkElement).href;
+      if (href) {
+        try {
+          const res = await fetch(href);
+          if (res.ok) {
+            const text = await res.text();
+            combinedCss += text + '\n';
+          }
+        } catch {
+          // Silently ignore
+        }
+      }
+    }
+
+    // 3. Gather all inline <style> tags
+    const styleTags = document.querySelectorAll('style');
+    styleTags.forEach((s) => {
+      if (s.textContent) {
+        combinedCss += s.textContent + '\n';
+      }
+    });
+  }
+
+  // Sanitize all modern color functions (oklch/oklab) in the combined CSS
+  cachedSanitizedCss = replaceModernColorsInString(combinedCss);
+  return cachedSanitizedCss;
+}
+
+/**
+ * Sanitizes all stylesheets and inline style attributes in cloned html2canvas document
+ * so html2canvas's parser receives 100% full CSS styling with sRGB/HEX color compatibility.
  */
 export function sanitizeOklabInDoc(clonedDoc: Document, targetEl?: HTMLElement | null) {
-  // 1. Sanitize all <style> tags in cloned document (fast regex replacement)
-  const styleElements = clonedDoc.querySelectorAll('style');
-  styleElements.forEach((style) => {
-    if (style.textContent) {
-      style.textContent = replaceModernColorsInString(style.textContent);
-    }
-  });
+  // 1. If we have cached sanitized CSS, inject it as a primary style tag
+  if (cachedSanitizedCss) {
+    // Remove external link tags in clone so html2canvas doesn't fetch un-sanitized external stylesheets
+    const linkElements = clonedDoc.querySelectorAll('link[rel="stylesheet"]');
+    linkElements.forEach((link) => link.remove());
 
-  // 2. Only inspect elements inside targetEl (not entire cloned document tree)
+    let pbcStyle = clonedDoc.getElementById('pbc-sanitized-styles') as HTMLStyleElement | null;
+    if (!pbcStyle) {
+      pbcStyle = clonedDoc.createElement('style');
+      pbcStyle.id = 'pbc-sanitized-styles';
+      if (clonedDoc.head) {
+        clonedDoc.head.appendChild(pbcStyle);
+      } else if (clonedDoc.body) {
+        clonedDoc.body.prepend(pbcStyle);
+      }
+    }
+    pbcStyle.textContent = cachedSanitizedCss;
+  } else {
+    // Fallback: sanitize existing style tags in clonedDoc
+    const styleElements = clonedDoc.querySelectorAll('style');
+    styleElements.forEach((style) => {
+      if (style.textContent) {
+        style.textContent = replaceModernColorsInString(style.textContent);
+      }
+    });
+  }
+
+  // 2. Inspect target element inline styles and sanitize them
   const container = targetEl || clonedDoc.body;
   if (!container) return;
 
@@ -300,18 +391,25 @@ export async function captureElementToCanvas(
   el: HTMLElement, 
   options: Partial<Parameters<typeof html2canvas>[1]> = {}
 ) {
-  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const defaultScale = isMobile ? 2.5 : 3;
+  // Preload and sanitize all stylesheets before capturing to guarantee full Tailwind styles without oklch crashes
+  await preloadAndSanitizeAppStyles();
+
+  const width = el.offsetWidth || 340;
+  const height = el.offsetHeight || 525;
 
   return await html2canvas(el, {
-    scale: defaultScale,
+    scale: 3,
     useCORS: true,
     allowTaint: false,
     logging: false,
     scrollY: 0,
     scrollX: 0,
+    windowWidth: 1200,
+    windowHeight: 1200,
+    width,
+    height,
     backgroundColor: '#040D1B',
-    imageTimeout: 8000,
+    imageTimeout: 10000,
     ...options,
     onclone: (clonedDoc, element) => {
       sanitizeOklabInDoc(clonedDoc, element);
@@ -329,6 +427,13 @@ export async function captureElementToCanvas(
       });
 
       if (element) {
+        if (element.parentElement) {
+          element.parentElement.style.opacity = '1';
+          element.parentElement.style.visibility = 'visible';
+          element.parentElement.style.pointerEvents = 'auto';
+          element.parentElement.style.zIndex = '1';
+          element.parentElement.classList.remove('opacity-0', 'pointer-events-none');
+        }
         element.style.transform = 'none';
         element.style.webkitTransform = 'none';
         element.style.opacity = '1';
@@ -336,7 +441,25 @@ export async function captureElementToCanvas(
         element.style.left = '0px';
         element.style.top = '0px';
         element.style.visibility = 'visible';
+        element.style.width = `${width}px`;
+        element.style.height = `${height}px`;
+        element.style.minWidth = `${width}px`;
+        element.style.minHeight = `${height}px`;
+        element.style.maxWidth = `${width}px`;
+        element.style.maxHeight = `${height}px`;
+        element.style.boxSizing = 'border-box';
         element.classList.remove('rotate-y-180', 'opacity-0', 'pointer-events-none');
+
+        // Ensure all SVG elements (including QR code & logos) have explicit dimensions
+        const svgs = element.querySelectorAll('svg');
+        svgs.forEach((svg) => {
+          if (!svg.getAttribute('width') && svg.clientWidth) {
+            svg.setAttribute('width', `${svg.clientWidth}`);
+          }
+          if (!svg.getAttribute('height') && svg.clientHeight) {
+            svg.setAttribute('height', `${svg.clientHeight}`);
+          }
+        });
 
         const children = element.querySelectorAll('*');
         children.forEach((child) => {

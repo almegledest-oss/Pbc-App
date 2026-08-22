@@ -45,6 +45,7 @@ import {
   subscribeCardTemplate,
   saveCardTemplateDoc,
   getUserRoleAndStatus,
+  getIsGlobalQuotaExceeded,
   ReportItem,
   UserProfile,
   auth,
@@ -427,12 +428,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [activeTab]);
 
   useEffect(() => {
-    if (!isLoggedIn || isQuotaExceeded) return;
+    if (!isLoggedIn || isQuotaExceeded || getIsGlobalQuotaExceeded()) return;
     const userEmail = authUser?.email || currentMember?.email;
     if (!userEmail) return;
 
     const pingSession = () => {
-      if (isQuotaExceeded) return;
+      if (isQuotaExceeded || getIsGlobalQuotaExceeded()) return;
       updateActiveSessionDoc({
         uid: authUser?.uid || currentMember?.id || 'session-uid',
         email: userEmail,
@@ -446,7 +447,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     pingSession();
-    const interval = setInterval(pingSession, 60000); // Heartbeat every 60s
+    const interval = setInterval(pingSession, 120000); // Throttled heartbeat every 2 minutes
 
     return () => clearInterval(interval);
   }, [isLoggedIn, isQuotaExceeded, authUser?.email, authUser?.uid, currentMember?.fullName, currentMember?.id, currentMember?.photoUrl, role]);
@@ -465,12 +466,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (targetMember) {
-        setCurrentMember(prev => {
-          if (prev && prev.id === targetMember!.id && prev.fullName === targetMember!.fullName && prev.photoUrl === targetMember!.photoUrl && prev.role === targetMember!.role && prev.status === targetMember!.status) {
-            return prev;
-          }
-          return targetMember!;
-        });
+        setCurrentMember(targetMember);
         
         // Dynamically sync role if member's role was changed in Firestore (e.g. promoted to admin)
         const effectiveRole = targetMember.role === 'super_admin' ? 'super_admin' : (targetMember.role === 'admin' ? 'admin' : 'member');
@@ -483,7 +479,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         if (members[0]) {
-          setCurrentMember(prev => (prev?.id === members[0].id ? prev : members[0]));
+          setCurrentMember(members[0]);
         }
       }
     }

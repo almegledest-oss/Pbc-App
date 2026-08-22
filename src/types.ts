@@ -115,6 +115,7 @@ export interface Member {
   dateOfBirth?: string;
   bloodGroup?: string;
   idCardNumber?: string;
+  batchNumber?: string;
   password?: string;
   // Family Information (ID Card Back)
   familyInfoName?: string;
