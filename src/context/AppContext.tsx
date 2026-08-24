@@ -731,6 +731,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       delete data.role;
     }
 
+    // Optimistic local state update
+    setMembers(prev => prev.map(m => m.id === id ? { ...m, ...data } : m));
+    if (currentMember && currentMember.id === id) {
+      setCurrentMember(prev => ({ ...prev, ...data }));
+    }
+
     await updateMemberDoc(id, data);
 
     // Sync user profile role in 'users' collection if email/role updated
@@ -881,6 +887,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alert('Security Restriction: Members cannot edit deposits.');
       return;
     }
+    // Optimistic local state update
+    setDeposits(prev => prev.map(d => d.id === id ? { ...d, ...data } : d));
     await updateDepositDoc(id, data);
     await addActivityLog('Deposit Updated', `Deposit ${id} modified`);
   };
@@ -1034,6 +1042,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alert('Security Restriction: Members cannot edit projects.');
       return;
     }
+    // Optimistic local state update
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
     await updateProjectDoc(id, data);
     await addActivityLog('Project Updated', `Project ${id} details updated`);
     addNotification('Project Update', `Project ${id} status updated.`, 'project');

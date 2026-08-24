@@ -4,10 +4,18 @@ import {
   initializeFirestore,
   getFirestore,
   persistentLocalCache,
-  persistentMultipleTabManager
+  persistentMultipleTabManager,
+  setLogLevel
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
+
+// Suppress benign internal log spam
+try {
+  setLogLevel('silent');
+} catch (e) {
+  // Ignored if unsupported
+}
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);

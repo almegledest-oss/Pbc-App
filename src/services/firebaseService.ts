@@ -83,8 +83,8 @@ let isGlobalQuotaExceeded = (() => {
     const timestampStr = safeStorage.getItem('pbc_firestore_quota_exceeded_timestamp');
     if (timestampStr) {
       const time = parseInt(timestampStr, 10);
-      // If quota exceeded within the last 30 minutes, keep safe mode enabled
-      if (Date.now() - time < 30 * 60 * 1000) {
+      // If quota exceeded within the last 60 minutes, keep safe offline mode enabled
+      if (Date.now() - time < 60 * 60 * 1000) {
         return true;
       }
     }
@@ -104,12 +104,14 @@ export function isQuotaExceededError(err: any): boolean {
   const hit = (
     code.includes('resource-exhausted') ||
     code.includes('quota') ||
+    code.includes('unavailable') ||
     msg.includes('quota limit exceeded') ||
     msg.includes('quota exceeded') ||
     msg.includes('resource_exhausted') ||
     msg.includes('free daily read units') ||
     msg.includes('free daily write units') ||
-    msg.includes('maximum backoff delay')
+    msg.includes('maximum backoff delay') ||
+    msg.includes('retry after quota limits are reset')
   );
   if (hit) {
     isGlobalQuotaExceeded = true;
@@ -239,6 +241,7 @@ export function subscribeSystemSettings(callback: (settings: SystemSettings) => 
 }
 
 export async function updateSystemSettingsDoc(settings: Partial<SystemSettings>) {
+  if (isGlobalQuotaExceeded) return;
   let settingsData = { ...settings };
   if (settingsData.customLogoUrl && settingsData.customLogoUrl.startsWith('data:image')) {
     try {
@@ -477,6 +480,9 @@ export async function restoreBackupData(backupObj: any) {
 export async function seedFirestoreIfEmpty() {
   if (isGlobalQuotaExceeded) return;
   try {
+    const isSeeded = safeStorage.getItem('pbc_firestore_seeded_ok');
+    if (isSeeded) return;
+
     const superEmail = 'fokrulislammir9897@gmail.com';
     const qSuper = query(collection(db, 'users'), where('email', '==', superEmail));
     const superSnap = await getDocs(qSuper);
@@ -512,6 +518,7 @@ export async function seedFirestoreIfEmpty() {
         }
       }
     }
+    safeStorage.setItem('pbc_firestore_seeded_ok', 'true');
   } catch (err: any) {
     notifyQuotaExceeded(err);
   }
@@ -835,7 +842,8 @@ export function subscribeProjects(callback: (projects: RealEstateProject[]) => v
         documents: data.documents || [],
         description: data.description || '',
         expectedRoiPercent: data.expectedRoiPercent || (investmentAmount > 0 ? Number(((profit / investmentAmount) * 100).toFixed(1)) : 0),
-        totalInvestors: data.totalInvestors || 0
+        totalInvestors: data.totalInvestors || (data.memberAllocations?.length || 0),
+        memberAllocations: Array.isArray(data.memberAllocations) ? data.memberAllocations : []
       } as RealEstateProject;
     });
     setCachedItem('pbc_cached_projects', list);

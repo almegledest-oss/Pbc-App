@@ -417,7 +417,7 @@ export const MyProfileView: React.FC = () => {
                       type="text"
                       value={formData.familyInfoName}
                       onChange={(e) => setFormData({ ...formData, familyInfoName: e.target.value })}
-                      placeholder="e.g. Bristi Akter"
+                      placeholder="e.g. Fatema Begum"
                       className="w-full bg-[#071220] border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-400 outline-hidden"
                     />
                   </div>
@@ -439,7 +439,7 @@ export const MyProfileView: React.FC = () => {
                       type="text"
                       value={formData.familyInfoMobile}
                       onChange={(e) => setFormData({ ...formData, familyInfoMobile: e.target.value })}
-                      placeholder="e.g. 01871713907"
+                      placeholder="e.g. +880 1800-000000"
                       className="w-full bg-[#071220] border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-400 outline-hidden"
                     />
                   </div>
@@ -450,7 +450,7 @@ export const MyProfileView: React.FC = () => {
                       rows={2}
                       value={formData.familyInfoAddress}
                       onChange={(e) => setFormData({ ...formData, familyInfoAddress: e.target.value })}
-                      placeholder="e.g. Gojaria, Nawabgonj, Dhaka"
+                      placeholder="e.g. Village, Post, District"
                       className="w-full bg-[#071220] border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-400 outline-hidden resize-none"
                     />
                   </div>

@@ -17,7 +17,11 @@ import {
   LogOut, 
   Check,
   ChevronDown,
-  CreditCard
+  CreditCard,
+  Wallet,
+  Users,
+  Briefcase,
+  Languages
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -42,7 +46,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
     currentMember,
     authUser,
     setActiveTab,
-    logout
+    logout,
+    stats,
+    members
   } = useApp();
 
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
@@ -51,54 +57,94 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
   const labels = t[language];
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const handleRoleChange = (newRole: UserRole) => {
-    setRole(newRole);
-    setIsRoleDropdownOpen(false);
-  };
+  const totalDepositsVal = stats?.totalDeposits || 0;
+  const totalMembersVal = (members || []).length || stats?.totalMembers || 0;
+  const totalInvestedVal = stats?.totalInvestment || 0;
 
   return (
-    <header className="sticky top-0 z-30 bg-[#070D1B] border-b border-[#D4AF37]/30 h-16 sm:h-20 flex items-center px-3 sm:px-6 lg:px-8 transition-colors text-white shadow-xl w-full max-w-full overflow-x-hidden">
-      <div className="w-full max-w-full flex items-center justify-between gap-2 sm:gap-4 min-w-0">
+    <header className="sticky top-0 z-30 bg-[#070D1B] border-b border-[#D4AF37]/30 transition-colors text-white shadow-xl w-full max-w-full">
+      {/* Main Top Header Bar */}
+      <div className="h-16 sm:h-20 flex items-center px-3 sm:px-6 lg:px-8 justify-between gap-2 sm:gap-4 min-w-0">
         
         {/* Left: Branding (Mobile view / Header title) */}
-        <div className="flex items-center gap-2.5 sm:gap-3 cursor-pointer md:hidden shrink-0" onClick={() => setActiveTab('dashboard')}>
+        <div className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => setActiveTab('dashboard')}>
           <PbcLogo variant="gold" className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 shadow-md" />
           <div className="flex flex-col">
             <h1 className="text-xs xs:text-sm sm:text-base font-black tracking-wider text-white uppercase leading-tight whitespace-nowrap">
               PROBASHI <span className="text-[#E5A93C]">BUSINESS CLUB</span>
             </h1>
-            <p className="text-[9px] sm:text-[10px] text-amber-300/80 font-bold tracking-[0.15em] uppercase">
+            <p className="text-[8px] xs:text-[9px] sm:text-[10px] text-amber-300/80 font-bold tracking-[0.15em] uppercase">
               Official Portal
             </p>
           </div>
         </div>
 
-        {/* Center: Search Trigger Bar */}
-        {(role === 'super_admin' || role === 'admin') && (
-          <div className="flex-1 max-w-md hidden md:block">
-            <button
-              onClick={() => setIsSearchOpen(true)}
-              className="w-full flex items-center justify-between px-4 py-2 text-sm text-slate-300 bg-[#0B1528] hover:bg-[#112244] rounded-full border border-[#D4AF37]/30 transition shadow-xs cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <Search className="w-4 h-4 text-amber-400" />
-                <span className="text-xs font-medium text-slate-400">{labels.searchPlaceholder}</span>
+        {/* Center: Live Quick Stats & Language Button (Desktop/Tablet Only) */}
+        <div className="hidden md:flex items-center gap-3">
+          {/* Quick Stats Pill */}
+          <div className="flex items-center gap-3.5 px-3.5 py-1.5 rounded-full bg-[#0B1528] border border-[#D4AF37]/40 shadow-md">
+            {/* Total Deposits */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+                <Wallet className="w-3 h-3" />
               </div>
-              <kbd className="px-2 py-0.5 text-[10px] font-mono font-bold bg-[#070D1B] border border-amber-500/30 rounded-md text-amber-300 shadow-xs">
-                ⌘K
-              </kbd>
-            </button>
+              <span className="text-slate-400 font-medium">{language === 'bn' ? 'মোট জমা:' : 'Deposits:'}</span>
+              <span className="font-extrabold text-emerald-400 tracking-tight">৳{totalDepositsVal.toLocaleString()}</span>
+            </div>
+
+            <div className="w-[1px] h-3.5 bg-slate-700" />
+
+            {/* Total Members */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                <Users className="w-3 h-3" />
+              </div>
+              <span className="text-slate-400 font-medium">{language === 'bn' ? 'সদস্য:' : 'Members:'}</span>
+              <span className="font-extrabold text-blue-400 tracking-tight">{totalMembersVal} {language === 'bn' ? 'জন' : ''}</span>
+            </div>
+
+            <div className="w-[1px] h-3.5 bg-slate-700" />
+
+            {/* Total Invested */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                <Briefcase className="w-3 h-3" />
+              </div>
+              <span className="text-slate-400 font-medium">{language === 'bn' ? 'বিনিয়োগ:' : 'Invested:'}</span>
+              <span className="font-extrabold text-amber-400 tracking-tight">৳{totalInvestedVal.toLocaleString()}</span>
+            </div>
           </div>
-        )}
+
+          {/* Quick Language Switcher */}
+          <button
+            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/50 text-xs font-bold text-amber-400 transition-all cursor-pointer shadow-md group"
+            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
+          >
+            <Languages className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform shrink-0" />
+            <span className={language === 'bn' ? 'text-amber-300 font-black' : 'text-slate-400 font-normal'}>বাং</span>
+            <span className="text-slate-600">/</span>
+            <span className={language === 'en' ? 'text-amber-300 font-black' : 'text-slate-400 font-normal'}>EN</span>
+          </button>
+        </div>
 
         {/* Right Actions & Switches */}
-        <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Mobile Language Button (Always visible on mobile in header!) */}
+          <button
+            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
+            className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0B1528] border border-[#D4AF37]/40 text-xs font-bold text-amber-400 active:scale-95 shadow-sm"
+            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
+          >
+            <Languages className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="text-[11px] font-black">{language === 'bn' ? 'বাং' : 'EN'}</span>
+          </button>
 
           {/* Quick Search Mobile Icon */}
           {(role === 'super_admin' || role === 'admin') && (
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="md:hidden p-1.5 text-slate-300 hover:bg-[#112244] rounded-lg border border-[#D4AF37]/20"
+              className="md:hidden p-1.5 text-slate-300 hover:bg-[#112244] rounded-lg border border-[#D4AF37]/20 active:scale-95"
             >
               <Search className="w-4 h-4 text-amber-400" />
             </button>
@@ -123,40 +169,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
             )}
           </button>
 
-          {/* Role Mode Switcher Dropdown (Admin / Member Mode) - Desktop Only (on mobile accessible via More) */}
+          {/* Role Mode Switcher Dropdown (Admin / Member Mode) - Desktop Only */}
           {(accountRole === 'super_admin' || accountRole === 'admin' || role === 'super_admin' || role === 'admin') && (
             <div className="relative hidden md:block">
               <button
                 onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold rounded-xl transition cursor-pointer shadow-xs border ${
-                  role === 'member'
-                    ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
-                }`}
-                title="Switch between Admin Mode and Member Mode"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 bg-[#0B1528] hover:bg-[#112244] rounded-xl border border-[#D4AF37]/30 transition"
               >
-                {role === 'member' ? (
-                  <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                )}
-                <span>{role === 'member' ? (language === 'bn' ? 'মেম্বার' : 'Member') : (role === 'super_admin' ? (language === 'bn' ? 'সিস্টেম অ্যাডমিন' : 'System Admin') : 'Admin')}</span>
-                <ChevronDown className="w-3 h-3 opacity-60" />
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                <span className="capitalize">{role === 'super_admin' ? 'Super Admin' : role}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
               {isRoleDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl z-50 p-2 space-y-1 text-xs">
-                  <div className="px-3 py-1.5 border-b border-slate-800">
-                    <p className="text-[10px] text-slate-400 font-semibold uppercase">Switch Mode (রোল নির্বাচন)</p>
-                    <p className="text-slate-200 font-bold truncate">
-                      {authUser?.displayName || (accountRole === 'super_admin' ? 'Fokrul Islam Mir' : currentMember?.fullName) || 'Admin User'}
-                    </p>
+                <div className="absolute right-0 mt-2 w-56 bg-[#070D1B] rounded-2xl shadow-2xl border border-[#D4AF37]/40 p-2 z-50">
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                    ভিউ মোড পরিবর্তন করুন
                   </div>
-
                   <button
                     onClick={() => {
-                      switchRoleMode(accountRole === 'super_admin' ? 'super_admin' : 'admin');
-                      setActiveTab('admin_panel');
+                      switchRoleMode('admin');
+                      setActiveTab('dashboard');
                       setIsRoleDropdownOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left font-bold transition ${
@@ -234,7 +267,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
           {/* Notifications Bell */}
           <button
             onClick={onOpenNotifications}
-            className="relative p-1.5 sm:p-2 text-slate-300 hover:bg-[#112244] rounded-xl border border-[#D4AF37]/20 transition"
+            className="relative p-1.5 sm:p-2 text-slate-300 hover:bg-[#112244] rounded-xl border border-[#D4AF37]/20 transition active:scale-95"
             title={labels.notifications}
           >
             <Bell className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300" />
@@ -331,7 +364,46 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
               </div>
             )}
           </div>
+        </div>
+      </div>
 
+      {/* MOBILE ONLY LIVE STATS STRIP (Always shown on phone screens right under top bar) */}
+      <div className="md:hidden bg-[#0B1528] border-t border-[#D4AF37]/30 px-3 py-2 flex items-center justify-around text-xs shadow-inner">
+        {/* Total Deposits */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+            <Wallet className="w-2.5 h-2.5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'মোট জমা' : 'Deposit'}</span>
+            <span className="font-extrabold text-emerald-400 text-[11px] leading-tight">৳{totalDepositsVal.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div className="w-[1px] h-4 bg-slate-700" />
+
+        {/* Total Members */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <Users className="w-2.5 h-2.5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'সদস্য' : 'Members'}</span>
+            <span className="font-extrabold text-blue-400 text-[11px] leading-tight">{totalMembersVal} {language === 'bn' ? 'জন' : ''}</span>
+          </div>
+        </div>
+
+        <div className="w-[1px] h-4 bg-slate-700" />
+
+        {/* Total Invested */}
+        <div className="flex items-center gap-1.5">
+          <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+            <Briefcase className="w-2.5 h-2.5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'বিনিয়োগ' : 'Invested'}</span>
+            <span className="font-extrabold text-amber-400 text-[11px] leading-tight">৳{totalInvestedVal.toLocaleString()}</span>
+          </div>
         </div>
       </div>
     </header>

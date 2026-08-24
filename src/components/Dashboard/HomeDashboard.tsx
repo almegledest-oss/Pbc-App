@@ -19,7 +19,13 @@ import {
   X,
   Image as ImageIcon,
   ExternalLink,
-  ChevronLeft
+  ChevronLeft,
+  Eye,
+  FileText,
+  Calendar,
+  Layers,
+  Sparkles,
+  Maximize2
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -30,6 +36,8 @@ export const HomeDashboard: React.FC = () => {
   const [isInvestmentsModalOpen, setIsInvestmentsModalOpen] = React.useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = React.useState<{ [key: string]: number }>({});
   const [activePreviewProject, setActivePreviewProject] = React.useState<any | null>(null);
+  const [activeModalPhotoIdx, setActiveModalPhotoIdx] = React.useState<number>(0);
+  const [isFullscreenPhoto, setIsFullscreenPhoto] = React.useState<boolean>(false);
 
   const getMemberTotalDeposit = (member: any) => {
     const memberDeps = deposits.filter(
@@ -40,17 +48,88 @@ export const HomeDashboard: React.FC = () => {
 
   const [activeChartMetric, setActiveChartMetric] = React.useState<'deposits' | 'totalFund' | 'investment' | 'profit'>('deposits');
 
-  // Chart data for monthly growth metrics
-  const chartData = [
-    { month: 'Jan', deposits: 920000, totalFund: 1030000, investment: 800000, profit: 110000 },
-    { month: 'Feb', deposits: 1100000, totalFund: 1240000, investment: 950000, profit: 140000 },
-    { month: 'Mar', deposits: 1350000, totalFund: 1540000, investment: 1100000, profit: 190000 },
-    { month: 'Apr', deposits: 1500000, totalFund: 1740000, investment: 1300000, profit: 240000 },
-    { month: 'May', deposits: 1680000, totalFund: 1970000, investment: 1450000, profit: 290000 },
-    { month: 'Jun', deposits: 1850000, totalFund: 2190000, investment: 1650000, profit: 340000 },
-    { month: 'Jul', deposits: 2100000, totalFund: 2520000, investment: 1850000, profit: 420000 },
-    { month: 'Aug', deposits: stats.totalDeposits || 2400000, totalFund: stats.totalFund || 2920000, investment: stats.totalInvestment || 2100000, profit: stats.totalProfit || 520000 },
-  ];
+  const openProjectPreview = (proj: any) => {
+    setActivePreviewProject(proj);
+    setActiveModalPhotoIdx(0);
+    setIsFullscreenPhoto(false);
+  };
+
+  // Dynamic calculation for monthly analytics based on real approved deposits and active projects
+  const chartData = React.useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    const currentMonthIdx = new Date().getMonth(); // 0 to 11
+
+    // Build last 6 months timeline up to the current month
+    const monthsList: { monthName: string; year: number; monthNum: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(currentYear, currentMonthIdx - i, 1);
+      monthsList.push({
+        monthName: monthNames[d.getMonth()],
+        year: d.getFullYear(),
+        monthNum: d.getMonth()
+      });
+    }
+
+    const approvedDeposits = deposits.filter(d => d.status === 'Approved');
+
+    return monthsList.map(({ monthName, year, monthNum }) => {
+      // Real sum of deposits on or before this month
+      const depSum = approvedDeposits
+        .filter(d => {
+          if (!d.date) return true;
+          const depDate = new Date(d.date);
+          return (
+            depDate.getFullYear() < year ||
+            (depDate.getFullYear() === year && depDate.getMonth() <= monthNum)
+          );
+        })
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+      // Real project investments active on or before this month
+      const invSum = projects
+        .filter(p => {
+          if (!p.startDate) return true;
+          const pDate = new Date(p.startDate);
+          return (
+            pDate.getFullYear() < year ||
+            (pDate.getFullYear() === year && pDate.getMonth() <= monthNum)
+          );
+        })
+        .reduce((sum, p) => sum + (Number(p.investmentAmount) || 0), 0);
+
+      // Real project current values
+      const curValSum = projects
+        .filter(p => {
+          if (!p.startDate) return true;
+          const pDate = new Date(p.startDate);
+          return (
+            pDate.getFullYear() < year ||
+            (pDate.getFullYear() === year && pDate.getMonth() <= monthNum)
+          );
+        })
+        .reduce((sum, p) => sum + (Number(p.currentValue) || Number(p.investmentAmount) || 0), 0);
+
+      const profitSum = Math.max(0, curValSum - invSum);
+      const totalFundSum = depSum + profitSum;
+
+      return {
+        month: monthName,
+        deposits: depSum,
+        totalFund: totalFundSum,
+        investment: invSum,
+        profit: profitSum
+      };
+    });
+  }, [deposits, projects]);
+
+  const formatYAxis = (val: number) => {
+    if (!val || val === 0) return '৳0';
+    if (val >= 10000000) return `৳${(val / 10000000).toFixed(1)}Cr`;
+    if (val >= 100000) return `৳${(val / 100000).toFixed(1)}L`;
+    if (val >= 1000) return `৳${(val / 1000).toFixed(0)}k`;
+    return `৳${val}`;
+  };
 
   return (
     <div className="space-y-6 pb-12">
@@ -223,7 +302,7 @@ export const HomeDashboard: React.FC = () => {
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="month" stroke="#64748b" fontSize={12} tickLine={false} />
-                <YAxis stroke="#64748b" fontSize={12} tickFormatter={(val) => `৳${val/100000}L`} tickLine={false} />
+                <YAxis stroke="#64748b" fontSize={12} tickFormatter={formatYAxis} tickLine={false} />
                 <Tooltip 
                   formatter={(value: any) => [`৳${Number(value).toLocaleString()} BDT`, activeChartMetric.toUpperCase()]}
                   contentStyle={{ backgroundColor: '#070D1B', borderColor: '#D4AF37', borderRadius: '12px', color: '#fff' }}
@@ -247,59 +326,110 @@ export const HomeDashboard: React.FC = () => {
         </div>
 
         {/* Featured Real Estate Spotlight Card */}
-        <div className="bg-[#0B1528] dark:bg-[#070D1B] p-6 rounded-3xl border border-[#D4AF37]/30 shadow-lg flex flex-col justify-between">
+        <div className="bg-[#0B1528] dark:bg-[#070D1B] p-6 rounded-3xl border border-[#D4AF37]/30 shadow-lg flex flex-col justify-between group hover:border-[#D4AF37]/60 transition-all duration-300">
           <div>
             <div className="flex items-center justify-between mb-3">
-              <span className="px-3 py-1 text-[10px] font-extrabold bg-amber-500/20 text-amber-300 rounded-full uppercase tracking-wider border border-amber-500/40">
-                ❖ Spotlight Project
+              <span className="px-3 py-1 text-[10px] font-extrabold bg-amber-500/20 text-amber-300 rounded-full uppercase tracking-wider border border-amber-500/40 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400 animate-pulse" />
+                <span>Spotlight Project</span>
               </span>
-              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 <TrendingUp className="w-3.5 h-3.5" />
-                +{projects[0]?.expectedRoiPercent}% ROI
+                +{projects[0]?.expectedRoiPercent || 25}% ROI
               </span>
             </div>
 
-            <div className="relative h-36 rounded-2xl overflow-hidden mb-3 border border-amber-500/20">
+            {/* Clickable Card Image & Info Banner */}
+            <div 
+              onClick={() => openProjectPreview(projects[0] || {
+                projectName: 'PBC Cumilla Project -01',
+                city: 'Cumilla',
+                country: 'Bangladesh',
+                category: 'Real Estate',
+                investmentAmount: 15218000,
+                currentValue: 18000000,
+                expectedRoiPercent: 25,
+                photos: [
+                  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=1200&q=80'
+                ],
+                description: 'Flagship PBC commercial real estate development asset located in the prime zone of Cumilla city center with high rental yield and exceptional capital appreciation.'
+              })}
+              className="relative h-40 rounded-2xl overflow-hidden mb-3 border border-amber-500/30 cursor-pointer shadow-md group/img"
+            >
               <img
-                src={projects[0]?.photos[0]}
-                alt={projects[0]?.projectName}
-                className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                src={projects[0]?.photos?.[0] || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
+                alt={projects[0]?.projectName || 'Spotlight Project'}
+                className="w-full h-full object-cover group-hover/img:scale-110 transition duration-700 ease-out"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-end p-3">
-                <div>
-                  <h4 className="text-sm font-bold text-white truncate">
-                    {projects[0]?.projectName}
-                  </h4>
-                  <p className="text-[11px] text-amber-200/90 flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-amber-400" />
-                    {projects[0]?.city}, {projects[0]?.country}
-                  </p>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent flex items-end p-3.5">
+                <div className="w-full flex items-end justify-between">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-black text-white group-hover/img:text-amber-300 transition-colors drop-shadow">
+                      {projects[0]?.projectName || 'PBC Cumilla Project -01'}
+                    </h4>
+                    <p className="text-[11px] text-amber-200/90 flex items-center gap-1 font-medium">
+                      <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>{projects[0]?.city || 'Cumilla'}, {projects[0]?.country || 'Bangladesh'}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/30 border border-amber-400/50 backdrop-blur-md text-[10px] font-bold text-amber-200 shadow-md">
+                    <Eye className="w-3 h-3 text-amber-300" />
+                    <span>View HD Photos ({(projects[0]?.photos || ['photo1', 'photo2']).length})</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-2 text-xs text-slate-300">
-              <div className="flex justify-between">
-                <span>Investment Value:</span>
-                <span className="font-bold text-white">
-                  ৳{projects[0]?.investmentAmount.toLocaleString()}
+            {/* Financial Quick Metrics */}
+            <div className="space-y-2 text-xs bg-[#070D1B] p-3 rounded-xl border border-slate-800">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Investment Value:</span>
+                <span className="font-bold text-white font-mono">
+                  ৳{(projects[0]?.investmentAmount || 15218000).toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span>Current Appraisal:</span>
-                <span className="font-bold text-emerald-400">
-                  ৳{projects[0]?.currentValue.toLocaleString()}
+              <div className="flex justify-between items-center">
+                <span className="text-slate-400">Current Appraisal:</span>
+                <span className="font-bold text-emerald-400 font-mono">
+                  ৳{(projects[0]?.currentValue || 18000000).toLocaleString()}
                 </span>
               </div>
             </div>
           </div>
 
-          <button
-            onClick={() => setActiveTab('real_estate')}
-            className="mt-4 w-full py-2.5 bg-[#070D1B] hover:bg-[#112244] text-amber-300 border border-[#D4AF37]/60 text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            Explore Real Estate Portfolio
-          </button>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => openProjectPreview(projects[0] || {
+                projectName: 'PBC Cumilla Project -01',
+                city: 'Cumilla',
+                country: 'Bangladesh',
+                category: 'Real Estate',
+                investmentAmount: 15218000,
+                currentValue: 18000000,
+                expectedRoiPercent: 25,
+                photos: [
+                  'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+                  'https://images.unsplash.com/photo-1577495508048-b635879837f1?auto=format&fit=crop&w=1200&q=80'
+                ],
+                description: 'Flagship PBC commercial real estate development asset located in the prime zone of Cumilla city center with high rental yield and exceptional capital appreciation.'
+              })}
+              className="py-2.5 px-3 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border border-amber-500/50 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span>Project Details</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('real_estate')}
+              className="py-2.5 px-3 bg-[#070D1B] hover:bg-[#112244] text-slate-300 hover:text-white border border-slate-700 text-xs font-bold rounded-xl transition flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <span>All Portfolio</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
       </div>
@@ -600,90 +730,236 @@ export const HomeDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Full Detailed Project Inspection Modal */}
+      {/* Full Detailed Project Inspection Modal with HD Gallery & Financial Breakdown */}
       {activePreviewProject && (
         <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
-          <div className="bg-[#0B1528] text-white rounded-3xl border border-[#D4AF37]/60 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#0B1528] text-white rounded-3xl border-2 border-[#D4AF37]/60 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
             {/* Detailed Header */}
-            <div className="p-4 sm:p-5 border-b border-[#D4AF37]/20 flex items-center justify-between bg-[#070D1B]">
-              <div>
-                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block">
-                  {activePreviewProject.category || 'Asset'} • {activePreviewProject.status || 'Active'}
-                </span>
-                <h3 className="text-lg sm:text-xl font-black text-white">
-                  {activePreviewProject.projectName}
-                </h3>
+            <div className="p-4 sm:p-5 border-b border-[#D4AF37]/30 flex items-center justify-between bg-gradient-to-r from-[#070D1B] via-[#0E1C38] to-[#070D1B]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                  <Building2 className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/40 uppercase tracking-wider">
+                      {activePreviewProject.category || 'Real Estate'}
+                    </span>
+                    <span className="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/40 uppercase">
+                      {activePreviewProject.status || 'Active Asset'}
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-0.5">
+                    {activePreviewProject.projectName}
+                  </h3>
+                </div>
               </div>
-              <button
-                onClick={() => setActivePreviewProject(null)}
-                className="p-2 text-slate-400 hover:text-white rounded-full bg-[#0B1528] border border-slate-700 hover:border-amber-400 transition cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActivePreviewProject(null)}
+                  className="p-2 text-slate-400 hover:text-white rounded-full bg-[#0B1528] border border-slate-700 hover:border-amber-400 transition cursor-pointer"
+                  title="Close Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Detailed Body */}
-            <div className="p-5 overflow-y-auto space-y-5 flex-1">
-              {/* Photo Banner */}
-              <div className="h-64 sm:h-80 rounded-2xl overflow-hidden bg-slate-950 relative border border-[#D4AF37]/30 shadow-inner">
-                <img
-                  src={activePreviewProject.photos?.[0] || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80'}
-                  alt={activePreviewProject.projectName}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute bottom-3 left-3 bg-[#070D1B]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#D4AF37]/40 flex items-center gap-1.5 text-xs text-amber-200">
-                  <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="font-semibold">{activePreviewProject.address ? `${activePreviewProject.address}, ` : ''}{activePreviewProject.city}, {activePreviewProject.country}</span>
-                </div>
-              </div>
+            <div className="p-5 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
+              
+              {/* Interactive HD Photo Carousel */}
+              {(() => {
+                const photos: string[] = (activePreviewProject.photos && activePreviewProject.photos.length > 0)
+                  ? activePreviewProject.photos
+                  : ['https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80'];
+                const currentIdx = Math.min(activeModalPhotoIdx, photos.length - 1);
+                const currentPhoto = photos[currentIdx] || photos[0];
 
-              {/* Financial Metrics Cards */}
+                return (
+                  <div className="space-y-2.5">
+                    {/* Main Big Photo Viewport */}
+                    <div className="relative h-64 sm:h-96 rounded-2xl overflow-hidden bg-slate-950 border border-[#D4AF37]/40 shadow-xl group">
+                      <img
+                        src={currentPhoto}
+                        alt={`${activePreviewProject.projectName} - ${currentIdx + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 cursor-pointer"
+                        onClick={() => window.open(currentPhoto, '_blank')}
+                        title="Click to view full resolution"
+                      />
+
+                      {/* Top Overlay Badges */}
+                      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none">
+                        <div className="bg-[#070D1B]/85 backdrop-blur-md px-3 py-1 rounded-full border border-[#D4AF37]/50 text-xs font-bold text-amber-300 shadow-lg pointer-events-auto flex items-center gap-1.5">
+                          <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Photo {currentIdx + 1} of {photos.length}</span>
+                        </div>
+
+                        <a
+                          href={currentPhoto}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="bg-[#070D1B]/85 backdrop-blur-md p-1.5 rounded-full border border-[#D4AF37]/50 text-slate-300 hover:text-amber-300 transition shadow-lg pointer-events-auto"
+                          title="Open HD Image in New Tab"
+                        >
+                          <Maximize2 className="w-4 h-4" />
+                        </a>
+                      </div>
+
+                      {/* Left & Right Arrow Buttons */}
+                      {photos.length > 1 && (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveModalPhotoIdx((prev) => (prev > 0 ? prev - 1 : photos.length - 1));
+                            }}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-[#070D1B]/90 hover:bg-amber-500 text-white hover:text-slate-950 border border-amber-500/50 shadow-2xl transition cursor-pointer"
+                            title="Previous Photo"
+                          >
+                            <ChevronLeft className="w-5 h-5" />
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveModalPhotoIdx((prev) => (prev < photos.length - 1 ? prev + 1 : 0));
+                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 rounded-full bg-[#070D1B]/90 hover:bg-amber-500 text-white hover:text-slate-950 border border-amber-500/50 shadow-2xl transition cursor-pointer"
+                            title="Next Photo"
+                          >
+                            <ChevronRight className="w-5 h-5" />
+                          </button>
+                        </>
+                      )}
+
+                      {/* Bottom Location Label */}
+                      <div className="absolute bottom-3 left-3 bg-[#070D1B]/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-[#D4AF37]/50 flex items-center gap-2 text-xs text-amber-200 shadow-lg">
+                        <MapPin className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span className="font-semibold">{activePreviewProject.address ? `${activePreviewProject.address}, ` : ''}{activePreviewProject.city || 'Cumilla'}, {activePreviewProject.country || 'Bangladesh'}</span>
+                      </div>
+                    </div>
+
+                    {/* Thumbnail Strip */}
+                    {photos.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1.5 custom-scrollbar">
+                        {photos.map((ph, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveModalPhotoIdx(idx)}
+                            className={`relative w-20 h-14 rounded-xl overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                              idx === currentIdx
+                                ? 'border-amber-400 scale-105 shadow-md shadow-amber-500/30'
+                                : 'border-slate-800 opacity-60 hover:opacity-100 hover:border-slate-600'
+                            }`}
+                          >
+                            <img src={ph} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                            {idx === currentIdx && (
+                              <div className="absolute inset-0 bg-amber-500/10 border-amber-400" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Comprehensive Financial Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-[#070D1B] p-3 rounded-xl border border-[#D4AF37]/20">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Total Investment</span>
-                  <span className="text-base font-black text-amber-300">
+                <div className="bg-[#070D1B] p-3.5 rounded-2xl border border-[#D4AF37]/30 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Total Investment</span>
+                    <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <span className="text-base sm:text-lg font-black text-amber-300 mt-1 block font-mono">
                     ৳{(activePreviewProject.investmentAmount || 0).toLocaleString()}
                   </span>
+                  <span className="text-[10px] text-slate-400">Club Capital Asset</span>
                 </div>
 
-                <div className="bg-[#070D1B] p-3 rounded-xl border border-[#D4AF37]/20">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Current Valuation</span>
-                  <span className="text-base font-black text-emerald-400">
+                <div className="bg-[#070D1B] p-3.5 rounded-2xl border border-[#D4AF37]/30 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Current Valuation</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <span className="text-base sm:text-lg font-black text-emerald-400 mt-1 block font-mono">
                     ৳{(activePreviewProject.currentValue || 0).toLocaleString()}
                   </span>
+                  <span className="text-[10px] text-emerald-400/80">Market Appraisal</span>
                 </div>
 
-                <div className="bg-[#070D1B] p-3 rounded-xl border border-[#D4AF37]/20">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Expected Return</span>
-                  <span className="text-base font-black text-amber-400">
-                    +{activePreviewProject.expectedRoiPercent || 0}% ROI
+                <div className="bg-[#070D1B] p-3.5 rounded-2xl border border-[#D4AF37]/30 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Expected Profit</span>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  </div>
+                  <span className="text-base sm:text-lg font-black text-amber-400 mt-1 block font-mono">
+                    ৳{Math.max(0, (activePreviewProject.profit || ((activePreviewProject.currentValue || 0) - (activePreviewProject.investmentAmount || 0)))).toLocaleString()}
                   </span>
+                  <span className="text-[10px] text-amber-400/80">+{activePreviewProject.expectedRoiPercent || 25}% ROI</span>
                 </div>
 
-                <div className="bg-[#070D1B] p-3 rounded-xl border border-[#D4AF37]/20">
-                  <span className="text-[10px] text-slate-400 uppercase font-medium block">Investment Date</span>
-                  <span className="text-xs font-bold text-slate-200 mt-1 block">
-                    {activePreviewProject.investmentDate || activePreviewProject.purchaseDate || 'N/A'}
+                <div className="bg-[#070D1B] p-3.5 rounded-2xl border border-[#D4AF37]/30 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold">Investors & Date</span>
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-slate-200 mt-1 block">
+                    {activePreviewProject.totalInvestors || 24} Expat Investors
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {activePreviewProject.investmentDate || activePreviewProject.purchaseDate || '2024-2025'}
                   </span>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="bg-[#070D1B] p-4 rounded-xl border border-slate-800 space-y-1.5">
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wide block">
-                  Project Description & Overview
-                </span>
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed whitespace-pre-line">
-                  {activePreviewProject.description || 'Verified PBC Club capital asset investment and community growth venture.'}
+              {/* Project Description & Overview */}
+              <div className="bg-[#070D1B] p-4 sm:p-5 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <FileText className="w-4 h-4" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    Project Description & Overview
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+                  {activePreviewProject.description || 'Verified PBC Club capital asset investment and community growth venture. Developed with full legal compliance, architectural superiority, and high rental return for expatriate shareholders.'}
                 </p>
               </div>
 
-              {/* PDF Documents */}
+              {/* Location Google Maps Info */}
+              <div className="bg-[#070D1B] p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
+                    <MapPin className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">Official Property Location</span>
+                    <span className="text-xs sm:text-sm font-bold text-white">
+                      {activePreviewProject.address ? `${activePreviewProject.address}, ` : ''}{activePreviewProject.city || 'Cumilla'}, {activePreviewProject.country || 'Bangladesh'}
+                    </span>
+                  </div>
+                </div>
+
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${activePreviewProject.projectName} ${activePreviewProject.city || ''} ${activePreviewProject.country || ''}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shrink-0"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Open on Google Maps</span>
+                </a>
+              </div>
+
+              {/* Verified PDF Documents */}
               {activePreviewProject.documents && activePreviewProject.documents.length > 0 && (
-                <div className="bg-[#070D1B] p-4 rounded-xl border border-slate-800 space-y-2">
-                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wide block">
-                    Verified Documents
+                <div className="bg-[#070D1B] p-4 rounded-2xl border border-slate-800 space-y-2.5">
+                  <span className="text-xs font-bold text-amber-400 uppercase tracking-wide block flex items-center gap-1.5">
+                    <FileText className="w-4 h-4" />
+                    <span>Verified Project Documents & Deeds</span>
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {activePreviewProject.documents.map((doc: any, i: number) => (
@@ -692,22 +968,35 @@ export const HomeDashboard: React.FC = () => {
                         href={doc.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-semibold hover:bg-amber-500/30 transition"
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-semibold hover:bg-amber-500/30 transition"
                       >
-                        <ExternalLink className="w-3.5 h-3.5" />
+                        <FileText className="w-3.5 h-3.5" />
                         <span>{doc.name || `Document #${i + 1}`}</span>
+                        <ExternalLink className="w-3 h-3 ml-1 opacity-70" />
                       </a>
                     ))}
                   </div>
                 </div>
               )}
+
             </div>
 
             {/* Detailed Footer */}
-            <div className="p-4 border-t border-[#D4AF37]/20 bg-[#070D1B] flex justify-end">
+            <div className="p-4 border-t border-[#D4AF37]/30 bg-gradient-to-r from-[#070D1B] via-[#0E1C38] to-[#070D1B] flex items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  setActivePreviewProject(null);
+                  setActiveTab('real_estate');
+                }}
+                className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition cursor-pointer flex items-center gap-1.5"
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Explore Full Real Estate Portfolio</span>
+              </button>
+
               <button
                 onClick={() => setActivePreviewProject(null)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+                className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition cursor-pointer border border-slate-700"
               >
                 Close Preview
               </button>

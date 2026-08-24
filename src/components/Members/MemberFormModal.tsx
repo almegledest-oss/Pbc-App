@@ -130,10 +130,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         userRole: 'member',
         notes: 'Expat Investor',
         password: autoPass,
-        familyInfoName: 'Bristi Akter',
+        familyInfoName: 'Fatema Begum',
         familyInfoRelation: 'Wife',
-        familyInfoMobile: '01871713907',
-        familyInfoAddress: 'Gojaria,Nawabgonj,Dhaka'
+        familyInfoMobile: '+880 1800-000000',
+        familyInfoAddress: 'Village, Post, District'
       });
     }
     setErrors({});
@@ -598,7 +598,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 <label className="block text-slate-300 font-semibold mb-1">Nominee / Family Name (N. Name)</label>
                 <input
                   type="text"
-                  placeholder="e.g. Bristi Akter"
+                  placeholder="e.g. Fatema Begum"
                   value={formData.familyInfoName}
                   onChange={e => setFormData({ ...formData, familyInfoName: e.target.value })}
                   className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
@@ -620,7 +620,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 <label className="block text-slate-300 font-semibold mb-1">Family Mobile Number</label>
                 <input
                   type="text"
-                  placeholder="e.g. 01871713907"
+                  placeholder="e.g. +880 1800-000000"
                   value={formData.familyInfoMobile}
                   onChange={e => setFormData({ ...formData, familyInfoMobile: e.target.value })}
                   className="w-full px-3 py-2 font-mono bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
@@ -631,7 +631,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 <label className="block text-slate-300 font-semibold mb-1">Family Address</label>
                 <input
                   type="text"
-                  placeholder="e.g. Gojaria,Nawabgonj,Dhaka"
+                  placeholder="e.g. Village, Post, District"
                   value={formData.familyInfoAddress}
                   onChange={e => setFormData({ ...formData, familyInfoAddress: e.target.value })}
                   className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"

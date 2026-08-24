@@ -31,22 +31,53 @@ export const ReportsView: React.FC = () => {
 
   const [activeReportTab, setActiveReportTab] = useState<'deposits' | 'members' | 'investments' | 'profit'>('deposits');
 
-  // Monthly deposit breakdown data
-  const monthlyData = [
-    { month: 'Jan', amount: 1800000 },
-    { month: 'Feb', amount: 2200000 },
-    { month: 'Mar', amount: 2500000 },
-    { month: 'Apr', amount: 3100000 },
-    { month: 'May', amount: 3900000 },
-    { month: 'Jun', amount: 5000000 }
-  ];
+  // Dynamic monthly deposit breakdown from actual database deposits
+  const monthlyData = React.useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    const currentMonthIdx = new Date().getMonth();
+    const monthsList: { month: string; year: number; monthNum: number }[] = [];
 
-  // Yearly deposits data
-  const yearlyData = [
-    { year: '2022', total: 45000000 },
-    { year: '2023', total: 110000000 },
-    { year: '2024', total: 185000000 }
-  ];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(currentYear, currentMonthIdx - i, 1);
+      monthsList.push({
+        month: monthNames[d.getMonth()],
+        year: d.getFullYear(),
+        monthNum: d.getMonth()
+      });
+    }
+
+    const approvedDeps = deposits.filter(d => d.status === 'Approved');
+
+    return monthsList.map(({ month, year, monthNum }) => {
+      const amount = approvedDeps
+        .filter(d => {
+          if (!d.date) return false;
+          const depDate = new Date(d.date);
+          return depDate.getFullYear() === year && depDate.getMonth() === monthNum;
+        })
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+      return { month, amount };
+    });
+  }, [deposits]);
+
+  // Dynamic yearly deposits data
+  const yearlyData = React.useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years = [currentYear - 2, currentYear - 1, currentYear];
+    const approvedDeps = deposits.filter(d => d.status === 'Approved');
+
+    return years.map(y => {
+      const total = approvedDeps
+        .filter(d => {
+          if (!d.date) return false;
+          return new Date(d.date).getFullYear() === y;
+        })
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+      return { year: String(y), total };
+    });
+  }, [deposits]);
 
   // Country Demographics
   const countryCounts: Record<string, number> = {};
@@ -297,54 +328,123 @@ export const ReportsView: React.FC = () => {
 
       {/* 4. Profit & Yield Share Report */}
       {activeReportTab === 'profit' && (
-        <div className="bg-[#0B1528] p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4 text-white">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="text-base font-extrabold text-white uppercase tracking-wider">
-                Member Profit Distribution Share Ledger
-              </h3>
-              <p className="text-xs text-slate-400">Estimated quarterly yield return per member deposit</p>
+        <div className="space-y-6">
+          <div className="bg-[#0B1528] p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4 text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-extrabold text-white uppercase tracking-wider">
+                  Member Profit Distribution Share Ledger
+                </h3>
+                <p className="text-xs text-slate-400">Estimated annual yield return per member deposit based on total equity share</p>
+              </div>
+              <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-full self-start sm:self-auto">
+                Average Portfolio ROI: {stats.profitPercentage}%
+              </span>
             </div>
-            <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-full self-start sm:self-auto">
-              Average ROI: {stats.profitPercentage}%
-            </span>
+
+            {/* Overall Ledger Table */}
+            <div className="overflow-x-auto rounded-2xl border border-[#D4AF37]/20">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-[#070D1B] text-amber-300 font-bold border-b border-[#D4AF37]/30 uppercase tracking-wider">
+                    <th className="py-3 px-4">Member ID</th>
+                    <th className="py-3 px-4">Full Name</th>
+                    <th className="py-3 px-4">Total Deposit</th>
+                    <th className="py-3 px-4">Fund Equity Share %</th>
+                    <th className="py-3 px-4 text-right">Estimated Annual Yield</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#D4AF37]/20 bg-[#0B1528]">
+                  {(() => {
+                    // Compute accurate member deposits map
+                    const memberDepositMap: Record<string, number> = {};
+                    deposits.filter(d => d.status === 'Approved').forEach(d => {
+                      memberDepositMap[d.memberId] = (memberDepositMap[d.memberId] || 0) + Number(d.amount || 0);
+                    });
+
+                    // Total club deposits across all members
+                    const calculatedTotalDeposits = members.reduce((sum, m) => {
+                      const dep = memberDepositMap[m.id] !== undefined ? memberDepositMap[m.id] : Number(m.totalDeposit || 0);
+                      return sum + dep;
+                    }, 0) || stats.totalDeposits || 1;
+
+                    return members.map(m => {
+                      const actualDeposit = memberDepositMap[m.id] !== undefined 
+                        ? memberDepositMap[m.id] 
+                        : Number(m.totalDeposit || 0);
+
+                      const sharePct = calculatedTotalDeposits > 0 
+                        ? Math.min(100, (actualDeposit / calculatedTotalDeposits) * 100).toFixed(2)
+                        : '0.00';
+
+                      const estimatedProfit = Math.round(actualDeposit * (stats.profitPercentage / 100));
+
+                      return (
+                        <tr key={m.id} className="hover:bg-[#112244]/50 transition">
+                          <td className="py-3 px-4 font-mono font-bold text-amber-300">{m.id}</td>
+                          <td className="py-3 px-4 font-bold text-white">{m.fullName}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-200">
+                            ৳{actualDeposit.toLocaleString()}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-amber-400 font-bold">{sharePct}%</td>
+                          <td className="py-3 px-4 font-extrabold text-emerald-400 text-right">
+                            +৳{estimatedProfit.toLocaleString()} BDT
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-[#D4AF37]/20">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="bg-[#070D1B] text-amber-300 font-bold border-b border-[#D4AF37]/30 uppercase tracking-wider">
-                  <th className="py-3 px-4">Member ID</th>
-                  <th className="py-3 px-4">Full Name</th>
-                  <th className="py-3 px-4">Total Deposit</th>
-                  <th className="py-3 px-4">Fund Equity Share %</th>
-                  <th className="py-3 px-4 text-right">Estimated Annual Yield</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#D4AF37]/20 bg-[#0B1528]">
-                {members.map(m => {
-                  const sharePct = stats.totalDeposits > 0 
-                    ? ((m.totalDeposit / stats.totalDeposits) * 100).toFixed(2)
-                    : 0;
-                  const estimatedProfit = Math.round((m.totalDeposit * (stats.profitPercentage / 100)));
+          {/* Project-Specific Investor Allocations Breakdown */}
+          {projects.some(p => p.memberAllocations && p.memberAllocations.length > 0) && (
+            <div className="bg-[#0B1528] p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4 text-white">
+              <div>
+                <h3 className="text-base font-extrabold text-amber-300 uppercase tracking-wider">
+                  Active Project Investment Allocations & Shares
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Direct capital allocations by project with individual investor shares
+                </p>
+              </div>
 
-                  return (
-                    <tr key={m.id} className="hover:bg-[#112244]/50 transition">
-                      <td className="py-3 px-4 font-mono font-bold text-amber-300">{m.id}</td>
-                      <td className="py-3 px-4 font-bold text-white">{m.fullName}</td>
-                      <td className="py-3 px-4 font-semibold text-slate-200">
-                        ৳{m.totalDeposit.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-amber-400 font-bold">{sharePct}%</td>
-                      <td className="py-3 px-4 font-extrabold text-emerald-400 text-right">
-                        +৳{estimatedProfit.toLocaleString()} BDT
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {projects
+                  .filter(p => p.memberAllocations && p.memberAllocations.length > 0)
+                  .map(p => {
+                    const totalAlloc = (p.memberAllocations || []).reduce((sum, a) => sum + (Number(a.allocatedAmount) || 0), 0);
+                    return (
+                      <div key={p.id} className="p-4 bg-[#070D1B] border border-[#D4AF37]/30 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-white block text-sm">{p.projectName}</span>
+                            <span className="text-[10px] text-amber-300 font-mono">{p.id} • {p.category}</span>
+                          </div>
+                          <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 text-xs font-bold rounded-lg border border-amber-500/40">
+                            ৳{totalAlloc.toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 divide-y divide-slate-800">
+                          {(p.memberAllocations || []).map(alloc => (
+                            <div key={alloc.memberId} className="pt-1.5 flex items-center justify-between text-xs">
+                              <span className="text-slate-300">{alloc.memberName} ({alloc.memberId})</span>
+                              <div className="text-right">
+                                <span className="font-mono text-emerald-400 font-bold block">৳{alloc.allocatedAmount.toLocaleString()}</span>
+                                <span className="text-[10px] text-amber-400 font-mono">{alloc.sharePercentage || ((alloc.allocatedAmount / (totalAlloc || 1)) * 100).toFixed(1)}% Share</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

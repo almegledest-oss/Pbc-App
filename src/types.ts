@@ -176,6 +176,18 @@ export interface Deposit {
   approvedByAdminSignature?: string;
 }
 
+export interface ProjectMemberAllocation {
+  memberId: string;
+  memberName: string;
+  memberEmail?: string;
+  memberPhone?: string;
+  allocatedAmount: number; // in BDT (৳)
+  availableDeposit: number; // in BDT (৳)
+  sharePercentage?: number; // % share in this project
+  allocationDate: string; // YYYY-MM-DD
+  notes?: string;
+}
+
 export interface RealEstateProject {
   id: string; // e.g., PRJ-301
   projectName: string;
@@ -198,6 +210,7 @@ export interface RealEstateProject {
   description: string;
   expectedRoiPercent?: number;
   totalInvestors?: number;
+  memberAllocations?: ProjectMemberAllocation[];
   createdAt?: any;
 }
 

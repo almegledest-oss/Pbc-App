@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { RealEstateProject, InvestmentCategory, ProjectStatus, INVESTMENT_CATEGORIES } from '../../types';
+import { RealEstateProject, InvestmentCategory, ProjectStatus, INVESTMENT_CATEGORIES, ProjectMemberAllocation } from '../../types';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 import { uploadImageToCloudOrCompressed } from '../../utils/imageCompressor';
+import { ProjectAllocationModal } from './ProjectAllocationModal';
 import { 
   Building2, 
   MapPin, 
@@ -31,17 +32,25 @@ import {
   Upload,
   Loader2,
   CheckCircle2,
-  Star
+  Star,
+  Wallet,
+  Percent,
+  Sparkles,
+  DollarSign,
+  ArrowLeft
 } from 'lucide-react';
 
 export const ProjectList: React.FC = () => {
   const { 
     projects, 
+    members,
+    deposits,
     addProject, 
     updateProject, 
     deleteProjectWithReason,
     language, 
-    role 
+    role,
+    setActiveTab
   } = useApp();
 
   const labels = t[language];
@@ -56,6 +65,8 @@ export const ProjectList: React.FC = () => {
   const [projectToDelete, setProjectToDelete] = useState<RealEstateProject | null>(null);
   const [selectedGalleryProject, setSelectedGalleryProject] = useState<RealEstateProject | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [allocatingProject, setAllocatingProject] = useState<RealEstateProject | null>(null);
+  const [viewingAllocationsProject, setViewingAllocationsProject] = useState<RealEstateProject | null>(null);
 
   // Upload States
   const [isUploadingAdd, setIsUploadingAdd] = useState(false);
@@ -264,24 +275,42 @@ export const ProjectList: React.FC = () => {
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-extrabold text-white tracking-tight uppercase">
-            Investment Portfolio {isAdmin && `(${projects.length})`}
-          </h2>
-          <p className="text-xs text-slate-300">
-            PBC Club premier investment categories, land, and asset acquisitions
-          </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="p-2.5 bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/30 hover:border-amber-400 text-amber-400 hover:text-white rounded-xl transition-all shadow-md flex items-center gap-2 text-xs font-bold cursor-pointer group"
+            title="ড্যাশবোর্ডে ফিরে যান (Back to Dashboard)"
+          >
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline">ড্যাশবোর্ড (Back)</span>
+          </button>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight uppercase">
+              Investment Portfolio {isAdmin && `(${projects.length})`}
+            </h2>
+            <p className="text-xs text-slate-300">
+              PBC Club premier investment categories, land, and asset acquisitions
+            </p>
+          </div>
         </div>
 
-        {isAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
+            onClick={() => setActiveTab('dashboard')}
+            className="sm:hidden flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700"
           >
-            <Plus className="w-4 h-4" />
-            <span>Add Investment</span>
+            <ArrowLeft className="w-3.5 h-3.5" /> ড্যাশবোর্ড
           </button>
-        )}
+          {isAdmin && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Investment</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 10 Investment Category Summary Grid */}
@@ -451,6 +480,50 @@ export const ProjectList: React.FC = () => {
                         <TrendingUp className="w-3 h-3 text-amber-400" />
                         ৳{(project.profit || 0).toLocaleString()}
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Member Capital Allocation Banner */}
+                  <div className="bg-[#070D1B] p-3 rounded-2xl border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-amber-300 text-xs font-bold">
+                        <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Member Capital Allocation</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        {project.memberAllocations && project.memberAllocations.length > 0 ? (
+                          <span>
+                            <strong className="text-emerald-400 font-mono">
+                              ৳{project.memberAllocations.reduce((sum, a) => sum + (Number(a.allocatedAmount) || 0), 0).toLocaleString()}
+                            </strong> allocated across <strong className="text-white">{project.memberAllocations.length} Members</strong>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">No member deposit allocated yet</span>
+                        )}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {project.memberAllocations && project.memberAllocations.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setViewingAllocationsProject(project)}
+                          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                        >
+                          View Shares
+                        </button>
+                      )}
+
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setAllocatingProject(project)}
+                          className="px-3 py-1.5 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border border-amber-500/50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        >
+                          <Wallet className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Allocate Funds</span>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1141,6 +1214,119 @@ export const ProjectList: React.FC = () => {
             setProjectToDelete(null);
           }}
         />
+      )}
+
+      {/* Dynamic Member Fund Allocation Modal */}
+      {allocatingProject && (
+        <ProjectAllocationModal
+          project={allocatingProject}
+          members={members}
+          deposits={deposits}
+          onClose={() => setAllocatingProject(null)}
+          onSave={(updatedAllocations, totalAllocated) => {
+            updateProject(allocatingProject.id, {
+              memberAllocations: updatedAllocations,
+              totalInvestors: updatedAllocations.length > 0 ? updatedAllocations.length : (allocatingProject.totalInvestors || 1),
+              investmentAmount: totalAllocated > 0 ? totalAllocated : allocatingProject.investmentAmount
+            });
+            setAllocatingProject(null);
+          }}
+        />
+      )}
+
+      {/* View Allocated Investors & Shares Modal */}
+      {viewingAllocationsProject && (
+        <div className="fixed inset-0 z-60 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0B1528] text-white rounded-3xl border-2 border-[#D4AF37]/50 shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-[#D4AF37]/30 flex items-center justify-between bg-[#070D1B]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-amber-300 uppercase tracking-widest block">
+                    Participating Investors & Shares
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    {viewingAllocationsProject.projectName}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingAllocationsProject(null)}
+                className="p-2 text-slate-400 hover:text-white rounded-full bg-[#070D1B] border border-slate-700 hover:border-amber-400 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content Table */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1 custom-scrollbar">
+              <div className="overflow-x-auto rounded-2xl border border-[#D4AF37]/20">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-[#070D1B] text-amber-300 font-bold border-b border-[#D4AF37]/30 uppercase tracking-wider">
+                      <th className="py-3 px-4">Member ID</th>
+                      <th className="py-3 px-4">Investor Name</th>
+                      <th className="py-3 px-4">Allocated Capital</th>
+                      <th className="py-3 px-4 text-right">Project Share %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 bg-[#0B1528]">
+                    {(() => {
+                      const allocs = viewingAllocationsProject.memberAllocations || [];
+                      const totalSum = allocs.reduce((sum, a) => sum + (Number(a.allocatedAmount) || 0), 0);
+
+                      if (allocs.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={4} className="py-6 text-center text-slate-400">
+                              No member allocations recorded for this project yet.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return allocs.map((alloc) => {
+                        const share = totalSum > 0 ? ((alloc.allocatedAmount / totalSum) * 100).toFixed(2) : 0;
+                        return (
+                          <tr key={alloc.memberId} className="hover:bg-[#112244]/40 transition">
+                            <td className="py-3 px-4 font-mono font-bold text-amber-300">{alloc.memberId}</td>
+                            <td className="py-3 px-4 font-bold text-white">{alloc.memberName}</td>
+                            <td className="py-3 px-4 font-mono font-bold text-emerald-400">
+                              ৳{(alloc.allocatedAmount || 0).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-black text-amber-400 text-right">
+                              {share}%
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-[#D4AF37]/20 bg-[#070D1B] flex justify-between items-center">
+              <span className="text-xs text-slate-300">
+                Total Capital: <strong className="text-amber-300 font-mono">
+                  ৳{((viewingAllocationsProject.memberAllocations || []).reduce((sum, a) => sum + (Number(a.allocatedAmount) || 0), 0)).toLocaleString()}
+                </strong>
+              </span>
+
+              <button
+                onClick={() => setViewingAllocationsProject(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
