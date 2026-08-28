@@ -39,10 +39,18 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
       let safeSignatureUrl = deposit.approvedByAdminSignature;
 
       if (deposit.receiptUrl && !deposit.receiptUrl.startsWith('data:image/')) {
-        safeReceiptUrl = await urlToSafeDataUrl(deposit.receiptUrl);
+        try {
+          safeReceiptUrl = await urlToSafeDataUrl(deposit.receiptUrl);
+        } catch (e) {
+          console.warn('Could not convert receipt URL:', e);
+        }
       }
       if (deposit.approvedByAdminSignature && !deposit.approvedByAdminSignature.startsWith('data:image/')) {
-        safeSignatureUrl = await urlToSafeDataUrl(deposit.approvedByAdminSignature);
+        try {
+          safeSignatureUrl = await urlToSafeDataUrl(deposit.approvedByAdminSignature);
+        } catch (e) {
+          console.warn('Could not convert signature URL:', e);
+        }
       }
 
       const pdf = new jsPDF({
@@ -50,8 +58,15 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
         unit: 'mm',
         format: 'a4'
       });
+
+      // Accurately measure the unconstrained full size of the voucher
+      const fullWidth = Math.max(voucherEl.scrollWidth, voucherEl.offsetWidth, 580);
+      const fullHeight = Math.max(voucherEl.scrollHeight, voucherEl.offsetHeight, 650);
+
       const canvas = await captureElementToCanvas(voucherEl, {
         scale: 2.5,
+        width: fullWidth,
+        height: fullHeight,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#070D1B',
@@ -61,12 +76,16 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
           const clonedVoucher = clonedDoc.getElementById('deposit-receipt-voucher');
           if (clonedVoucher) {
             clonedVoucher.scrollTop = 0;
+            clonedVoucher.style.width = `${fullWidth}px`;
+            clonedVoucher.style.minWidth = `${fullWidth}px`;
+            clonedVoucher.style.maxWidth = `${fullWidth}px`;
+            clonedVoucher.style.height = `${fullHeight}px`;
+            clonedVoucher.style.minHeight = `${fullHeight}px`;
             clonedVoucher.style.maxHeight = 'none';
-            clonedVoucher.style.height = 'auto';
             clonedVoucher.style.overflow = 'visible';
             clonedVoucher.style.backgroundColor = '#070D1B';
             clonedVoucher.style.color = '#FFFFFF';
-            clonedVoucher.style.padding = '20px';
+            clonedVoucher.style.padding = '24px';
             clonedVoucher.style.borderRadius = '20px';
             clonedVoucher.style.boxSizing = 'border-box';
 
@@ -81,11 +100,15 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
               sigImg.src = safeSignatureUrl;
             }
 
-            if (clonedVoucher.parentElement) {
-              clonedVoucher.parentElement.scrollTop = 0;
-              clonedVoucher.parentElement.style.maxHeight = 'none';
-              clonedVoucher.parentElement.style.height = 'auto';
-              clonedVoucher.parentElement.style.overflow = 'visible';
+            // Remove any overflow and height limits on all parent ancestors in the cloned DOM
+            let curr = clonedVoucher.parentElement;
+            while (curr) {
+              curr.scrollTop = 0;
+              curr.style.maxHeight = 'none';
+              curr.style.height = 'auto';
+              curr.style.minHeight = 'auto';
+              curr.style.overflow = 'visible';
+              curr = curr.parentElement;
             }
           }
         }
@@ -138,7 +161,7 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white bg-[#070D1B] hover:bg-rose-600 rounded-full transition flex items-center gap-1 text-xs font-bold border border-amber-500/20"
+            className="p-2 text-slate-400 hover:text-white bg-[#070D1B] hover:bg-rose-600 rounded-full transition flex items-center gap-1 text-xs font-bold border border-amber-500/20 cursor-pointer"
             title={language === 'bn' ? "বন্ধ করুন" : "Close"}
           >
             <X className="w-5 h-5" />
@@ -146,8 +169,19 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
           </button>
         </div>
 
-        {/* Printable Deposit Receipt Voucher - Scrollable middle */}
-        <div id="deposit-receipt-voucher" className="p-5 sm:p-6 space-y-5 overflow-y-auto flex-1 text-white" style={{ backgroundColor: '#070D1B', color: '#FFFFFF', fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+        {/* Modal Scroll Container - Allows natural scrolling on small mobile screens without restricting inner voucher height */}
+        <div className="p-3 sm:p-5 overflow-y-auto flex-1 bg-[#040D1B]/60">
+          {/* Printable Deposit Receipt Voucher Document Card */}
+          <div 
+            id="deposit-receipt-voucher" 
+            className="p-5 sm:p-6 space-y-5 text-white rounded-2xl shadow-xl w-full" 
+            style={{ 
+              backgroundColor: '#070D1B', 
+              color: '#FFFFFF', 
+              border: '1.5px solid rgba(212, 175, 55, 0.4)',
+              fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' 
+            }}
+          >
           {/* Club Header Banner */}
           <div className="flex items-center justify-between pb-4 border-b" style={{ borderColor: 'rgba(212, 175, 55, 0.4)' }}>
             <div className="flex items-center gap-3">
@@ -307,8 +341,9 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Modal Actions - Sticky Bottom */}
+      {/* Modal Actions - Sticky Bottom */}
         <div className="p-3 sm:p-4 bg-[#0B1528] border-t border-[#D4AF37]/30 flex items-center justify-between gap-2 shrink-0">
           <button
             onClick={onClose}

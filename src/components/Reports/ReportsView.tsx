@@ -356,22 +356,17 @@ export const ReportsView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-[#D4AF37]/20 bg-[#0B1528]">
                   {(() => {
-                    // Compute accurate member deposits map
+                    // Compute accurate member deposits map strictly from Approved deposits
                     const memberDepositMap: Record<string, number> = {};
                     deposits.filter(d => d.status === 'Approved').forEach(d => {
                       memberDepositMap[d.memberId] = (memberDepositMap[d.memberId] || 0) + Number(d.amount || 0);
                     });
 
-                    // Total club deposits across all members
-                    const calculatedTotalDeposits = members.reduce((sum, m) => {
-                      const dep = memberDepositMap[m.id] !== undefined ? memberDepositMap[m.id] : Number(m.totalDeposit || 0);
-                      return sum + dep;
-                    }, 0) || stats.totalDeposits || 1;
+                    // Total club approved deposits across all members
+                    const calculatedTotalDeposits = Object.values(memberDepositMap).reduce((sum, val) => sum + val, 0);
 
                     return members.map(m => {
-                      const actualDeposit = memberDepositMap[m.id] !== undefined 
-                        ? memberDepositMap[m.id] 
-                        : Number(m.totalDeposit || 0);
+                      const actualDeposit = memberDepositMap[m.id] || 0;
 
                       const sharePct = calculatedTotalDeposits > 0 
                         ? Math.min(100, (actualDeposit / calculatedTotalDeposits) * 100).toFixed(2)

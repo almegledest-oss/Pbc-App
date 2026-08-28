@@ -39,7 +39,7 @@ export const ProjectAllocationModal: React.FC<ProjectAllocationModalProps> = ({
   const memberDepositMap = useMemo(() => {
     const map = new Map<string, number>();
     
-    // First from deposits table
+    // Sum only approved deposits from deposits table
     deposits
       .filter(d => d.status === 'Approved')
       .forEach(d => {
@@ -47,15 +47,8 @@ export const ProjectAllocationModal: React.FC<ProjectAllocationModalProps> = ({
         map.set(d.memberId, cur + (Number(d.amount) || 0));
       });
 
-    // Fallback from member.totalDeposit if deposits collection is empty for that member
-    members.forEach(m => {
-      if (!map.has(m.id) && m.totalDeposit > 0) {
-        map.set(m.id, Number(m.totalDeposit) || 0);
-      }
-    });
-
     return map;
-  }, [deposits, members]);
+  }, [deposits]);
 
   // Initial state of allocations mapping memberId -> allocatedAmount
   const [allocations, setAllocations] = useState<Record<string, number>>(() => {

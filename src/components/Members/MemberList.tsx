@@ -57,11 +57,25 @@ export const MemberList: React.FC = () => {
 
   const labels = t[language];
 
-  const getMemberTotalDeposit = (member: Member) => {
+  const getMemberDepositBreakdown = (member: Member) => {
+    const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
     const memberDeps = deposits.filter(
-      d => (d.memberId === member.id || (member.fullName && d.memberName.toLowerCase() === member.fullName.toLowerCase())) && d.status === 'Approved'
+      d => (d.memberId === member.id || (member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())) && 
+      isApproved(d.status)
     );
-    return memberDeps.reduce((sum, d) => sum + d.amount, 0);
+    const total = memberDeps.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    const fundRaising = memberDeps
+      .filter(d => d.category === 'Fund Raising' || !d.category)
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    const realEstate = memberDeps
+      .filter(d => d.category === 'Real Estate')
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+    return { total, fundRaising, realEstate };
+  };
+
+  const getMemberTotalDeposit = (member: Member) => {
+    return getMemberDepositBreakdown(member).total;
   };
 
   // Filters & Search
@@ -210,7 +224,7 @@ export const MemberList: React.FC = () => {
       `"${(m.country || '').replace(/"/g, '""')}"`,
       `"${(m.city || '').replace(/"/g, '""')}"`,
       m.status || '',
-      m.totalDeposit || 0,
+      getMemberTotalDeposit(m),
       m.sharePercentage || 0,
       m.joinDate || '',
       m.role || '',
@@ -379,9 +393,18 @@ export const MemberList: React.FC = () => {
                       {member.phone}
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="font-extrabold text-amber-300">
+                      <span className="font-extrabold text-amber-300 block">
                         ৳{getMemberTotalDeposit(member).toLocaleString()} BDT
                       </span>
+                      {getMemberTotalDeposit(member) > 0 ? (
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          🌱 ৳{getMemberDepositBreakdown(member).fundRaising.toLocaleString()} | 🏢 ৳{getMemberDepositBreakdown(member).realEstate.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 italic block mt-0.5">
+                          ৳0 (No Deposit)
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
                       <span className={`px-2.5 py-1 text-[10px] font-bold rounded-full capitalize flex items-center gap-1 w-max ${
@@ -620,17 +643,27 @@ export const MemberList: React.FC = () => {
             </div>
 
             {/* Bottom Row: Deposit Total & Digital Pass Trigger */}
-            <div className="pt-3 border-t border-[#D4AF37]/20 flex items-center justify-between">
+            <div className="pt-3 border-t border-[#D4AF37]/20 flex items-center justify-between gap-2">
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">TOTAL DEPOSIT</span>
                 <p className="text-sm font-extrabold text-amber-300">
                   ৳{getMemberTotalDeposit(member).toLocaleString()} BDT
                 </p>
+                {/* Breakdown */}
+                {getMemberTotalDeposit(member) > 0 ? (
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px]">
+                    <span className="text-emerald-400 font-medium">🌱 ৳{getMemberDepositBreakdown(member).fundRaising.toLocaleString()}</span>
+                    <span className="text-slate-600">•</span>
+                    <span className="text-cyan-400 font-medium">🏢 ৳{getMemberDepositBreakdown(member).realEstate.toLocaleString()}</span>
+                  </div>
+                ) : (
+                  <span className="text-[10px] text-slate-500 italic block mt-0.5">No approved deposit</span>
+                )}
               </div>
 
               <button
                 onClick={() => setActiveCardMember(member)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-md active:scale-95 cursor-pointer"
+                className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-md active:scale-95 cursor-pointer shrink-0"
               >
                 <CreditCard className="w-4 h-4 text-slate-950" />
                 <span>Card Pass</span>

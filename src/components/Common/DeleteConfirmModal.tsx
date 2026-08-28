@@ -50,7 +50,12 @@ export const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
     try {
       setIsSubmitting(true);
       setErrorMsg('');
-      await onConfirm(reason.trim());
+      
+      // Execute deletion with a 5-second safeguard timeout to prevent hanging UI
+      const deletionPromise = Promise.resolve(onConfirm(reason.trim()));
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+      await Promise.race([deletionPromise, timeoutPromise]);
+
       setReason('');
       onClose();
     } catch (err: any) {

@@ -26,6 +26,7 @@ export interface SystemSettings {
   trashBoxAccessAdmins?: string[];
   maintenanceMode?: boolean;
   maintenanceMessage?: string;
+  activeThemeId?: string;
 }
 
 export interface TrashedItem {
@@ -86,6 +87,30 @@ export const INVESTMENT_CATEGORIES: InvestmentCategory[] = [
   'Other'
 ];
 
+export function resolveProjectCategory(p?: Partial<RealEstateProject> | string | null): InvestmentCategory {
+  if (!p) return 'Land';
+  const rawCat = (typeof p === 'string' ? p : (p.category || p.propertyType || '')).toString().trim();
+  const name = typeof p === 'object' && p ? (p.projectName || p.projectNameBn || '') : '';
+  const desc = typeof p === 'object' && p ? (p.description || '') : '';
+  const text = `${rawCat} ${name} ${desc}`.toLowerCase();
+
+  if (/land|plot|জমি|জায়গা|প্লট|মাটি|cumilla|কুমিল্লা/i.test(text)) return 'Land';
+  if (/building|tower|plaza|ভবন|টাওয়ার|প্লাজা|apartment|flat/i.test(text)) return 'Building';
+  if (/hotel|resort|হোটেল|রিসোর্ট/i.test(text)) return 'Hotel';
+  if (/restaurant|cafe|food|খাবার|রেস্তোরাঁ|রেস্টুরেন্ট/i.test(text)) return 'Restaurant';
+  if (/hospital|clinic|medical|ডাক্তার|হাসপাতাল/i.test(text)) return 'Hospital';
+  if (/factory|industry|কারখানা|শিল্প/i.test(text)) return 'Factory';
+  if (/agri|farm|agriculture|কৃষি|খামার/i.test(text)) return 'Agriculture';
+  if (/warehouse|godown|গুদাম|স্টোরেজ/i.test(text)) return 'Warehouse';
+  if (/transport|vehicle|গাড়ি|পরিবহন/i.test(text)) return 'Transport';
+  if (/real|estate|property|রিয়েল|এস্টেট/i.test(text)) return 'Real Estate';
+
+  const exactMatch = INVESTMENT_CATEGORIES.find(c => c.toLowerCase() === rawCat.toLowerCase());
+  if (exactMatch) return exactMatch;
+
+  return 'Land';
+}
+
 export type ProjectStatus = 'Approved' | 'Pending' | 'Archived' | 'Planning' | 'Acquired' | 'Under Construction' | 'Generating Yield' | 'Sold';
 
 export interface ProjectDocument {
@@ -106,6 +131,8 @@ export interface Member {
   photoUrl: string;
   idCardPhotoUrl?: string;
   totalDeposit: number; // in BDT (৳)
+  totalFundRaisingDeposit?: number;
+  totalRealEstateDeposit?: number;
   qrCodeData: string;
   barcodeData?: string;
   passportNumber?: string;
@@ -163,6 +190,7 @@ export interface Deposit {
   memberId: string;
   memberName: string;
   amount: number; // in BDT (৳)
+  category?: 'Fund Raising' | 'Real Estate';
   currency: 'BDT';
   localAmount?: number;
   depositDate: string;
@@ -226,6 +254,8 @@ export interface NotificationItem {
 export interface ClubStats {
   totalMembers: number;
   totalDeposits: number;
+  totalFundRaisingDeposits?: number;
+  totalRealEstateDeposits?: number;
   totalFund: number;
   totalInvestment: number;
   availableBalance: number;

@@ -26,7 +26,7 @@ import {
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
-import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession } from '../types';
+import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession, resolveProjectCategory } from '../types';
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
@@ -715,6 +715,7 @@ export function subscribeDeposits(callback: (deposits: Deposit[]) => void) {
         memberId: data.memberId || '',
         memberName: data.memberName || '',
         amount: data.amount || 0,
+        category: data.category === 'Real Estate' ? 'Real Estate' : 'Fund Raising',
         currency: data.currency || 'BDT',
         localAmount: data.localAmount,
         depositDate: data.depositDate || '',
@@ -816,17 +817,25 @@ export function subscribeProjects(callback: (projects: RealEstateProject[]) => v
   return onSnapshot(colRef, (snapshot) => {
     const list: RealEstateProject[] = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
-      const investmentAmount = data.investmentAmount || 0;
-      const currentValue = data.currentValue || 0;
-      const profit = data.profit !== undefined ? data.profit : (currentValue - investmentAmount);
+      const investmentAmount = Number(data.investmentAmount) || 0;
+      const currentValue = Number(data.currentValue) || 0;
+      const profit = data.profit !== undefined ? Number(data.profit) : (currentValue - investmentAmount);
       const loss = Math.max(0, investmentAmount - currentValue);
+
+      const category: InvestmentCategory = resolveProjectCategory({
+        category: data.category,
+        propertyType: data.propertyType,
+        projectName: data.projectName,
+        projectNameBn: data.projectNameBn,
+        description: data.description
+      });
 
       return {
         id: docSnap.id,
         projectName: data.projectName || '',
         projectNameBn: data.projectNameBn,
-        category: data.category || data.propertyType || 'Real Estate',
-        propertyType: data.propertyType || 'Real Estate',
+        category,
+        propertyType: data.propertyType || category,
         country: data.country || '',
         city: data.city || '',
         address: data.address || '',

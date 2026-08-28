@@ -170,7 +170,9 @@ export const AdminSignatureModal: React.FC<AdminSignatureModalProps> = ({
 
     try {
       const sigDataUrl = generateSignatureImage();
-      await onConfirmApprove(sigDataUrl);
+      const approvalPromise = Promise.resolve(onConfirmApprove(sigDataUrl));
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 4000));
+      await Promise.race([approvalPromise, timeoutPromise]);
       onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Signature authorization failed');

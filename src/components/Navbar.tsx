@@ -37,8 +37,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
     switchRoleMode,
     language, 
     setLanguage, 
-    theme, 
-    setTheme, 
     viewMode, 
     setViewMode, 
     setIsSearchOpen,
@@ -242,26 +240,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
           >
             <Globe className="w-3.5 h-3.5 text-amber-400" />
             <span>{language === 'en' ? 'বাংলা' : 'EN'}</span>
-          </button>
-
-          {/* Theme Switcher (Dark / Light) - Desktop/Tablet */}
-          <button
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-200 bg-[#0B1528] hover:bg-[#112244] rounded-xl border border-[#D4AF37]/30 transition cursor-pointer"
-            title={theme === 'light' ? "Switch to Dark Mode (ডার্ক মোড)" : "Switch to Light Mode (লাইট মোড)"}
-            aria-label="Toggle Theme"
-          >
-            {theme === 'light' ? (
-              <>
-                <Moon className="w-3.5 h-3.5 text-amber-300" />
-                <span className="text-slate-200">Dark</span>
-              </>
-            ) : (
-              <>
-                <Sun className="w-3.5 h-3.5 text-amber-400 fill-amber-400/20" />
-                <span className="text-amber-400">Light</span>
-              </>
-            )}
           </button>
 
           {/* Notifications Bell */}

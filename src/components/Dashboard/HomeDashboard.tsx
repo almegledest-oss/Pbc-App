@@ -40,10 +40,12 @@ export const HomeDashboard: React.FC = () => {
   const [isFullscreenPhoto, setIsFullscreenPhoto] = React.useState<boolean>(false);
 
   const getMemberTotalDeposit = (member: any) => {
+    const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
     const memberDeps = deposits.filter(
-      d => (d.memberId === member.id || (member.fullName && d.memberName?.toLowerCase() === member.fullName.toLowerCase())) && d.status === 'Approved'
+      d => (d.memberId === member.id || (member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())) && 
+      isApproved(d.status)
     );
-    return memberDeps.reduce((sum, d) => sum + d.amount, 0);
+    return memberDeps.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
   };
 
   const [activeChartMetric, setActiveChartMetric] = React.useState<'deposits' | 'totalFund' | 'investment' | 'profit'>('deposits');
@@ -196,7 +198,7 @@ export const HomeDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Total Deposits (BDT) */}
+        {/* Total Deposits (BDT) with Fund Breakdown */}
         <div 
           onClick={() => setActiveTab('deposits')}
           className="bg-[#0B1528] dark:bg-[#070D1B] p-5 rounded-2xl border border-[#D4AF37]/30 shadow-lg hover:border-[#D4AF37]/60 transition cursor-pointer group relative overflow-hidden"
@@ -210,8 +212,16 @@ export const HomeDashboard: React.FC = () => {
           <div className="text-2xl font-black text-white">
             ৳{stats.totalDeposits.toLocaleString()} BDT
           </div>
-          <div className="text-xs font-medium text-amber-400/90 mt-1">
-            ৳{(stats.totalDeposits / 100000).toFixed(2)} Lakh BDT Verified Capital
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#D4AF37]/20 text-[11px]">
+            <span className="flex items-center gap-1 font-bold text-emerald-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              Fund Raising: ৳{(stats.totalFundRaisingDeposits || 0).toLocaleString()}
+            </span>
+            <span className="text-slate-600">|</span>
+            <span className="flex items-center gap-1 font-bold text-cyan-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              Real Estate: ৳{(stats.totalRealEstateDeposits || 0).toLocaleString()}
+            </span>
           </div>
         </div>
 

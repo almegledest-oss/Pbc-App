@@ -38,6 +38,7 @@ import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../
 import { PbcLogo } from '../Common/PbcLogo';
 import { PbcAirplaneHeaderLogo } from '../Members/PbcCardGraphics';
 import { safeStorage } from '../../utils/safeStorage';
+import { ThemeSelectorCard } from './ThemeSelectorCard';
 
 export const AdminPanel: React.FC = () => {
   const { 
@@ -737,6 +738,9 @@ export const AdminPanel: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Theme Customizer Box */}
+              <ThemeSelectorCard />
+
               {/* App Logo Customization Box */}
               <div className="p-5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30 space-y-4">
                 <div className="flex items-center justify-between">

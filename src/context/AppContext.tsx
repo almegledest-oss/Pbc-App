@@ -537,15 +537,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Calculate live stats dynamically
   const totalMembersCount = members.length;
-  const totalDepositsSum = deposits.filter(d => d.status === 'Approved').reduce((sum, d) => sum + d.amount, 0);
-  const totalInvestmentSum = projects.reduce((sum, p) => sum + p.investmentAmount, 0);
-  const totalCurrentValSum = projects.reduce((sum, p) => sum + p.currentValue, 0);
+  const isApprovedStatus = (status?: string) => {
+    if (!status) return false;
+    const s = status.toLowerCase().trim();
+    return s === 'approved' || s === 'active' || s === 'completed';
+  };
+
+  const totalFundRaisingSum = deposits
+    .filter(d => isApprovedStatus(d.status) && (d.category === 'Fund Raising' || !d.category))
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalRealEstateSum = deposits
+    .filter(d => isApprovedStatus(d.status) && d.category === 'Real Estate')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalDepositsSum = deposits.filter(d => isApprovedStatus(d.status)).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalInvestmentSum = projects.reduce((sum, p) => sum + (Number(p.investmentAmount) || 0), 0);
+  const totalCurrentValSum = projects.reduce((sum, p) => sum + (Number(p.currentValue) || 0), 0);
   const totalProfitSum = totalCurrentValSum - totalInvestmentSum;
   const availableBal = Math.max(0, totalDepositsSum - totalInvestmentSum);
 
   const stats: ClubStats = {
     totalMembers: totalMembersCount,
     totalDeposits: totalDepositsSum,
+    totalFundRaisingDeposits: totalFundRaisingSum,
+    totalRealEstateDeposits: totalRealEstateSum,
     totalFund: totalDepositsSum + totalProfitSum,
     totalInvestment: totalInvestmentSum,
     availableBalance: availableBal,
@@ -778,21 +792,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = members.find(m => m.id === id);
     if (target) {
-      await addTrashedItemDoc({
-        itemType: 'Member',
-        title: `Member ${target.fullName} (${target.id})`,
-        originalId: target.id,
-        originalCollection: 'members',
-        itemData: target,
-        deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
-        deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
-        deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
-        reason: reason || 'No reason specified',
-        deletedAt: new Date().toISOString()
-      });
-      await deleteMemberDoc(id);
-      await addActivityLog('Member Moved to Trash', `Member ${target.fullName} (${id}) moved to Trash Box. Reason: ${reason}`);
-      addNotification('Member Deleted', `Member ${target.fullName} moved to Trash Box. Reason: ${reason}`, 'system');
+      // Instant optimistic local state update
+      setMembers(prev => prev.filter(m => m.id !== id));
+
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Member',
+            title: `Member ${target.fullName} (${target.id})`,
+            originalId: target.id,
+            originalCollection: 'members',
+            itemData: {
+              ...target,
+              photoUrl: target.photoUrl && target.photoUrl.length > 50000 ? '' : target.photoUrl
+            },
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason || 'No reason specified',
+            deletedAt: new Date().toISOString()
+          }),
+          deleteMemberDoc(id),
+          addActivityLog('Member Moved to Trash', `Member ${target.fullName} (${id}) moved to Trash Box. Reason: ${reason}`)
+        ]);
+        addNotification('Member Deleted', `Member ${target.fullName} moved to Trash Box. Reason: ${reason}`, 'system');
+      } catch (e) {
+        console.warn('Error during deleteMember async sync:', e);
+      }
     }
   };
 
@@ -852,14 +878,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // CRUD for Deposits
   const addDeposit = async (d: Omit<Deposit, 'id' | 'status'> & { status?: 'Approved' | 'Pending' | 'Rejected'; approvedByAdminName?: string; approvedByAdminId?: string }) => {
-    const nextDepNum = 9000 + deposits.length + 1;
+    // Collision-proof ID generation: find the highest existing DEP number
+    const existingNums = deposits.map(dep => {
+      const match = dep.id?.match(/DEP-(\d+)/i);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+    const nextDepNum = (existingNums.length > 0 ? Math.max(...existingNums, 9000) : 9000) + 1;
     const newId = `DEP-${nextDepNum}`;
 
     // Default status: if submitted by role === 'member' or explicitly 'Pending', status is 'pending'
-    const depositStatus = d.status || (role === 'member' ? 'pending' : 'Approved');
+    const depositStatus: 'Approved' | 'Pending' | 'Rejected' = (d.status?.toLowerCase() === 'pending' || role === 'member') ? 'Pending' : (d.status || 'Approved');
 
     const depositData = {
       ...d,
+      category: d.category || 'Fund Raising',
       status: depositStatus,
       approvedByAdminName: d.approvedByAdminName || (depositStatus === 'Approved' ? (currentMember?.fullName || authUser?.displayName || 'PBC Admin') : undefined),
       approvedByAdminId: d.approvedByAdminId || (depositStatus === 'Approved' ? (currentMember?.id || 'PBC-ADMIN') : undefined)
@@ -868,10 +900,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await addDepositDoc(newId, depositData);
 
     if (depositStatus === 'Approved') {
-      const targetMember = members.find(m => m.id === d.memberId);
+      const targetMember = members.find(m => m.id === d.memberId || (m.fullName && d.memberName && m.fullName.toLowerCase().trim() === d.memberName.toLowerCase().trim()));
       if (targetMember) {
-        await updateMemberDoc(d.memberId, {
-          totalDeposit: (targetMember.totalDeposit || 0) + d.amount
+        await updateMemberDoc(targetMember.id, {
+          totalDeposit: (targetMember.totalDeposit || 0) + (Number(d.amount) || 0),
+          totalFundRaisingDeposit: (d.category === 'Fund Raising' || !d.category)
+            ? (targetMember.totalFundRaisingDeposit || 0) + (Number(d.amount) || 0)
+            : (targetMember.totalFundRaisingDeposit || 0),
+          totalRealEstateDeposit: d.category === 'Real Estate'
+            ? (targetMember.totalRealEstateDeposit || 0) + (Number(d.amount) || 0)
+            : (targetMember.totalRealEstateDeposit || 0)
         });
       }
       await addActivityLog('Deposit Recorded', `Deposit of ৳${d.amount.toLocaleString()} logged for ${d.memberName}`);
@@ -900,21 +938,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = deposits.find(d => d.id === id);
     if (target) {
-      await addTrashedItemDoc({
-        itemType: 'Deposit',
-        title: `Deposit ${target.id} - ৳${(target.amount || 0).toLocaleString()} (${target.memberName || 'Member'})`,
-        originalId: target.id,
-        originalCollection: 'deposits',
-        itemData: target,
-        deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
-        deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
-        deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
-        reason: reason || 'No reason specified',
-        deletedAt: new Date().toISOString()
-      });
-      await deleteDepositDoc(id);
-      await addActivityLog('Deposit Moved to Trash', `Deposit ${id} (৳${target.amount}) moved to Trash Box. Reason: ${reason}`);
-      addNotification('Deposit Deleted', `Deposit ${id} was moved to Trash Box. Reason: ${reason}`, 'deposit');
+      // 1. Instant optimistic local state update for 0ms latency UI response
+      setDeposits(prev => prev.filter(d => d.id !== id));
+
+      // 2. If the deleted deposit was Approved, adjust member total deposit immediately
+      if (target.status === 'Approved' || target.status?.toLowerCase() === 'approved') {
+        const mem = members.find(m => m.id === target.memberId || (m.fullName && target.memberName && m.fullName.toLowerCase().trim() === target.memberName.toLowerCase().trim()));
+        if (mem) {
+          const newTot = Math.max(0, (mem.totalDeposit || 0) - (Number(target.amount) || 0));
+          setMembers(prev => prev.map(m => m.id === mem.id ? { ...m, totalDeposit: newTot } : m));
+          updateMemberDoc(mem.id, { totalDeposit: newTot }).catch(console.warn);
+        }
+      }
+
+      // 3. Perform background Firestore operations safely without blocking UI
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Deposit',
+            title: `Deposit ${target.id} - ৳${(target.amount || 0).toLocaleString()} (${target.memberName || 'Member'})`,
+            originalId: target.id,
+            originalCollection: 'deposits',
+            itemData: {
+              ...target,
+              receiptUrl: target.receiptUrl && target.receiptUrl.length > 50000 ? '' : target.receiptUrl
+            },
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason || 'No reason specified',
+            deletedAt: new Date().toISOString()
+          }),
+          deleteDepositDoc(id),
+          addActivityLog('Deposit Moved to Trash', `Deposit ${id} (৳${target.amount}) moved to Trash Box. Reason: ${reason}`)
+        ]);
+        addNotification('Deposit Deleted', `Deposit ${id} was moved to Trash Box. Reason: ${reason}`, 'deposit');
+      } catch (e) {
+        console.warn('Error during deleteDeposit async sync:', e);
+      }
     }
   };
 
@@ -955,19 +1016,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateData.approvedByAdminSignature = signatureDataUrl;
     }
 
-    await updateDepositDoc(id, updateData);
+    // 1. Instant optimistic local UI update (0ms response)
+    setDeposits(prev => prev.map(d => d.id === id ? { ...d, ...updateData } : d));
 
-    if (targetDeposit && targetDeposit.status !== 'Approved') {
-      const targetMember = members.find(m => m.id === targetDeposit.memberId);
+    // 2. Immediately update member's total deposit locally
+    if (targetDeposit.status !== 'Approved') {
+      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
       if (targetMember) {
-        await updateMemberDoc(targetDeposit.memberId, {
-          totalDeposit: (targetMember.totalDeposit || 0) + targetDeposit.amount
-        });
+        const newTotal = (Number(targetMember.totalDeposit) || 0) + (Number(targetDeposit.amount) || 0);
+        setMembers(prev => prev.map(m => m.id === targetMember.id ? { ...m, totalDeposit: newTotal } : m));
+        updateMemberDoc(targetMember.id, { totalDeposit: newTotal }).catch(console.warn);
       }
     }
 
-    await addActivityLog('Deposit Approved', `Admin (${adminName} | ID: ${adminId}) approved deposit voucher ${id} with signature`);
-    addNotification('Deposit Voucher Approved', `Deposit voucher ${id} was verified and approved with official signature by ${adminName} (${adminId}).`, 'deposit');
+    // 3. Background async database sync
+    try {
+      await Promise.allSettled([
+        updateDepositDoc(id, updateData),
+        addActivityLog('Deposit Approved', `Admin (${adminName} | ID: ${adminId}) approved deposit voucher ${id} with signature`)
+      ]);
+      addNotification('Deposit Voucher Approved', `Deposit voucher ${id} was verified and approved with official signature by ${adminName} (${adminId}).`, 'deposit');
+    } catch (e) {
+      console.warn('Background sync error on deposit approval:', e);
+    }
   };
 
   const rejectDeposit = async (id: string) => {
@@ -1056,20 +1127,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = projects.find(p => p.id === id);
     if (target) {
-      await addTrashedItemDoc({
-        itemType: 'Project',
-        title: `Project ${target.projectName} (${target.id})`,
-        originalId: target.id,
-        originalCollection: 'projects',
-        itemData: target,
-        deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
-        deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
-        deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
-        reason: reason || 'No reason specified',
-        deletedAt: new Date().toISOString()
-      });
-      await deleteProjectDoc(id);
-      await addActivityLog('Project Moved to Trash', `Project ${target.projectName} (${id}) moved to Trash Box. Reason: ${reason}`);
+      setProjects(prev => prev.filter(p => p.id !== id));
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Project',
+            title: `Project ${target.projectName} (${target.id})`,
+            originalId: target.id,
+            originalCollection: 'projects',
+            itemData: target,
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason || 'No reason specified',
+            deletedAt: new Date().toISOString()
+          }),
+          deleteProjectDoc(id),
+          addActivityLog('Project Moved to Trash', `Project ${target.projectName} (${id}) moved to Trash Box. Reason: ${reason}`)
+        ]);
+      } catch (e) {
+        console.warn('Error deleting project async:', e);
+      }
     }
   };
 
@@ -1093,6 +1171,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       alert('Security Restriction: Members cannot edit reports.');
       return;
     }
+    setReports(prev => prev.map(r => r.id === id ? { ...r, ...report } : r));
     await updateReportDoc(id, report);
   };
 
@@ -1103,20 +1182,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = reports.find(r => r.id === id);
     if (target) {
-      await addTrashedItemDoc({
-        itemType: 'Report',
-        title: `Report ${target.title} (${target.id})`,
-        originalId: target.id,
-        originalCollection: 'reports',
-        itemData: target,
-        deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
-        deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
-        deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
-        reason: reason || 'No reason specified',
-        deletedAt: new Date().toISOString()
-      });
-      await deleteReportDoc(id);
-      await addActivityLog('Report Moved to Trash', `Report ${target.title} (${id}) moved to Trash Box. Reason: ${reason}`);
+      setReports(prev => prev.filter(r => r.id !== id));
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Report',
+            title: `Report ${target.title} (${target.id})`,
+            originalId: target.id,
+            originalCollection: 'reports',
+            itemData: target,
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason || 'No reason specified',
+            deletedAt: new Date().toISOString()
+          }),
+          deleteReportDoc(id),
+          addActivityLog('Report Moved to Trash', `Report ${target.title} (${id}) moved to Trash Box. Reason: ${reason}`)
+        ]);
+      } catch (e) {
+        console.warn('Error deleting report async:', e);
+      }
     }
   };
 
@@ -1131,20 +1217,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const target = directors.find(d => d.id === id);
     if (target) {
-      await addTrashedItemDoc({
-        itemType: 'Director',
-        title: `Board Director ${target.name} (${target.designation})`,
-        originalId: target.id,
-        originalCollection: 'board_directors',
-        itemData: target,
-        deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
-        deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
-        deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
-        reason: reason || 'No reason specified',
-        deletedAt: new Date().toISOString()
-      });
-      await deleteDirectorDoc(id);
-      await addActivityLog('Director Moved to Trash', `Director ${target.name} (${id}) moved to Trash Box. Reason: ${reason}`);
+      setDirectors(prev => prev.filter(d => d.id !== id));
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Director',
+            title: `Board Director ${target.name} (${target.designation})`,
+            originalId: target.id,
+            originalCollection: 'board_directors',
+            itemData: target,
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason || 'No reason specified',
+            deletedAt: new Date().toISOString()
+          }),
+          deleteDirectorDoc(id),
+          addActivityLog('Director Moved to Trash', `Director ${target.name} (${id}) moved to Trash Box. Reason: ${reason}`)
+        ]);
+      } catch (e) {
+        console.warn('Error deleting director async:', e);
+      }
     }
   };
 
@@ -1152,14 +1245,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const item = trashedItems.find(t => t.id === trashId);
     if (!item) return;
 
-    await restoreTrashedItemDoc(item);
-    await addActivityLog('Item Restored from Trash', `"${item.title}" restored from Trash Box`);
-    addNotification('Item Restored', `"${item.title}" was restored back from Trash Box.`, 'system');
+    setTrashedItems(prev => prev.filter(t => t.id !== trashId));
+    try {
+      await restoreTrashedItemDoc(item);
+      await addActivityLog('Item Restored from Trash', `"${item.title}" restored from Trash Box`);
+      addNotification('Item Restored', `"${item.title}" was restored back from Trash Box.`, 'system');
+    } catch (e) {
+      console.warn('Error restoring item async:', e);
+    }
   };
 
   const permanentlyDeleteTrashedItem = async (trashId: string) => {
-    await deleteTrashedItemDoc(trashId);
-    await addActivityLog('Trash Item Permanently Deleted', `Item ${trashId} permanently purged from Trash Box`);
+    setTrashedItems(prev => prev.filter(t => t.id !== trashId));
+    try {
+      await deleteTrashedItemDoc(trashId);
+      await addActivityLog('Trash Item Permanently Deleted', `Item ${trashId} permanently purged from Trash Box`);
+    } catch (e) {
+      console.warn('Error permanently deleting trash item:', e);
+    }
   };
 
   const emptyTrashBox = async () => {

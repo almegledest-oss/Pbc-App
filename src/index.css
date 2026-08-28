@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Global Theme Variables (Default: PBC Royal Navy & Gold) */
+:root {
+  --theme-bg-main: #070D1B;
+  --theme-card-bg: #0B1528;
+  --theme-accent-gold: #D4AF37;
+  --theme-accent-hover: #F59E0B;
+  --theme-accent-glow: rgba(212, 175, 55, 0.25);
+  --theme-surface-dark: #070D1B;
+  --theme-nav-active: #112244;
+  --theme-border: rgba(212, 175, 55, 0.3);
+}
+
 html, body, #root {
   width: 100%;
   max-width: 100vw;
@@ -7,10 +19,95 @@ html, body, #root {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  background-color: var(--theme-bg-main);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 *, ::before, ::after {
   box-sizing: border-box;
+}
+
+/* Custom scrollbar for modern sleek dark aesthetics */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--theme-bg-main);
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Dynamic theme overrides to seamlessly style components without rewriting classes */
+.bg-\[\#070D1B\], .bg-\[\#030712\], .bg-\[\#040D1B\] {
+  background-color: var(--theme-bg-main) !important;
+}
+.bg-\[\#0B1528\] {
+  background-color: var(--theme-card-bg) !important;
+}
+.border-\[\#D4AF37\]\/30, .border-\[\#D4AF37\]\/40, .border-\[\#D4AF37\]\/20 {
+  border-color: var(--theme-border) !important;
+}
+
+/* Light Theme Mode Overrides */
+.light-theme {
+  color: #0F172A !important;
+}
+.light-theme .text-white {
+  color: #0F172A !important;
+}
+.light-theme .text-slate-100 {
+  color: #0F172A !important;
+}
+.light-theme .text-slate-200 {
+  color: #1E293B !important;
+}
+.light-theme .text-slate-300 {
+  color: #334155 !important;
+}
+.light-theme .text-slate-400 {
+  color: #475569 !important;
+}
+.light-theme .bg-\[\#070D1B\] {
+  background-color: #F1F5F9 !important;
+}
+.light-theme .bg-\[\#0B1528\] {
+  background-color: #FFFFFF !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
+}
+.light-theme .bg-\[\#030712\], .light-theme .bg-\[\#040D1B\] {
+  background-color: #F8FAFC !important;
+}
+.light-theme .bg-\[\#112244\] {
+  background-color: #E2E8F0 !important;
+}
+.light-theme .border-slate-800, .light-theme .border-slate-700 {
+  border-color: #E2E8F0 !important;
+}
+.light-theme .border-\[\#D4AF37\]\/30, .light-theme .border-\[\#D4AF37\]\/40, .light-theme .border-\[\#D4AF37\]\/20 {
+  border-color: var(--theme-border) !important;
+}
+.light-theme input:not([type="checkbox"]):not([type="radio"]),
+.light-theme select,
+.light-theme textarea {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #CBD5E1 !important;
+}
+.light-theme input::placeholder,
+.light-theme textarea::placeholder {
+  color: #94A3B8 !important;
+}
+.light-theme ::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+}
+.light-theme ::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }
 
 @layer utilities {

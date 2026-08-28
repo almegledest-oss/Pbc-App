@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { RealEstateProject, InvestmentCategory, ProjectStatus, INVESTMENT_CATEGORIES, ProjectMemberAllocation } from '../../types';
+import { RealEstateProject, InvestmentCategory, ProjectStatus, INVESTMENT_CATEGORIES, ProjectMemberAllocation, resolveProjectCategory } from '../../types';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 import { uploadImageToCloudOrCompressed } from '../../utils/imageCompressor';
 import { ProjectAllocationModal } from './ProjectAllocationModal';
@@ -114,7 +114,8 @@ export const ProjectList: React.FC = () => {
     if (role === 'member' && p.isArchived) {
       return false;
     }
-    const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
+    const cat = resolveProjectCategory(p);
+    const matchesCat = categoryFilter === 'All' || cat === categoryFilter;
     const matchesCountry = countryFilter === 'All' || p.country === countryFilter;
     return matchesCat && matchesCountry;
   });
@@ -322,10 +323,10 @@ export const ProjectList: React.FC = () => {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           {INVESTMENT_CATEGORIES.map((cat) => {
             const Icon = categoryIcons[cat] || Building2;
-            const catProjects = projects.filter(p => p.category === cat && !p.isArchived);
+            const catProjects = projects.filter(p => resolveProjectCategory(p) === cat && (role !== 'member' || !p.isArchived));
             const projCount = catProjects.length;
-            const totalInv = catProjects.reduce((sum, p) => sum + (p.investmentAmount || 0), 0);
-            const totalProfit = catProjects.reduce((sum, p) => sum + (p.profit || 0), 0);
+            const totalInv = catProjects.reduce((sum, p) => sum + (Number(p.investmentAmount) || 0), 0);
+            const totalProfit = catProjects.reduce((sum, p) => sum + (Number(p.profit) || 0), 0);
             const isSelected = categoryFilter === cat;
 
             return (
@@ -334,7 +335,7 @@ export const ProjectList: React.FC = () => {
                 onClick={() => setCategoryFilter(isSelected ? 'All' : cat)}
                 className={`p-3.5 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-[#112244] text-amber-300 border-[#D4AF37] shadow-xl'
+                    ? 'bg-[#112244] text-amber-300 border-[#D4AF37] shadow-xl ring-1 ring-amber-400'
                     : 'bg-[#0B1528] border-[#D4AF37]/30 hover:border-amber-400 text-slate-200'
                 }`}
               >
@@ -346,7 +347,6 @@ export const ProjectList: React.FC = () => {
                     Projects: {projCount}
                   </span>
                 </div>
-
                 <div>
                   <h4 className="text-xs font-bold truncate text-white">{cat}</h4>
                   <div className="mt-1 space-y-0.5 text-[10px]">
@@ -376,7 +376,7 @@ export const ProjectList: React.FC = () => {
                 : 'bg-[#070D1B] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400'
             }`}
           >
-            All
+            All ({projects.length})
           </button>
           {INVESTMENT_CATEGORIES.map(cat => (
             <button
@@ -388,7 +388,7 @@ export const ProjectList: React.FC = () => {
                   : 'bg-[#070D1B] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400'
               }`}
             >
-              {cat}
+              {cat} ({projects.filter(p => resolveProjectCategory(p) === cat && (role !== 'member' || !p.isArchived)).length})
             </button>
           ))}
         </div>
@@ -406,8 +406,17 @@ export const ProjectList: React.FC = () => {
       {filteredProjects.length === 0 ? (
         <div className="bg-[#0B1528] rounded-3xl p-12 text-center border border-[#D4AF37]/30 text-slate-400">
           <Building2 className="w-12 h-12 mx-auto mb-3 text-amber-400/50" />
-          <h4 className="text-base font-bold text-white">No Investments Found</h4>
-          <p className="text-xs text-slate-400 mt-1">There are currently no investment projects listed in this category.</p>
+          <h4 className="text-base font-bold text-white">No Investments Found in "{categoryFilter}"</h4>
+          <p className="text-xs text-slate-400 mt-1">There are currently no investment projects listed matching this filter.</p>
+          {categoryFilter !== 'All' && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('All')}
+              className="mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition cursor-pointer"
+            >
+              Show All Investments ({projects.length})
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -431,16 +440,32 @@ export const ProjectList: React.FC = () => {
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0B1528] via-black/30 to-transparent p-4 flex flex-col justify-between">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-1 bg-[#070D1B]/90 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold rounded-lg border border-[#D4AF37]/40">
-                        {project.id} • {project.category}
-                      </span>
-
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-2.5 py-1 bg-[#070D1B]/90 backdrop-blur-md text-amber-300 font-mono text-[10px] font-bold rounded-lg border border-[#D4AF37]/40">
+                          {project.id} • {project.category}
+                        </span>
+                        {isAdmin && (
+                          <select
+                            value={project.category}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              updateProject(project.id, { category: e.target.value as InvestmentCategory, propertyType: e.target.value as any });
+                            }}
+                            className="px-2 py-1 bg-slate-950/90 text-amber-300 border border-amber-400/50 rounded-lg text-[10px] font-bold cursor-pointer hover:border-amber-400"
+                            title="Change Category"
+                          >
+                            {INVESTMENT_CATEGORIES.map(c => (
+                              <option key={c} value={c} className="bg-slate-900 text-white">{c}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                       <span className="px-2.5 py-1 bg-emerald-500/80 backdrop-blur-md text-slate-950 font-black text-[10px] rounded-full">
                         {project.status}
                       </span>
                     </div>
-
                     <div>
                       <h3 className="text-lg font-extrabold text-white leading-tight">
                         {project.projectName}

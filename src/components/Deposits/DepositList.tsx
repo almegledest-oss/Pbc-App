@@ -53,6 +53,7 @@ export const DepositList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('All');
   const [currencyFilter, setCurrencyFilter] = useState('All');
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -66,6 +67,7 @@ export const DepositList: React.FC = () => {
   const [formData, setFormData] = useState({
     memberId: members[0]?.id || 'PBC-1001',
     amount: 5000,
+    category: 'Fund Raising' as 'Fund Raising' | 'Real Estate',
     currency: 'BDT' as const,
     depositDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'Bank' as const,
@@ -108,8 +110,11 @@ export const DepositList: React.FC = () => {
 
     const matchesMethod = methodFilter === 'All' || d.paymentMethod === methodFilter;
     const matchesCurrency = currencyFilter === 'All' || d.currency === currencyFilter;
+    const matchesCategory = categoryFilter === 'All' 
+      || (categoryFilter === 'Fund Raising' && (d.category === 'Fund Raising' || !d.category))
+      || (categoryFilter === 'Real Estate' && d.category === 'Real Estate');
 
-    return matchesSearch && matchesMethod && matchesCurrency;
+    return matchesSearch && matchesMethod && matchesCurrency && matchesCategory;
   });
 
   const totalFilteredAmount = filteredDeposits.reduce((sum, d) => sum + d.amount, 0);
@@ -145,6 +150,7 @@ export const DepositList: React.FC = () => {
       memberId: memberObj.id,
       memberName: memberObj.fullName,
       amount: Number(formData.amount),
+      category: formData.category,
       currency: formData.currency,
       depositDate: formData.depositDate,
       paymentMethod: formData.paymentMethod,
@@ -269,6 +275,16 @@ export const DepositList: React.FC = () => {
 
           <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 touch-pan-x">
             <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="px-3 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-amber-200 font-medium shrink-0"
+            >
+              <option value="All" className="bg-[#070D1B] text-white">All Fund Categories</option>
+              <option value="Fund Raising" className="bg-[#070D1B] text-white">🌱 Fund Raising</option>
+              <option value="Real Estate" className="bg-[#070D1B] text-white">🏢 Real Estate</option>
+            </select>
+
+            <select
               value={methodFilter}
               onChange={e => setMethodFilter(e.target.value)}
               className="px-3 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-amber-200 font-medium shrink-0"
@@ -302,6 +318,7 @@ export const DepositList: React.FC = () => {
                 {(role === 'super_admin' || role === 'admin') && <th className="py-4 px-4">{labels.depositId}</th>}
                 <th className="py-4 px-4">{labels.memberName}</th>
                 <th className="py-4 px-4">{labels.amount}</th>
+                <th className="py-4 px-4">{language === 'bn' ? 'ফান্ডের ধরণ' : 'Fund Type'}</th>
                 <th className="py-4 px-4">{labels.depositDate}</th>
                 {(role === 'super_admin' || role === 'admin') && <th className="py-4 px-4">{labels.paymentMethod}</th>}
                 {(role === 'super_admin' || role === 'admin') && <th className="py-4 px-4">{labels.referenceNumber}</th>}
@@ -326,6 +343,15 @@ export const DepositList: React.FC = () => {
                   <td className="py-4 px-4 whitespace-nowrap">
                     <span className="font-extrabold text-amber-300">
                       ৳{d.amount.toLocaleString()} BDT
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${
+                      d.category === 'Real Estate'
+                        ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                        : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                    }`}>
+                      {d.category === 'Real Estate' ? '🏢 Real Estate' : '🌱 Fund Raising'}
                     </span>
                   </td>
                   <td className="py-4 px-4 text-slate-300 whitespace-nowrap">
@@ -497,6 +523,49 @@ export const DepositList: React.FC = () => {
                     ))}
                   </select>
                 )}
+              </div>
+
+              {/* Fund Category Selection (Fund Raising vs Real Estate) */}
+              <div>
+                <label className="block text-amber-300 font-bold mb-1.5 flex items-center justify-between">
+                  <span>{language === 'bn' ? 'ফান্ডের ধরণ নির্বাচন করুন *' : 'Select Fund Category *'}</span>
+                  <span className="text-[11px] text-slate-400 font-normal">
+                    {formData.category === 'Real Estate' ? '🏢 Real Estate Project Fund' : '🌱 Club Fund Raising'}
+                  </span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, category: 'Fund Raising' })}
+                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition text-left cursor-pointer ${
+                      formData.category === 'Fund Raising'
+                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-md ring-1 ring-emerald-400'
+                        : 'bg-[#0B1528] border-[#D4AF37]/30 text-slate-300 hover:border-emerald-400/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>Fund Raising</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 text-center">ক্লাব ফান্ড রেইজিং / সাধারণ জমা</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, category: 'Real Estate' })}
+                    className={`p-2.5 rounded-xl border flex flex-col items-center justify-center gap-1 transition text-left cursor-pointer ${
+                      formData.category === 'Real Estate'
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-md ring-1 ring-cyan-400'
+                        : 'bg-[#0B1528] border-[#D4AF37]/30 text-slate-300 hover:border-cyan-400/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                      <span>Real Estate</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 text-center">রিয়েল এস্টেট প্রকল্প তহবিল</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

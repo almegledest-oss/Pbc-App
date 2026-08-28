@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { VersionProvider } from './context/VersionContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Splash } from './components/Splash';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -131,11 +132,13 @@ export default function App() {
   return (
     <VersionProvider>
       <AppProvider>
-        {!isSplashComplete ? (
-          <Splash onComplete={() => setIsSplashComplete(true)} />
-        ) : (
-          <MainContent />
-        )}
+        <ThemeProvider>
+          {!isSplashComplete ? (
+            <Splash onComplete={() => setIsSplashComplete(true)} />
+          ) : (
+            <MainContent />
+          )}
+        </ThemeProvider>
       </AppProvider>
     </VersionProvider>
   );

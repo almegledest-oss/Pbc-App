@@ -394,8 +394,13 @@ export async function captureElementToCanvas(
   // Preload and sanitize all stylesheets before capturing to guarantee full Tailwind styles without oklch crashes
   await preloadAndSanitizeAppStyles();
 
-  const width = el.offsetWidth || 340;
-  const height = el.offsetHeight || 525;
+  // Accurately determine the true full rendering width and height
+  const width = options.width || el.scrollWidth || el.offsetWidth || 340;
+  const height = options.height || Math.max(el.scrollHeight || 0, el.offsetHeight || 0, 525);
+
+  const mergedOptions = { ...options };
+  delete mergedOptions.width;
+  delete mergedOptions.height;
 
   return await html2canvas(el, {
     scale: 3,
@@ -404,13 +409,13 @@ export async function captureElementToCanvas(
     logging: false,
     scrollY: 0,
     scrollX: 0,
-    windowWidth: 1200,
-    windowHeight: 1200,
+    windowWidth: Math.max(1200, width + 200),
+    windowHeight: Math.max(2400, height + 400),
     width,
     height,
     backgroundColor: '#040D1B',
-    imageTimeout: 10000,
-    ...options,
+    imageTimeout: 15000,
+    ...mergedOptions,
     onclone: (clonedDoc, element) => {
       sanitizeOklabInDoc(clonedDoc, element);
       sanitizeTextForCanvas(clonedDoc, element);
@@ -442,11 +447,12 @@ export async function captureElementToCanvas(
         element.style.top = '0px';
         element.style.visibility = 'visible';
         element.style.width = `${width}px`;
-        element.style.height = `${height}px`;
         element.style.minWidth = `${width}px`;
-        element.style.minHeight = `${height}px`;
         element.style.maxWidth = `${width}px`;
-        element.style.maxHeight = `${height}px`;
+        element.style.height = `${height}px`;
+        element.style.minHeight = `${height}px`;
+        element.style.maxHeight = 'none';
+        element.style.overflow = 'visible';
         element.style.boxSizing = 'border-box';
         element.classList.remove('rotate-y-180', 'opacity-0', 'pointer-events-none');
 
