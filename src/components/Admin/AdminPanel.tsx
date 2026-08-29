@@ -29,10 +29,13 @@ import {
   XCircle,
   FileText,
   Clock,
+  Calendar,
   Eye,
   X,
   CreditCard,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ArrowLeft,
+  ChevronRight
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
@@ -63,12 +66,14 @@ export const AdminPanel: React.FC = () => {
     currentMember,
     authUser,
     triggerSecurityAlert,
-    setActiveTab 
+    setActiveTab,
+    currentNavState,
+    navigateWithHistory,
+    goBack
   } = useApp();
 
   const labels = t[language];
-
-  const [activeAdminTab, setActiveAdminTab] = useState<'approvals' | 'users' | 'settings' | 'logs' | 'broadcast'>('approvals');
+  const isBn = language === 'bn';
 
   // Push Notification Form State
   const [notifTitle, setNotifTitle] = useState('Quarterly Fund Dividend Announcement');
@@ -82,9 +87,6 @@ export const AdminPanel: React.FC = () => {
   const [newAdminRole, setNewAdminRole] = useState<'admin' | 'super_admin'>('admin');
   const [selectedMemberForAdmin, setSelectedMemberForAdmin] = useState('');
 
-  // Backup file upload
-  const [backupJsonStr, setBackupJsonStr] = useState('');
-
   // Voucher Audit States
   const [previewVoucherImage, setPreviewVoucherImage] = useState<string | null>(null);
   const [selectedAuditDeposit, setSelectedAuditDeposit] = useState<Deposit | null>(null);
@@ -97,6 +99,7 @@ export const AdminPanel: React.FC = () => {
     d.status?.toLowerCase() === 'pending_audit' || 
     d.status === 'Pending'
   );
+  const totalPending = pendingMembers.length + pendingDeposits.length;
   const depositsWithReceipts = deposits.filter(d => !!d.receiptUrl);
   const displayedVouchers = voucherFilter === 'pending' ? pendingDeposits : depositsWithReceipts;
 
@@ -167,9 +170,9 @@ export const AdminPanel: React.FC = () => {
       try {
         const content = evt.target?.result as string;
         const parsed = JSON.parse(content);
-        if (confirm("Restoring database backup will overwrite existing records. Proceed?")) {
+        if (confirm(isBn ? "ডাটাবেজ রিস্টোর করলে বর্তমান সমস্ত রেকর্ড প্রতিস্থাপিত হবে। আপনি কি নিশ্চিত?" : "Restoring database backup will overwrite existing records. Proceed?")) {
           await restoreBackupData(parsed);
-          alert("Database successfully restored from backup file!");
+          alert(isBn ? "ডাটাবেজ ব্যাকআপ সফলভাবে রিস্টোর করা হয়েছে!" : "Database successfully restored from backup file!");
           window.location.reload();
         }
       } catch (err: any) {
@@ -179,119 +182,261 @@ export const AdminPanel: React.FC = () => {
     reader.readAsText(file);
   };
 
-  // Admin Navigation Tabs
-  // Rule: Admins cannot access role management or system settings. Hide Super Admin management features.
+  const openSubView = (
+    subViewKey: 'approvals' | 'users' | 'logs' | 'broadcast' | 'settings' | 'backup',
+    title: string,
+    titleBn: string
+  ) => {
+    navigateWithHistory({
+      tab: 'admin_panel',
+      subView: subViewKey,
+      title,
+      titleBn,
+      isFocusMode: true
+    });
+  };
+
+  const currentSubView = currentNavState.subView;
+
+
+
+  // If no subView is active, render the requested HUB MENU LIST
+  if (!currentSubView) {
+    return (
+      <div className="space-y-6 pb-12 max-w-5xl mx-auto">
+        
+        {/* Top Header Card */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#070D1B] via-[#0B1528] to-[#112244] p-6 rounded-3xl text-white border-2 border-[#D4AF37]/40 shadow-2xl">
+          <div>
+            <span className="px-3 py-1 text-[10px] font-extrabold bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-full uppercase tracking-widest shadow-md">
+              {role.toUpperCase()} CONTROL CENTER
+            </span>
+            <h2 className="text-2xl font-black mt-2 tracking-tight uppercase text-amber-300">
+              PBC Club System Administration
+            </h2>
+            <p className="text-xs text-slate-300 mt-1">
+              {isBn 
+                ? 'সিস্টেমের যেকোনো মডিউলে প্রবেশ করতে নিচের তালিকা থেকে নির্বাচন করুন' 
+                : 'Select any administrative module below to manage in dedicated full-screen view'}
+            </p>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="px-3 py-2 bg-[#070D1B]/90 border border-[#D4AF37]/30 rounded-2xl text-center">
+              <span className="text-[10px] text-slate-400 font-bold block uppercase">Pending</span>
+              <span className={`text-base font-black ${totalPending > 0 ? 'text-amber-400 animate-pulse' : 'text-emerald-400'}`}>
+                {totalPending}
+              </span>
+            </div>
+            <div className="px-3 py-2 bg-[#070D1B]/90 border border-[#D4AF37]/30 rounded-2xl text-center">
+              <span className="text-[10px] text-slate-400 font-bold block uppercase">Admins</span>
+              <span className="text-base font-black text-amber-300">
+                {users.length}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* The List of Super Admin Modules (Formulated List View) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* 1. Approval Queue */}
+          <div
+            onClick={() => openSubView('approvals', 'Approval Queue', 'অনুমোদন কিউ (সদস্য ও ডিপোজিট)')}
+            className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                <UserCheck className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                    {isBn ? 'অনুমোদন কিউ (Approval Queue)' : 'Approval Queue'}
+                  </h3>
+                  {totalPending > 0 && (
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-400 text-slate-950 rounded-full font-black animate-pulse">
+                      {totalPending}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'পেন্ডিং মেম্বার ভেরিফিকেশন ও মানি রিসিট ভাউচার স্বাক্ষর অডিট' 
+                    : 'Review & verify pending member registrations and money receipt vouchers'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* 2. Role Management */}
+          {role === 'super_admin' && (
+            <div
+              onClick={() => openSubView('users', 'Role Management', 'ভূমিকা ও অ্যাডমিন ব্যবস্থাপনা')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'রোল ম্যানেজমেন্ট (Role Management)' : 'Role Management'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full font-bold">
+                      {users.length}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'নতুন অ্যাডমিন তৈরি, পারমিশন লেভেল নির্ধারণ ও ইউজার অ্যাকাউন্ট ব্যবস্থাপনা' 
+                      : 'Create admin accounts, assign roles, and configure system permissions'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
+          {/* 3. Activity Log */}
+          <div
+            onClick={() => openSubView('logs', 'Activity Log', 'কার্যক্রম লগ ও অডিট ট্রেইল')}
+            className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                <History className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                    {isBn ? 'কার্যক্রম লগ (Activity Log)' : 'Activity Log'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full font-bold">
+                    {activityLogs.length}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'সিস্টেমের রিয়েল-টাইম ইভেন্ট হিস্ট্রি, অ্যাডমিন একশন ও নিরাপত্তা অডিট লগ' 
+                    : 'Real-time audit trail, admin action logs, and system events tracking'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* 4. Push Broadcast */}
+          <div
+            onClick={() => openSubView('broadcast', 'Push Broadcast', 'পুশ নোটিফিকেশন ব্রডকাস্ট')}
+            className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                <Bell className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                    {isBn ? 'পুশ ব্রডকাস্ট (Push Broadcast)' : 'Push Broadcast'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-bold">
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'সকল মেম্বারদের কাছে তাৎক্ষণিক জরুরি নোটিশ, লভ্যাংশ ও সাধারণ ঘোষণা প্রেরণ' 
+                    : 'Dispatch instant push announcements, dividend alerts & notices to all members'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* 5. System Settings */}
+          {role === 'super_admin' && (
+            <div
+              onClick={() => openSubView('settings', 'System Settings', 'সিস্টেম কনফিগারেশন ও থিম')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <Sliders className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'সিস্টেম সেটিংস (System Settings)' : 'System Settings'}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'ক্লাব ব্র্যান্ডিং লোগো, আইডি কার্ড হেডার, থিম কাস্টমাইজেশন ও মেইনটেন্যান্স মোড' 
+                      : 'Club logo branding, ID card graphics, theme selection, maintenance mode'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
+          {/* 6. Database Backup & Restore */}
+          <div
+            onClick={() => openSubView('backup', 'Database Backup & Restore', 'ডাটাবেজ ব্যাকআপ ও রিস্টোর')}
+            className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                <Database className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                    {isBn ? 'ডাটাবেজ ব্যাকআপ ও রিস্টোর' : 'Export & Restore Backup'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full font-bold">
+                    JSON
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'ক্লাবের সকল মেম্বার, ডিপোজিট ও ইনভেস্টমেন্টের পূর্ণাঙ্গ ডাটা এক্সপোর্ট এবং রিস্টোর' 
+                    : 'Download complete system backup file and restore database anytime'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    );
+  }
+
+  // If a subView is active, render the dedicated Sub-View in full screen
   return (
     <div className="space-y-6 pb-12">
-      
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#070D1B] via-[#0B1528] to-[#112244] p-6 rounded-3xl text-white border-2 border-[#D4AF37]/40 shadow-2xl">
-        <div>
-          <span className="px-3 py-1 text-[10px] font-extrabold bg-[#D4AF37] text-slate-950 rounded-full uppercase tracking-widest">
-            {role.toUpperCase()} CONTROL CENTER
-          </span>
-          <h2 className="text-2xl font-black mt-2 tracking-tight uppercase text-amber-300">
-            PBC Club System Administration
-          </h2>
-          <p className="text-xs text-slate-300 mt-0.5">
-            Admin approvals, security management, backup & restore, activity logs
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportBackup}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#070D1B] hover:bg-[#112244] text-amber-300 font-bold text-xs rounded-xl border border-[#D4AF37]/30 transition shadow-lg cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-amber-400" />
-            <span>Export Backup</span>
-          </button>
-          
-          {role === 'super_admin' && (
-            <label className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 cursor-pointer transition">
-              <Upload className="w-4 h-4 text-slate-950" />
-              <span>Restore Backup</span>
-              <input type="file" accept=".json" onChange={handleRestoreBackup} className="hidden" />
-            </label>
-          )}
-        </div>
-      </div>
-
-      {/* Admin Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#D4AF37]/30 overflow-x-auto pb-2">
-        <button
-          onClick={() => setActiveAdminTab('approvals')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-xl transition shrink-0 cursor-pointer ${
-            activeAdminTab === 'approvals' 
-              ? 'bg-[#112244] text-amber-300 border border-[#D4AF37] shadow-lg shadow-amber-500/10' 
-              : 'bg-[#0B1528] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400/50'
-          }`}
-        >
-          <UserCheck className={`w-4 h-4 ${activeAdminTab === 'approvals' ? 'text-amber-400' : 'text-slate-400'}`} />
-          <span>Approval Queue</span>
-          {(pendingMembers.length > 0 || pendingDeposits.length > 0) && (
-            <span className="px-2 py-0.5 text-[10px] bg-amber-400 text-slate-950 rounded-full font-black">
-              {pendingMembers.length + pendingDeposits.length}
-            </span>
-          )}
-        </button>
-
-        {role === 'super_admin' && (
-          <button
-            onClick={() => setActiveAdminTab('users')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-xl transition shrink-0 cursor-pointer ${
-              activeAdminTab === 'users' 
-                ? 'bg-[#112244] text-amber-300 border border-[#D4AF37] shadow-lg shadow-amber-500/10' 
-                : 'bg-[#0B1528] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400/50'
-            }`}
-          >
-            <Users className={`w-4 h-4 ${activeAdminTab === 'users' ? 'text-amber-400' : 'text-slate-400'}`} />
-            <span>Role Management ({users.length})</span>
-          </button>
-        )}
-
-        {role === 'super_admin' && (
-          <button
-            onClick={() => setActiveAdminTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-xl transition shrink-0 cursor-pointer ${
-              activeAdminTab === 'settings' 
-                ? 'bg-[#112244] text-amber-300 border border-[#D4AF37] shadow-lg shadow-amber-500/10' 
-                : 'bg-[#0B1528] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400/50'
-            }`}
-          >
-            <Sliders className={`w-4 h-4 ${activeAdminTab === 'settings' ? 'text-amber-400' : 'text-slate-400'}`} />
-            <span>System Settings</span>
-          </button>
-        )}
-
-        <button
-          onClick={() => setActiveAdminTab('logs')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-xl transition shrink-0 cursor-pointer ${
-            activeAdminTab === 'logs' 
-              ? 'bg-[#112244] text-amber-300 border border-[#D4AF37] shadow-lg shadow-amber-500/10' 
-              : 'bg-[#0B1528] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400/50'
-          }`}
-        >
-          <History className={`w-4 h-4 ${activeAdminTab === 'logs' ? 'text-amber-400' : 'text-slate-400'}`} />
-          <span>Activity Log ({activityLogs.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveAdminTab('broadcast')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-extrabold rounded-xl transition shrink-0 cursor-pointer ${
-            activeAdminTab === 'broadcast' 
-              ? 'bg-[#112244] text-amber-300 border border-[#D4AF37] shadow-lg shadow-amber-500/10' 
-              : 'bg-[#0B1528] text-slate-300 border border-[#D4AF37]/20 hover:border-amber-400/50'
-          }`}
-        >
-          <Bell className={`w-4 h-4 ${activeAdminTab === 'broadcast' ? 'text-amber-400' : 'text-slate-400'}`} />
-          <span>Push Broadcast</span>
-        </button>
-      </div>
-
-      {/* Tab 1: Approval Queue */}
-      {activeAdminTab === 'approvals' && (
+      {/* Sub-View: Approval Queue */}
+      {currentSubView === 'approvals' && (
         <div className="space-y-6">
+
           {/* Pending Members Section */}
           <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl">
             <div className="flex items-center justify-between mb-4">
@@ -579,137 +724,491 @@ export const AdminPanel: React.FC = () => {
         }}
       />
 
-      {/* Tab 2: Admin Users & Security Controls */}
-      {activeAdminTab === 'users' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Create Admin Form */}
-          <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
-              <UserPlus className="w-5 h-5 text-amber-400" />
-              <span>Create New Admin</span>
-            </h3>
+      {/* Sub-View 2: Admin Users & Security Controls (Role Management) */}
+      {currentSubView === 'users' && (
+        <div className="space-y-6">
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Create Admin Form */}
+            <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
+                <UserPlus className="w-5 h-5 text-amber-400" />
+                <span>Create New Admin</span>
+              </h3>
+
+              {role !== 'super_admin' ? (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs">
+                  Only <strong>System Admin</strong> role can create or remove administrative accounts.
+                </div>
+              ) : (
+                <form onSubmit={handleCreateAdmin} className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Select Registered Member (মেম্বার নির্বাচন করুন)</span>
+                      <span className="text-[10px] text-amber-400 font-bold">List ({members.length})</span>
+                    </label>
+                    <select
+                      value={selectedMemberForAdmin}
+                      onChange={e => handleSelectMemberForAdmin(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      <option value="" className="bg-[#070D1B]">-- Choose Member from Club List --</option>
+                      {members.map(m => (
+                        <option key={m.id} value={m.id} className="bg-[#070D1B]">
+                          {m.fullName} ({m.id}) {m.role === 'super_admin' ? '👑 System Admin' : m.role === 'admin' ? '★ Admin' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Admin Rahman"
+                      value={newAdminName}
+                      onChange={e => setNewAdminName(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="admin@pbcclub.org"
+                      value={newAdminEmail}
+                      onChange={e => setNewAdminEmail(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-300 mb-1">Admin Level</label>
+                    <select
+                      value="admin"
+                      disabled
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/20 rounded-xl text-amber-300 font-bold cursor-not-allowed opacity-90"
+                    >
+                      <option value="admin" className="bg-[#070D1B]">Admin</option>
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Rule: Standard Admin accounts can be created. There is strictly only ONE System Admin in the application.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4 text-slate-950" />
+                    <span>Create / Assign Admin Role</span>
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Admin User List */}
+            <div className="lg:col-span-2 bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
+                <ShieldCheck className="w-5 h-5 text-amber-400" />
+                <span>Active System Administrators ({users.length})</span>
+              </h3>
+
+              <div className="divide-y divide-[#D4AF37]/20">
+                {users.map((u, idx) => {
+                  const isSuperAdminAccount = u.role === 'super_admin' || u.email.toLowerCase() === 'fokrulislammir9897@gmail.com';
+                  return (
+                    <div key={u.uid || `user-${idx}`} className="py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <span className="font-bold text-white text-xs block">{u.displayName}</span>
+                        <span className="text-[11px] text-slate-400">{u.email}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {role === 'super_admin' && !isSuperAdminAccount ? (
+                          <select
+                            value={u.role}
+                            onChange={(e) => updateUserRole(u.uid, e.target.value as any)}
+                            className="px-2 py-1 text-[11px] font-bold rounded-lg bg-[#070D1B] border border-[#D4AF37]/30 text-amber-300"
+                            title="Change User Role"
+                          >
+                            <option value="member" className="bg-[#070D1B]">Member</option>
+                            <option value="admin" className="bg-[#070D1B]">Admin</option>
+                          </select>
+                        ) : (
+                          <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                            isSuperAdminAccount
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                          }`}>
+                            {isSuperAdminAccount ? 'SYSTEM ADMIN' : u.role.replace('_', ' ')}
+                          </span>
+                        )}
+
+                        {role === 'super_admin' && !isSuperAdminAccount && (
+                          <button
+                            onClick={() => removeAdminUser(u.uid)}
+                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition cursor-pointer"
+                            title="Remove Account"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View 3: System Settings */}
+      {currentSubView === 'settings' && (
+        <div className="space-y-6">
+
+          <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-6">
+            <div>
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
+                <Sliders className="w-5 h-5 text-amber-400" />
+                <span>Global PBC Club Configuration</span>
+              </h3>
+              <p className="text-xs text-slate-300">
+                System governance, auto approval rules, maintenance modes
+              </p>
+            </div>
 
             {role !== 'super_admin' ? (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl text-xs">
-                Only <strong>System Admin</strong> role can create or remove administrative accounts.
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl text-xs">
+                System Settings and global parameters are locked. Only <strong>System Admin</strong> can modify global club settings.
               </div>
             ) : (
-              <form onSubmit={handleCreateAdmin} className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                    <span>Select Registered Member (মেম্বার নির্বাচন করুন)</span>
-                    <span className="text-[10px] text-amber-400 font-bold">List ({members.length})</span>
-                  </label>
-                  <select
-                    value={selectedMemberForAdmin}
-                    onChange={e => handleSelectMemberForAdmin(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  >
-                    <option value="" className="bg-[#070D1B]">-- Choose Member from Club List --</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id} className="bg-[#070D1B]">
-                        {m.fullName} ({m.id}) {m.role === 'super_admin' ? '👑 System Admin' : m.role === 'admin' ? '★ Admin' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-6">
+                {/* Theme Customizer Box */}
+                <ThemeSelectorCard />
 
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Admin Rahman"
-                    value={newAdminName}
-                    onChange={e => setNewAdminName(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="admin@pbcclub.org"
-                    value={newAdminEmail}
-                    onChange={e => setNewAdminEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Admin Level</label>
-                  <select
-                    value="admin"
-                    disabled
-                    className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/20 rounded-xl text-amber-300 font-bold cursor-not-allowed opacity-90"
-                  >
-                    <option value="admin" className="bg-[#070D1B]">Admin</option>
-                  </select>
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Rule: Standard Admin accounts can be created. There is strictly only ONE System Admin in the application.
-                  </p>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl transition shadow-lg cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <UserPlus className="w-4 h-4 text-slate-950" />
-                  <span>Create / Assign Admin Role</span>
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Admin User List */}
-          <div className="lg:col-span-2 bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
-              <ShieldCheck className="w-5 h-5 text-amber-400" />
-              <span>Active System Administrators ({users.length})</span>
-            </h3>
-
-            <div className="divide-y divide-[#D4AF37]/20">
-              {users.map((u, idx) => {
-                const isSuperAdminAccount = u.role === 'super_admin' || u.email.toLowerCase() === 'fokrulislammir9897@gmail.com';
-                return (
-                  <div key={u.uid || `user-${idx}`} className="py-3 flex items-center justify-between gap-3">
+                {/* App Logo Customization Box */}
+                <div className="p-5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30 space-y-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <span className="font-bold text-white text-xs block">{u.displayName}</span>
-                      <span className="text-[11px] text-slate-400">{u.email}</span>
+                      <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                        <ImageIcon className="w-4 h-4 text-amber-400" />
+                        <span>Application Branding Logo (অ্যাপের কাস্টম লোগো)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        Upload your custom logo image to display across the Navbar, Sidebar, Member Cards, and Splash Screen.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
+                    {/* Logo Preview */}
+                    <div className="flex flex-col items-center gap-2 shrink-0">
+                      <div className="p-2 bg-[#0B1528] rounded-2xl shadow-md border border-[#D4AF37]/30">
+                        <PbcLogo className="w-20 h-20" />
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400">Current Logo Preview</span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {role === 'super_admin' && !isSuperAdminAccount ? (
-                        <select
-                          value={u.role}
-                          onChange={(e) => updateUserRole(u.uid, e.target.value as any)}
-                          className="px-2 py-1 text-[11px] font-bold rounded-lg bg-[#070D1B] border border-[#D4AF37]/30 text-amber-300"
-                          title="Change User Role"
-                        >
-                          <option value="member" className="bg-[#070D1B]">Member</option>
-                          <option value="admin" className="bg-[#070D1B]">Admin</option>
-                        </select>
-                      ) : (
-                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                          isSuperAdminAccount
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                        }`}>
-                          {isSuperAdminAccount ? 'SYSTEM ADMIN' : u.role.replace('_', ' ')}
-                        </span>
-                      )}
+                    {/* Upload Controls */}
+                    <div className="flex-1 space-y-3 w-full">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Select Image File (PNG / JPG / SVG / WebP)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('Please select an image smaller than 5MB');
+                                return;
+                              }
+                              try {
+                                const compressedUrl = await compressImageToDataUrl(file, 300, 0.82);
+                                if (compressedUrl && compressedUrl.length < 100 * 1024) {
+                                  safeStorage.setItem('pbc_cached_custom_logo', compressedUrl);
+                                }
+                                await updateSystemSettings({ customLogoUrl: compressedUrl });
+                              } catch (err) {
+                                console.error('Failed to compress logo image:', err);
+                                alert('Failed to process logo image.');
+                              }
+                            }
+                          }}
+                          className="block w-full text-xs text-slate-300
+                            file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
+                            file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300
+                            hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
+                        />
+                      </div>
 
-                      {role === 'super_admin' && !isSuperAdminAccount && (
-                        <button
-                          onClick={() => removeAdminUser(u.uid)}
-                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 rounded-lg transition cursor-pointer"
-                          title="Remove Account"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2 pt-1">
+                        {systemSettings.customLogoUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              safeStorage.removeItem('pbc_cached_custom_logo');
+                              updateSystemSettings({ customLogoUrl: '' });
+                            }}
+                            className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"
+                          >
+                            Reset to Default Official Logo
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-emerald-400 font-medium">
+                            ✓ Currently using default official circular emblem (/logo.svg)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Dedicated ID Card Header Logo (Horizontal Luxury Banner) */}
+                <div className="p-4 bg-[#070D1B] border border-[#D4AF37]/30 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-amber-400" />
+                        <span>Dedicated ID Card Header Logo (আইডি কার্ডের বিশেষ লোগো)</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        Only used for the luxury horizontal header at the top of the Member PVC ID Card (Airplane + PBC Monogram + PROBASHI BUSINESS CLUB).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
+                    {/* Card Logo Preview */}
+                    <div className="flex flex-col items-center gap-2 shrink-0">
+                      <div className="p-3 bg-[#040D1B] rounded-2xl shadow-md border border-[#D4AF37]/40 w-52 h-16 flex items-center justify-center">
+                        <PbcAirplaneHeaderLogo className="w-44 h-10" />
+                      </div>
+                      <span className="text-[10px] font-semibold text-slate-400">ID Card Header Preview</span>
+                    </div>
+
+                    {/* Upload Controls */}
+                    <div className="flex-1 space-y-3 w-full">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 mb-1">
+                          Select Custom ID Card Logo (PNG / SVG / WebP)
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert('Please select an image smaller than 5MB');
+                                return;
+                              }
+                              try {
+                                const compressedUrl = await compressImageToDataUrl(file, 1200, 0.95);
+                                if (compressedUrl && compressedUrl.length < 250 * 1024) {
+                                  safeStorage.setItem('pbc_cached_custom_card_logo', compressedUrl);
+                                }
+                                await updateSystemSettings({ customCardLogoUrl: compressedUrl });
+                              } catch (err) {
+                                console.error('Failed to compress ID card logo:', err);
+                                alert('Failed to process image.');
+                              }
+                            }
+                          }}
+                          className="block w-full text-xs text-slate-300
+                            file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
+                            file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300
+                            hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        {systemSettings.customCardLogoUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              safeStorage.removeItem('pbc_cached_custom_card_logo');
+                              updateSystemSettings({ customCardLogoUrl: '' });
+                            }}
+                            className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"
+                          >
+                            Reset to Built-in Vector Header
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-emerald-400 font-medium">
+                            ✓ Currently using built-in high-definition Golden Airplane & PBC monogram vector
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-slate-300">Club Title</label>
+                    <input
+                      type="text"
+                      value={systemSettings.clubName ?? ''}
+                      onChange={e => updateSystemSettings({ clubName: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block font-semibold text-slate-300">Primary Operating Currency</label>
+                    <input
+                      type="text"
+                      disabled
+                      value={systemSettings.currency ?? 'BDT'}
+                      className="w-full px-3 py-2 bg-[#070D1B]/50 border border-[#D4AF37]/20 rounded-xl text-amber-300 font-bold"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
+                    <div>
+                      <span className="font-bold text-white block">Require Admin Approval</span>
+                      <span className="text-[11px] text-slate-400">Hold new member registrations for review</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={!!systemSettings.requireAdminApproval}
+                      onChange={e => updateSystemSettings({ requireAdminApproval: e.target.checked })}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
+                    <div>
+                      <span className="font-bold text-white block">Expat Registration Portal</span>
+                      <span className="text-[11px] text-slate-400">Allow new users to sign up online</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={!!systemSettings.registrationOpen}
+                      onChange={e => updateSystemSettings({ registrationOpen: e.target.checked })}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="p-4 bg-[#070D1B] rounded-2xl border border-rose-500/40 col-span-1 md:col-span-2 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-white text-sm block">System Maintenance Mode (মেইনটেন্যান্স মোড)</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                            systemSettings.maintenanceMode ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          }`}>
+                            {systemSettings.maintenanceMode ? '🔴 Active (মেইনটেন্যান্স চালু)' : '🟢 App Live (অ্যাপ সচল)'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400">
+                          সিস্টেম আপডেট চলাকালীন সাধারণ মেম্বারদের প্রবেশ রুদ্ধ করে নোটিশ প্রদর্শন করবে। (System Admin ব্যতীত কেউ লগইন করতে পারবে না)
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={!!systemSettings.maintenanceMode}
+                        onChange={e => updateSystemSettings({ maintenanceMode: e.target.checked })}
+                        className="w-6 h-6 accent-rose-500 rounded cursor-pointer"
+                      />
+                    </div>
+
+                    {systemSettings.maintenanceMode && (
+                      <div className="space-y-2 pt-2 border-t border-slate-800">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs font-bold text-amber-300">
+                            মেইনটেন্যান্স নোটিশ বার্তা (Maintenance Notice Message):
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => updateSystemSettings({
+                              maintenanceMessage: `সম্মানিত মেম্বারবৃন্দ,\nঅ্যাপটির নতুন নিরাপত্তা আপডেট ও পারফরম্যান্স উন্নয়নের কাজ চলমান রয়েছে। সাময়িকভাবে সাধারণ মেম্বারদের জন্য লগইন ও অ্যাপ ব্যবহারের সেবা স্থগিত রাখা হয়েছে।\n\nকাজ শেষ হওয়া মাত্রই অ্যাপটি পুনরায় স্বাভাবিকভাবে সচল করা হবে। আপনার ধৈর্য ও সহযোগিতার জন্য ধন্যবাদ।`
+                            })}
+                            className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold px-2 py-1 rounded-lg border border-amber-500/40 transition cursor-pointer"
+                          >
+                            ✨ স্ট্যান্ডার্ড নোটিশ লোড করুন
+                          </button>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={systemSettings.maintenanceMessage ?? ''}
+                          onChange={e => updateSystemSettings({ maintenanceMessage: e.target.value })}
+                          placeholder="এখানে মেম্বারদের দেখার জন্য নোটিশ লিখুন..."
+                          className="w-full px-3 py-2 bg-[#02050A] border border-slate-700 rounded-xl text-white text-xs leading-relaxed focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Application Version & Update Control */}
+                  <div className="pt-2 col-span-1 md:col-span-2">
+                    <AppUpdateSettingCard />
+                  </div>
+
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View 4: Activity Log */}
+      {currentSubView === 'logs' && (
+        <div className="space-y-6">
+
+          <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
+                <History className="w-5 h-5 text-amber-400" />
+                <span>Audit Trail & Activity Logs ({activityLogs.length})</span>
+              </h3>
+              <span className="text-xs text-slate-400">Real-time system events</span>
+            </div>
+
+            <div className="space-y-2.5 max-h-[550px] overflow-y-auto pr-1">
+              {activityLogs.map((log, idx) => {
+                const logDate = new Date(log.timestamp);
+                const isValidDate = !isNaN(logDate.getTime());
+                const dateStr = isValidDate 
+                  ? logDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '';
+                const timeStr = isValidDate
+                  ? logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  : log.timestamp;
+
+                return (
+                  <div 
+                    key={log.id || `log-${idx}`} 
+                    className="p-3.5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:border-[#D4AF37]/40 transition"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white text-xs">{log.action}</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">
+                          {log.userEmail || 'system@pbcclub.org'}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 text-[11px] leading-relaxed">{log.details}</p>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono shrink-0 bg-[#0B1528] px-3 py-1.5 rounded-xl border border-[#D4AF37]/20 self-start sm:self-auto">
+                      <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {dateStr && (
+                          <>
+                            <span className="text-amber-300 font-semibold">{dateStr}</span>
+                            <span className="text-slate-600 font-bold">•</span>
+                          </>
+                        )}
+                        <span className="text-slate-300">{timeStr}</span>
+                      </div>
                     </div>
                   </div>
                 );
@@ -719,398 +1218,156 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 3: System Settings */}
-      {activeAdminTab === 'settings' && (
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-6">
-          <div>
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
-              <Sliders className="w-5 h-5 text-amber-400" />
-              <span>Global PBC Club Configuration</span>
-            </h3>
-            <p className="text-xs text-slate-300">
-              System governance, auto approval rules, maintenance modes
-            </p>
-          </div>
+      {/* Sub-View 5: Push Broadcast */}
+      {currentSubView === 'broadcast' && (
+        <div className="space-y-6">
 
-          {role !== 'super_admin' ? (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl text-xs">
-              System Settings and global parameters are locked. Only <strong>System Admin</strong> can modify global club settings.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* Theme Customizer Box */}
-              <ThemeSelectorCard />
-
-              {/* App Logo Customization Box */}
-              <div className="p-5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
-                      <ImageIcon className="w-4 h-4 text-amber-400" />
-                      <span>Application Branding Logo (অ্যাপের কাস্টম লোগো)</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Upload your custom logo image to display across the Navbar, Sidebar, Member Cards, and Splash Screen.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
-                  {/* Logo Preview */}
-                  <div className="flex flex-col items-center gap-2 shrink-0">
-                    <div className="p-2 bg-[#0B1528] rounded-2xl shadow-md border border-[#D4AF37]/30">
-                      <PbcLogo className="w-20 h-20" />
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-400">Current Logo Preview</span>
-                  </div>
-
-                  {/* Upload Controls */}
-                  <div className="flex-1 space-y-3 w-full">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Select Image File (PNG / JPG / SVG / WebP)
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 5 * 1024 * 1024) {
-                              alert('Please select an image smaller than 5MB');
-                              return;
-                            }
-                            try {
-                              const compressedUrl = await compressImageToDataUrl(file, 300, 0.82);
-                              if (compressedUrl && compressedUrl.length < 100 * 1024) {
-                                safeStorage.setItem('pbc_cached_custom_logo', compressedUrl);
-                              }
-                              await updateSystemSettings({ customLogoUrl: compressedUrl });
-                            } catch (err) {
-                              console.error('Failed to compress logo image:', err);
-                              alert('Failed to process logo image.');
-                            }
-                          }
-                        }}
-                        className="block w-full text-xs text-slate-300
-                          file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
-                          file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300
-                          hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      {systemSettings.customLogoUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            safeStorage.removeItem('pbc_cached_custom_logo');
-                            updateSystemSettings({ customLogoUrl: '' });
-                          }}
-                          className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"
-                        >
-                          Reset to Default Official Logo
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-emerald-400 font-medium">
-                          ✓ Currently using default official circular emblem (/logo.svg)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+          <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
+                  Broadcast Push Notification
+                </h3>
               </div>
-
-              {/* 2. Dedicated ID Card Header Logo (Horizontal Luxury Banner) */}
-              <div className="p-4 bg-[#070D1B] border border-[#D4AF37]/30 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-amber-300 text-sm flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-amber-400" />
-                      <span>Dedicated ID Card Header Logo (আইডি কার্ডের বিশেষ লোগো)</span>
-                    </h4>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Only used for the luxury horizontal header at the top of the Member PVC ID Card (Airplane + PBC Monogram + PROBASHI BUSINESS CLUB).
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
-                  {/* Card Logo Preview */}
-                  <div className="flex flex-col items-center gap-2 shrink-0">
-                    <div className="p-3 bg-[#040D1B] rounded-2xl shadow-md border border-[#D4AF37]/40 w-52 h-16 flex items-center justify-center">
-                      <PbcAirplaneHeaderLogo className="w-44 h-10" />
-                    </div>
-                    <span className="text-[10px] font-semibold text-slate-400">ID Card Header Preview</span>
-                  </div>
-
-                  {/* Upload Controls */}
-                  <div className="flex-1 space-y-3 w-full">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Select Custom ID Card Logo (PNG / SVG / WebP)
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 5 * 1024 * 1024) {
-                              alert('Please select an image smaller than 5MB');
-                              return;
-                            }
-                            try {
-                              const compressedUrl = await compressImageToDataUrl(file, 1200, 0.95);
-                              if (compressedUrl && compressedUrl.length < 250 * 1024) {
-                                safeStorage.setItem('pbc_cached_custom_card_logo', compressedUrl);
-                              }
-                              await updateSystemSettings({ customCardLogoUrl: compressedUrl });
-                            } catch (err) {
-                              console.error('Failed to compress ID card logo:', err);
-                              alert('Failed to process image.');
-                            }
-                          }
-                        }}
-                        className="block w-full text-xs text-slate-300
-                          file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0
-                          file:text-xs file:font-bold file:bg-amber-500/20 file:text-amber-300
-                          hover:file:bg-amber-500/30 file:cursor-pointer cursor-pointer"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      {systemSettings.customCardLogoUrl ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            safeStorage.removeItem('pbc_cached_custom_card_logo');
-                            updateSystemSettings({ customCardLogoUrl: '' });
-                          }}
-                          className="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/20 hover:bg-rose-500/30 rounded-xl border border-rose-500/30 transition cursor-pointer"
-                        >
-                          Reset to Built-in Vector Header
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-emerald-400 font-medium">
-                          ✓ Currently using built-in high-definition Golden Airplane & PBC monogram vector
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="space-y-1">
-                  <label className="block font-semibold text-slate-300">Club Title</label>
-                  <input
-                    type="text"
-                    value={systemSettings.clubName ?? ''}
-                    onChange={e => updateSystemSettings({ clubName: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block font-semibold text-slate-300">Primary Operating Currency</label>
-                  <input
-                    type="text"
-                    disabled
-                    value={systemSettings.currency ?? 'BDT'}
-                    className="w-full px-3 py-2 bg-[#070D1B]/50 border border-[#D4AF37]/20 rounded-xl text-amber-300 font-bold"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
-                  <div>
-                    <span className="font-bold text-white block">Require Admin Approval</span>
-                    <span className="text-[11px] text-slate-400">Hold new member registrations for review</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={!!systemSettings.requireAdminApproval}
-                    onChange={e => updateSystemSettings({ requireAdminApproval: e.target.checked })}
-                    className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
-                  <div>
-                    <span className="font-bold text-white block">Expat Registration Portal</span>
-                    <span className="text-[11px] text-slate-400">Allow new users to sign up online</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={!!systemSettings.registrationOpen}
-                    onChange={e => updateSystemSettings({ registrationOpen: e.target.checked })}
-                    className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
-                  />
-                </div>
-
-                <div className="p-4 bg-[#070D1B] rounded-2xl border border-rose-500/40 col-span-1 md:col-span-2 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm block">System Maintenance Mode (মেইনটেন্যান্স মোড)</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
-                          systemSettings.maintenanceMode ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        }`}>
-                          {systemSettings.maintenanceMode ? '🔴 Active (মেইনটেন্যান্স চালু)' : '🟢 App Live (অ্যাপ সচল)'}
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-slate-400">
-                        সিস্টেম আপডেট চলাকালীন সাধারণ মেম্বারদের প্রবেশ রুদ্ধ করে নোটিশ প্রদর্শন করবে। (System Admin ব্যতীত কেউ লগইন করতে পারবে না)
-                      </span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={!!systemSettings.maintenanceMode}
-                      onChange={e => updateSystemSettings({ maintenanceMode: e.target.checked })}
-                      className="w-6 h-6 accent-rose-500 rounded cursor-pointer"
-                    />
-                  </div>
-
-                  {systemSettings.maintenanceMode && (
-                    <div className="space-y-2 pt-2 border-t border-slate-800">
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs font-bold text-amber-300">
-                          মেইনটেন্যান্স নোটিশ বার্তা (Maintenance Notice Message):
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => updateSystemSettings({
-                            maintenanceMessage: `সম্মানিত মেম্বারবৃন্দ,\nঅ্যাপটির নতুন নিরাপত্তা আপডেট ও পারফরম্যান্স উন্নয়নের কাজ চলমান রয়েছে। সাময়িকভাবে সাধারণ মেম্বারদের জন্য লগইন ও অ্যাপ ব্যবহারের সেবা স্থগিত রাখা হয়েছে।\n\nকাজ শেষ হওয়া মাত্রই অ্যাপটি পুনরায় স্বাভাবিকভাবে সচল করা হবে। আপনার ধৈর্য ও সহযোগিতার জন্য ধন্যবাদ।`
-                          })}
-                          className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold px-2 py-1 rounded-lg border border-amber-500/40 transition cursor-pointer"
-                        >
-                          ✨ স্ট্যান্ডার্ড নোটিশ লোড করুন
-                        </button>
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={systemSettings.maintenanceMessage ?? ''}
-                        onChange={e => updateSystemSettings({ maintenanceMessage: e.target.value })}
-                        placeholder="এখানে মেম্বারদের দেখার জন্য নোটিশ লিখুন..."
-                        className="w-full px-3 py-2 bg-[#02050A] border border-slate-700 rounded-xl text-white text-xs leading-relaxed focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Application Version & Update Control */}
-                <div className="pt-2">
-                  <AppUpdateSettingCard />
-                </div>
-
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 4: Activity Log */}
-      {activeAdminTab === 'logs' && (
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-extrabold text-white flex items-center gap-2 uppercase tracking-wide">
-              <History className="w-5 h-5 text-amber-400" />
-              <span>Audit Trail & Activity Logs ({activityLogs.length})</span>
-            </h3>
-            <span className="text-xs text-slate-400">Real-time system events</span>
-          </div>
-
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-            {activityLogs.map((log, idx) => (
-              <div key={log.id || `log-${idx}`} className="p-3 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/20 flex items-start justify-between gap-3 text-xs">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white">{log.action}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-md">{log.userEmail || 'system@pbcclub.org'}</span>
-                  </div>
-                  <p className="text-slate-300 mt-1">{log.details}</p>
-                </div>
-                <span className="text-[10px] text-slate-400 shrink-0 font-mono flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-400" />
-                  {new Date(log.timestamp).toLocaleTimeString()}
+              {toastSuccess && (
+                <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 animate-pulse">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Broadcast Sent Live to All Members!</span>
                 </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab 5: Push Broadcast */}
-      {activeAdminTab === 'broadcast' && (
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-amber-400" />
-              <h3 className="text-base font-extrabold text-white uppercase tracking-wide">
-                Broadcast Push Notification
-              </h3>
+              )}
             </div>
-            {toastSuccess && (
-              <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 animate-pulse">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Broadcast Sent Live to All Members!</span>
-              </span>
-            )}
-          </div>
 
-          <form onSubmit={handleSendNotification} className="space-y-3 text-xs">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <form onSubmit={handleSendNotification} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-300 mb-1">
+                    Notification Headline *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={notifTitle}
+                    onChange={e => setNotifTitle(e.target.value)}
+                    className="w-full px-3.5 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-300 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={notifType}
+                    onChange={e => setNotifType(e.target.value as any)}
+                    className="w-full px-3.5 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-medium"
+                  >
+                    <option value="deposit" className="bg-[#070D1B]">Deposit Alert</option>
+                    <option value="profit" className="bg-[#070D1B]">Profit Dividend</option>
+                    <option value="project" className="bg-[#070D1B]">Real Estate Acquisition</option>
+                    <option value="system" className="bg-[#070D1B]">System Notice</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-300 mb-1">
-                  Notification Headline *
+                  Message Body *
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   required
-                  value={notifTitle}
-                  onChange={e => setNotifTitle(e.target.value)}
+                  value={notifMessage}
+                  onChange={e => setNotifMessage(e.target.value)}
                   className="w-full px-3.5 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white"
                 />
               </div>
 
-              <div>
-                <label className="block font-semibold text-slate-300 mb-1">
-                  Category
-                </label>
-                <select
-                  value={notifType}
-                  onChange={e => setNotifType(e.target.value as any)}
-                  className="w-full px-3.5 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-medium"
-                >
-                  <option value="deposit" className="bg-[#070D1B]">Deposit Alert</option>
-                  <option value="profit" className="bg-[#070D1B]">Profit Dividend</option>
-                  <option value="project" className="bg-[#070D1B]">Real Estate Acquisition</option>
-                  <option value="system" className="bg-[#070D1B]">System Notice</option>
-                </select>
+              <button
+                type="submit"
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
+              >
+                <Send className="w-4 h-4 text-slate-950" />
+                <span>Send Push Alert Now</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View 6: Database Backup & Restore */}
+      {currentSubView === 'backup' && (
+        <div className="space-y-6">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Export Card */}
+            <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Download className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-wide">
+                    {isBn ? 'ডাটাবেজ ব্যাকআপ ডাউনলোড (Export)' : 'Export Full Backup'}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    {isBn ? 'বর্তমান সমস্ত রেকর্ড JSON ফাইল হিসেবে সেভ করুন' : 'Generate & download complete JSON snapshot'}
+                  </p>
+                </div>
               </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed bg-[#070D1B] p-4 rounded-2xl border border-[#D4AF37]/20">
+                {isBn 
+                  ? 'এই অপশনের মাধ্যমে ক্লাবের সকল সদস্যের তথ্য, জমা হওয়া ডিপোজিট, প্রকল্পসমূহ, অডিট হিস্ট্রি এবং সিস্টেম কনফিগারেশন একটি সুরক্ষিত JSON ফাইল হিসেবে আপনার ডিভাইসে ডাউনলোড হবে।' 
+                  : 'Exports all verified members, transaction records, investment portfolios, audit logs, and club settings into a clean, portable JSON format.'}
+              </p>
+
+              <button
+                onClick={handleExportBackup}
+                className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition active:scale-95 cursor-pointer"
+              >
+                <Download className="w-4 h-4 stroke-[2.5]" />
+                <span>{isBn ? 'ব্যাকআপ ফাইল ডাউনলোড করুন (.json)' : 'Download Backup File (.json)'}</span>
+              </button>
             </div>
 
-            <div>
-              <label className="block font-semibold text-slate-300 mb-1">
-                Message Body *
-              </label>
-              <textarea
-                rows={2}
-                required
-                value={notifMessage}
-                onChange={e => setNotifMessage(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white"
-              />
+            {/* Restore Card */}
+            <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white uppercase tracking-wide">
+                    {isBn ? 'ডাটাবেজ রিস্টোর (Restore)' : 'Restore From Backup'}
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    {isBn ? 'পূর্বের সেভ করা JSON ফাইল আপলোড করুন' : 'Upload backup JSON file to restore database'}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed bg-[#070D1B] p-4 rounded-2xl border border-[#D4AF37]/20">
+                {isBn 
+                  ? '⚠️ সতর্কতা: ব্যাকআপ রিস্টোর করলে বর্তমান সমস্ত রেকর্ড ফাইলটির তথ্য দিয়ে প্রতিস্থাপিত হবে। শুধুমাত্র সুপার অ্যাডমিন এই কাজটি সম্পাদন করতে পারবে।' 
+                  : '⚠️ Notice: Restoring from a backup will replace the current live database state with the data from the uploaded file. Only authorized Super Admins can execute this action.'}
+              </p>
+
+              {role === 'super_admin' ? (
+                <label className="w-full flex items-center justify-center gap-2 py-3 bg-[#070D1B] hover:bg-[#112244] text-cyan-300 hover:text-cyan-200 border-2 border-dashed border-cyan-500/50 font-black text-xs rounded-xl shadow-lg transition active:scale-95 cursor-pointer">
+                  <Upload className="w-4 h-4 stroke-[2.5]" />
+                  <span>{isBn ? 'JSON ব্যাকআপ ফাইল নির্বাচন করুন' : 'Select Backup JSON File'}</span>
+                  <input type="file" accept=".json" onChange={handleRestoreBackup} className="hidden" />
+                </label>
+              ) : (
+                <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl text-center font-bold">
+                  Restricted to Super Admin Only
+                </div>
+              )}
             </div>
 
-            <button
-              type="submit"
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer"
-            >
-              <Send className="w-4 h-4 text-slate-950" />
-              <span>Send Push Alert Now</span>
-            </button>
-          </form>
+          </div>
         </div>
       )}
 

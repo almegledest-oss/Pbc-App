@@ -1,6 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { Member, Deposit, RealEstateProject, ClubStats, UserRole, Language, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession } from '../types';
+import { 
+  Member, 
+  Deposit, 
+  RealEstateProject, 
+  ClubStats, 
+  UserRole, 
+  Language, 
+  NotificationItem, 
+  ActivityLog, 
+  SystemSettings, 
+  CardTemplateConfig, 
+  BoardDirector, 
+  TrashedItem, 
+  ActiveSession,
+  AppTab,
+  NavigationState
+} from '../types';
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
@@ -132,9 +148,34 @@ interface AppContextType {
   triggerSecurityAlert: (msg?: string) => void;
   closeSecurityAlert: () => void;
 
-  // Active Navigation Tab
-  activeTab: 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now';
-  setActiveTab: (tab: 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now') => void;
+  // More Menu Bottom Sheet State
+  isMoreMenuOpen: boolean;
+  setIsMoreMenuOpen: (open: boolean) => void;
+  openMoreMenu: () => void;
+  closeMoreMenu: () => void;
+
+  // Navigation History Stack & Focus Mode
+  activeTab: AppTab;
+  setActiveTab: (tab: AppTab) => void;
+  navigationHistory: NavigationState[];
+  currentNavState: NavigationState;
+  previousNavState: NavigationState | null;
+  canGoBack: boolean;
+  goBack: () => boolean;
+  navigateWithHistory: (
+    target: AppTab | NavigationState,
+    options?: {
+      replace?: boolean;
+      isFocusMode?: boolean;
+      title?: string;
+      titleBn?: string;
+      subView?: string | null;
+      subId?: string | null;
+    }
+  ) => void;
+  isFocusMode: boolean;
+  setIsFocusMode: (focus: boolean) => void;
+  toggleFocusMode: () => void;
 
   // Active Sessions (Online Now)
   activeSessions: ActiveSession[];
@@ -233,6 +274,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(true);
   const [authUser, setAuthUser] = useState<any>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const openMoreMenu = () => setIsMoreMenuOpen(true);
+  const closeMoreMenu = () => setIsMoreMenuOpen(false);
 
   // Security Alert Modal State
   const [securityAlertMessage, setSecurityAlertMessage] = useState<string | null>(null);
@@ -278,8 +322,175 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isTrashBoxOpen, setIsTrashBoxOpen] = useState<boolean>(false);
   const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now'>('dashboard');
+  const [activeTab, setActiveTabState] = useState<AppTab>('dashboard');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+
+  // Navigation History Stack & Full-Screen Focus Mode
+  const [navigationHistory, setNavigationHistory] = useState<NavigationState[]>([
+    { tab: 'dashboard', title: 'Club Dashboard', titleBn: 'ক্লাব ড্যাশবোর্ড', isFocusMode: false }
+  ]);
+  const [isFocusMode, setIsFocusMode] = useState<boolean>(false);
+
+  const getTabTitles = (tab: AppTab) => {
+    switch (tab) {
+      case 'dashboard':
+        return { title: 'Club Dashboard', titleBn: 'ক্লাব ড্যাশবোর্ড' };
+      case 'members':
+        return { title: 'Club Members Directory', titleBn: 'মেম্বার তালিকা ও আইডি কার্ড' };
+      case 'deposits':
+        return { title: 'Deposit Ledger & Vouchers', titleBn: 'ডিপোজিট হিস্ট্রি ও অডিট ট্রেইল' };
+      case 'real_estate':
+        return { title: 'Investments & Real Estate', titleBn: 'ইনভেস্টমেন্ট প্রজেক্ট পোর্টফোলিও' };
+      case 'reports':
+        return { title: 'Audit & Financial Reports', titleBn: 'অডিট ও ফিন্যান্সিয়াল রিপোর্ট' };
+      case 'admin_panel':
+        return { title: 'Super Admin Control Center', titleBn: 'সুপার এডমিন কন্ট্রোল সেন্টার' };
+      case 'directors':
+        return { title: 'Board of Directors', titleBn: 'পরিচালনা পর্ষদ' };
+      case 'active_now':
+        return { title: 'Live Online Members', titleBn: 'লাইভ অ্যাক্টিভ মেম্বারস' };
+      case 'my_profile':
+        return { title: 'My Expat Profile', titleBn: 'আমার প্রোফাইল ও স্টেটমেন্ট' };
+      default:
+        return { title: 'PBC Portal', titleBn: 'পিবিসি পোর্টাল' };
+    }
+  };
+
+  const currentNavState: NavigationState = navigationHistory[navigationHistory.length - 1] || {
+    tab: activeTab,
+    title: getTabTitles(activeTab).title,
+    titleBn: getTabTitles(activeTab).titleBn,
+    isFocusMode: isFocusMode
+  };
+
+  const previousNavState: NavigationState | null = navigationHistory.length > 1
+    ? navigationHistory[navigationHistory.length - 2]
+    : null;
+
+  const canGoBack = navigationHistory.length > 1;
+
+  const navigateWithHistory = (
+    target: AppTab | NavigationState,
+    options?: {
+      replace?: boolean;
+      isFocusMode?: boolean;
+      title?: string;
+      titleBn?: string;
+      subView?: string | null;
+      subId?: string | null;
+      fromMoreMenu?: boolean;
+    }
+  ) => {
+    const targetTab: AppTab = typeof target === 'string' ? target : target.tab;
+    const defaultTitles = getTabTitles(targetTab);
+
+    // Auto focus mode for deposits or when requested
+    const shouldBeFocus = typeof target === 'object' && target.isFocusMode !== undefined
+      ? target.isFocusMode
+      : options?.isFocusMode !== undefined
+      ? options.isFocusMode
+      : (targetTab === 'deposits');
+
+    const fromMore = (typeof target === 'object' && target.fromMoreMenu !== undefined)
+      ? target.fromMoreMenu
+      : (options?.fromMoreMenu ?? false);
+
+    const newState: NavigationState = {
+      tab: targetTab,
+      title: (typeof target === 'object' && target.title) || options?.title || defaultTitles.title,
+      titleBn: (typeof target === 'object' && target.titleBn) || options?.titleBn || defaultTitles.titleBn,
+      subView: (typeof target === 'object' && target.subView !== undefined) ? target.subView : (options?.subView !== undefined ? options.subView : null),
+      subId: (typeof target === 'object' && target.subId !== undefined) ? target.subId : (options?.subId !== undefined ? options.subId : null),
+      isFocusMode: shouldBeFocus,
+      fromMoreMenu: fromMore
+    };
+
+    setNavigationHistory(prev => {
+      const current = prev[prev.length - 1];
+      if (current && current.tab === newState.tab && current.subView === newState.subView && current.subId === newState.subId) {
+        const updated = [...prev];
+        updated[updated.length - 1] = newState;
+        return updated;
+      }
+
+      if (options?.replace) {
+        const updated = [...prev];
+        updated[updated.length - 1] = newState;
+        return updated;
+      }
+
+      // If navigating directly back to dashboard with no subview, collapse history back to root
+      if (targetTab === 'dashboard' && !options?.subView) {
+        return [newState];
+      }
+
+      return [...prev, newState];
+    });
+
+    setActiveTabState(targetTab);
+    setIsFocusMode(shouldBeFocus);
+
+    try {
+      window.history.pushState({ pbcNavDepth: navigationHistory.length + 1 }, '');
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const setActiveTab = (tab: AppTab) => {
+    navigateWithHistory(tab);
+  };
+
+  const goBack = (): boolean => {
+    // If we are currently on dashboard and More menu is open, Back closes the More menu
+    if (activeTab === 'dashboard' && isMoreMenuOpen) {
+      setIsMoreMenuOpen(false);
+      return true;
+    }
+
+    if (navigationHistory.length > 1) {
+      const current = navigationHistory[navigationHistory.length - 1];
+      const newHistory = navigationHistory.slice(0, -1);
+      const prev = newHistory[newHistory.length - 1];
+      setNavigationHistory(newHistory);
+      if (prev) {
+        setActiveTabState(prev.tab);
+        setIsFocusMode(prev.isFocusMode ?? (prev.tab === 'deposits'));
+        if (prev.subId !== undefined) {
+          setSelectedMemberId(prev.subId);
+        }
+        // If exiting a screen that was opened from More Menu, re-open More Menu on dashboard!
+        if (current?.fromMoreMenu || prev.fromMoreMenu) {
+          setIsMoreMenuOpen(true);
+        }
+      }
+      return true;
+    } else {
+      if (activeTab !== 'dashboard') {
+        navigateWithHistory('dashboard');
+        return true;
+      }
+      return false;
+    }
+  };
+
+  const toggleFocusMode = () => {
+    setIsFocusMode(prev => !prev);
+  };
+
+  // Hardware / Browser Back button listener
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (navigationHistory.length > 1) {
+        event.preventDefault();
+        goBack();
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [navigationHistory]);
 
   // Clean up any stale logo cache from local storage on startup
   useEffect(() => {
@@ -1384,8 +1595,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         securityAlertMessage,
         triggerSecurityAlert,
         closeSecurityAlert,
+        isMoreMenuOpen,
+        setIsMoreMenuOpen,
+        openMoreMenu,
+        closeMoreMenu,
         activeTab,
         setActiveTab,
+        navigationHistory,
+        currentNavState,
+        previousNavState,
+        canGoBack,
+        goBack,
+        navigateWithHistory,
+        isFocusMode,
+        setIsFocusMode,
+        toggleFocusMode,
         activeSessions,
         selectedMemberId,
         setSelectedMemberId,

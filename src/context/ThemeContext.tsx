@@ -33,7 +33,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const vars = currentTheme.cssVariables;
 
     Object.entries(vars).forEach(([cssVar, value]) => {
-      root.style.setProperty(cssVar, value);
+      root.style.setProperty(cssVar, String(value));
     });
 
     if (currentTheme.mode === 'light') {

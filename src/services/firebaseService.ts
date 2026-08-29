@@ -26,7 +26,7 @@ import {
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
-import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession, resolveProjectCategory } from '../types';
+import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession, resolveProjectCategory, InvestmentCategory } from '../types';
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';

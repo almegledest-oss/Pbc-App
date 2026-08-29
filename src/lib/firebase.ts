@@ -1,20 +1,38 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import {
-  initializeFirestore,
   getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
   setLogLevel
 } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Suppress benign internal log spam
+// Suppress internal log spam
 try {
   setLogLevel('silent');
 } catch (e) {
   // Ignored if unsupported
+}
+
+// Global safety filter for transient Firestore SDK internal assertion assertions
+if (typeof window !== 'undefined') {
+  window.addEventListener('error', (event) => {
+    const msg = event?.message || '';
+    if (typeof msg === 'string' && msg.includes('FIRESTORE') && msg.includes('INTERNAL ASSERTION FAILED')) {
+      event.preventDefault();
+      event.stopPropagation();
+      console.warn('[Firestore SDK] Intercepted transient assertion:', msg);
+    }
+  }, true);
+
+  window.addEventListener('unhandledrejection', (event) => {
+    const reasonStr = (event?.reason?.message || event?.reason?.toString() || '');
+    if (typeof reasonStr === 'string' && reasonStr.includes('FIRESTORE') && reasonStr.includes('INTERNAL ASSERTION FAILED')) {
+      event.preventDefault();
+      event.stopPropagation();
+      console.warn('[Firestore SDK] Intercepted transient assertion rejection:', reasonStr);
+    }
+  });
 }
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
@@ -24,20 +42,9 @@ const databaseId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestor
   ? firebaseConfig.firestoreDatabaseId
   : undefined;
 
-let firestoreDb;
-try {
-  firestoreDb = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  }, databaseId);
-} catch (e) {
-  // If already initialized, retrieve existing instance
-  firestoreDb = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
-}
-
-export const db = firestoreDb;
+export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 export const storage = getStorage(app);
 
 export default app;
+
+

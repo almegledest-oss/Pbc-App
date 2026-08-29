@@ -6,6 +6,7 @@ import { generatePBCFrameImage } from '../../utils/pbcFrameGenerator';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 import { safeStorage } from '../../utils/safeStorage';
+import { DirectorDetailView } from './DirectorDetailView';
 import { 
   Users, 
   Plus, 
@@ -30,7 +31,8 @@ import {
   MapPin, 
   FileText,
   Lock,
-  Clock
+  Clock,
+  Eye
 } from 'lucide-react';
 
 export const DirectorsManager: React.FC = () => {
@@ -46,8 +48,27 @@ export const DirectorsManager: React.FC = () => {
     members, 
     language, 
     authUser,
-    currentMember 
+    currentMember,
+    currentNavState,
+    navigateWithHistory,
+    goBack 
   } = useApp();
+
+  // If in director_detail sub-view, render DirectorDetailView
+  if (currentNavState.subView === 'director_detail' && currentNavState.subId) {
+    return <DirectorDetailView directorId={currentNavState.subId} onBack={() => goBack()} />;
+  }
+
+  const handleOpenDirectorDetail = (director: BoardDirector) => {
+    navigateWithHistory({
+      tab: 'directors',
+      subView: 'director_detail',
+      subId: director.id,
+      title: director.name,
+      titleBn: director.name,
+      isFocusMode: true
+    });
+  };
 
   const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com';
 
@@ -436,13 +457,14 @@ export const DirectorsManager: React.FC = () => {
         {directors.map((director, index) => (
           <div 
             key={director.id}
+            onClick={() => handleOpenDirectorDetail(director)}
             className={`bg-[#0B1528] rounded-2xl border ${
               director.isActive !== false ? 'border-[#D4AF37]/40 shadow-lg' : 'border-slate-800 opacity-60'
-            } p-5 relative overflow-hidden transition hover:border-[#D4AF37] flex flex-col justify-between`}
+            } p-5 relative overflow-hidden transition hover:border-[#D4AF37] flex flex-col justify-between cursor-pointer group`}
           >
             <div>
               {/* Order Badge & Active Toggle */}
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3" onClick={(e) => e.stopPropagation()}>
                 <span className="px-2.5 py-0.5 text-[10px] font-black bg-amber-500/20 border border-amber-500/40 text-amber-300 rounded-full">
                   #{index + 1} Slide
                 </span>
@@ -523,13 +545,21 @@ export const DirectorsManager: React.FC = () => {
             </div>
 
             {/* Action Buttons Footer */}
-            <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
+            <div className="mt-5 pt-3 border-t border-slate-800 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => handleOpenDirectorDetail(director)}
+                className="py-2 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Eye className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'bn' ? 'বিবরণ' : 'Details'}</span>
+              </button>
+
               <button
                 onClick={() => handleOpenEditModal(director)}
-                className="flex-1 py-2 px-3 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs rounded-xl border border-amber-500/30 transition cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2 px-3 bg-[#030816] hover:bg-slate-800 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <Edit className="w-3.5 h-3.5" />
-                <span>{language === 'bn' ? 'এডিট করুন' : 'Edit Info'}</span>
+                <Edit className="w-3.5 h-3.5 text-amber-400" />
+                <span>{language === 'bn' ? 'এডিট' : 'Edit'}</span>
               </button>
 
               <button

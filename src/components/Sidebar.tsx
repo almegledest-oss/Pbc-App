@@ -34,6 +34,7 @@ export const Sidebar: React.FC = () => {
   const { 
     activeTab, 
     setActiveTab, 
+    navigateWithHistory,
     role, 
     accountRole, 
     canManageDirectors,
@@ -47,11 +48,12 @@ export const Sidebar: React.FC = () => {
     currentMember,
     authUser,
     logout,
-    activeSessions = []
+    activeSessions = [],
+    isMoreMenuOpen: isMoreOpen,
+    setIsMoreMenuOpen: setIsMoreOpen
   } = useApp();
   
   const { hasNewVersion } = useVersion();
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const labels = t[language];
 
   // Check if user has admin/super_admin privileges
@@ -208,56 +210,58 @@ export const Sidebar: React.FC = () => {
       </aside>
 
       {/* Mobile Bottom Navigation Bar (Strict 5 Buttons: Dashboard, Members, Deposits, Admin/Investment, More) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070D1B]/95 backdrop-blur-xl border-t border-[#D4AF37]/40 px-1 py-1.5 flex items-center justify-around text-white shadow-2xl">
-        {mobileBottomNavItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id && !isMoreOpen;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setIsMoreOpen(false);
-                // If member clicks Admin Panel, ensure appropriate tab action or prompt
-                if (item.id === 'admin_panel' && role === 'member' && (accountRole === 'super_admin' || accountRole === 'admin')) {
-                  switchRoleMode(accountRole === 'super_admin' ? 'super_admin' : 'admin');
-                }
-                setActiveTab(item.id as any);
-              }}
-              className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
-                isActive
-                  ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/50 shadow-sm shadow-amber-500/20'
-                  : 'text-slate-400 hover:text-amber-200'
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
-              <span className="text-[10px] tracking-tight whitespace-nowrap font-medium">{item.label}</span>
-            </button>
-          );
-        })}
+      {activeTab === 'dashboard' && (
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070D1B]/95 backdrop-blur-xl border-t border-[#D4AF37]/40 px-1 py-1.5 flex items-center justify-around text-white shadow-2xl">
+          {mobileBottomNavItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id && !isMoreOpen;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setIsMoreOpen(false);
+                  // If member clicks Admin Panel, ensure appropriate tab action or prompt
+                  if (item.id === 'admin_panel' && role === 'member' && (accountRole === 'super_admin' || accountRole === 'admin')) {
+                    switchRoleMode(accountRole === 'super_admin' ? 'super_admin' : 'admin');
+                  }
+                  setActiveTab(item.id as any);
+                }}
+                className={`flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
+                  isActive
+                    ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/50 shadow-sm shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-amber-200'
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                <span className="text-[10px] tracking-tight whitespace-nowrap font-medium">{item.label}</span>
+              </button>
+            );
+          })}
 
-        {/* 5th Button: MORE (মোর) with Update Badge */}
-        <button
-          onClick={() => setIsMoreOpen(!isMoreOpen)}
-          className={`relative flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
-            isMoreOpen
-              ? 'bg-amber-500/25 text-amber-300 font-extrabold border border-amber-400/60 shadow-md shadow-amber-500/30'
-              : 'text-slate-400 hover:text-amber-200'
-          }`}
-        >
-          <div className="relative">
-            <MoreHorizontal className={`w-5 h-5 ${isMoreOpen ? 'text-amber-300 animate-bounce' : 'text-slate-400'}`} />
-            {hasNewVersion && (
-              <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] tracking-tight whitespace-nowrap font-bold">
-            {language === 'bn' ? 'আরো' : 'More'}
-          </span>
-        </button>
-      </nav>
+          {/* 5th Button: MORE (মোর) with Update Badge */}
+          <button
+            onClick={() => setIsMoreOpen(!isMoreOpen)}
+            className={`relative flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-xl transition shrink-0 ${
+              isMoreOpen
+                ? 'bg-amber-500/25 text-amber-300 font-extrabold border border-amber-400/60 shadow-md shadow-amber-500/30'
+                : 'text-slate-400 hover:text-amber-200'
+            }`}
+          >
+            <div className="relative">
+              <MoreHorizontal className={`w-5 h-5 ${isMoreOpen ? 'text-amber-300 animate-bounce' : 'text-slate-400'}`} />
+              {hasNewVersion && (
+                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+              )}
+            </div>
+            <span className="text-[10px] tracking-tight whitespace-nowrap font-bold">
+              {language === 'bn' ? 'আরো' : 'More'}
+            </span>
+          </button>
+        </nav>
+      )}
 
       {/* Mobile MORE Drawer Popup Sheet */}
       {isMoreOpen && (
@@ -287,7 +291,7 @@ export const Sidebar: React.FC = () => {
             {/* Profile Summary Card */}
             <div 
               onClick={() => {
-                setActiveTab('my_profile');
+                navigateWithHistory('my_profile', { fromMoreMenu: true });
                 setIsMoreOpen(false);
               }}
               className="bg-gradient-to-r from-[#0B1528] to-[#112244] border border-[#D4AF37]/50 hover:border-[#D4AF37] rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-lg cursor-pointer group transition duration-200"
@@ -332,10 +336,10 @@ export const Sidebar: React.FC = () => {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
-                    setActiveTab('real_estate');
+                    navigateWithHistory('real_estate', { fromMoreMenu: true });
                     setIsMoreOpen(false);
                   }}
-                  className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left ${
+                  className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
                     activeTab === 'real_estate'
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                       : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
@@ -350,10 +354,10 @@ export const Sidebar: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    setActiveTab('my_profile');
+                    navigateWithHistory('my_profile', { fromMoreMenu: true });
                     setIsMoreOpen(false);
                   }}
-                  className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left ${
+                  className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
                     activeTab === 'my_profile'
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                       : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
@@ -370,10 +374,10 @@ export const Sidebar: React.FC = () => {
                 {isAdmin && (
                   <button
                     onClick={() => {
-                      setActiveTab('reports');
+                      navigateWithHistory('reports', { fromMoreMenu: true });
                       setIsMoreOpen(false);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left ${
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
                       activeTab === 'reports'
                         ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                         : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
@@ -391,10 +395,10 @@ export const Sidebar: React.FC = () => {
                 {isAdmin && (
                   <button
                     onClick={() => {
-                      setActiveTab('admin_panel');
+                      navigateWithHistory('admin_panel', { fromMoreMenu: true });
                       setIsMoreOpen(false);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left ${
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
                       activeTab === 'admin_panel'
                         ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                         : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
@@ -412,10 +416,10 @@ export const Sidebar: React.FC = () => {
                 {isAdmin && (
                   <button
                     onClick={() => {
-                      setActiveTab('active_now');
+                      navigateWithHistory('active_now', { fromMoreMenu: true });
                       setIsMoreOpen(false);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left col-span-2 ${
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left col-span-2 cursor-pointer ${
                       activeTab === 'active_now'
                         ? 'bg-emerald-500/25 border-emerald-500/80 text-emerald-300 shadow-md'
                         : 'bg-gradient-to-r from-emerald-950/40 via-[#070D1B] to-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-[#112244]'
@@ -446,10 +450,10 @@ export const Sidebar: React.FC = () => {
                 {canManageDirectors && (
                   <button
                     onClick={() => {
-                      setActiveTab('directors');
+                      navigateWithHistory('directors', { fromMoreMenu: true });
                       setIsMoreOpen(false);
                     }}
-                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left col-span-2 ${
+                    className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left col-span-2 cursor-pointer ${
                       activeTab === 'directors'
                         ? 'bg-amber-500/25 border-amber-500/80 text-amber-300 shadow-md'
                         : 'bg-[#070D1B] border-[#D4AF37]/40 text-amber-300 hover:bg-[#112244]'

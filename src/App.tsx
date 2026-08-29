@@ -5,6 +5,8 @@ import { ThemeProvider } from './context/ThemeContext';
 import { Splash } from './components/Splash';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
+import { FocusTopBar } from './components/Navigation/FocusTopBar';
+import { FloatingBackHomeControls } from './components/Navigation/FloatingBackHomeControls';
 import { HomeDashboard } from './components/Dashboard/HomeDashboard';
 import { MemberList } from './components/Members/MemberList';
 import { DepositList } from './components/Deposits/DepositList';
@@ -32,7 +34,9 @@ const MainContent: React.FC = () => {
     setIsTrashBoxOpen,
     systemSettings,
     setIsAuthModalOpen,
-    updateSystemSettings
+    updateSystemSettings,
+    isFocusMode,
+    canGoBack
   } = useApp();
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
 
@@ -80,17 +84,21 @@ const MainContent: React.FC = () => {
           </div>
         )}
 
-        {/* Top Navbar Header */}
-        <Navbar onOpenNotifications={() => setIsNotifDrawerOpen(true)} />
+        {/* Top Navbar Header - Only visible on main Dashboard */}
+        {currentTab === 'dashboard' ? (
+          <Navbar onOpenNotifications={() => setIsNotifDrawerOpen(true)} />
+        ) : (
+          <FocusTopBar onOpenNotifications={() => setIsNotifDrawerOpen(true)} />
+        )}
 
-        {/* Main Body Layout with Sidebar */}
-        <div className="flex-1 max-w-7xl w-full mx-auto flex overflow-x-hidden">
+        {/* Main Body Layout: When in sub-feature (e.g. Members, Deposits), 100% full screen with no top clutter */}
+        <div className={`flex-1 w-full mx-auto flex overflow-x-hidden ${currentTab !== 'dashboard' ? 'max-w-full px-2 sm:px-4 md:px-6 pt-1 sm:pt-2' : 'max-w-7xl'}`}>
           
-          {/* Navigation Sidebar */}
-          <Sidebar />
+          {/* Navigation Sidebar - Only on Main Dashboard */}
+          {currentTab === 'dashboard' && <Sidebar />}
 
-          {/* Tab Content Stage */}
-          <main className="flex-1 p-4 sm:p-6 md:p-8 pb-24 md:pb-8 overflow-y-auto overflow-x-hidden w-full max-w-full">
+          {/* Tab Content Stage - Sub-feature takes 100% full screen */}
+          <main className={`flex-1 p-2 sm:p-4 md:p-6 overflow-y-auto overflow-x-hidden w-full max-w-full ${currentTab !== 'dashboard' ? 'pb-28' : 'pb-24 md:pb-8'}`}>
             {currentTab === 'dashboard' && <HomeDashboard />}
             {currentTab === 'members' && <MemberList />}
             {currentTab === 'deposits' && <DepositList />}
@@ -102,6 +110,9 @@ const MainContent: React.FC = () => {
             {currentTab === 'my_profile' && <MyProfileView />}
           </main>
         </div>
+
+        {/* Floating Back (1-step) & Home (Full-exit) buttons on bottom-right */}
+        <FloatingBackHomeControls />
 
         {/* Universal Search Modal */}
         <GlobalSearchModal />

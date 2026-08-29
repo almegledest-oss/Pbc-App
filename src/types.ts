@@ -284,3 +284,15 @@ export interface BoardDirector {
   updatedAt?: string;
 }
 
+export type AppTab = 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now';
+
+export interface NavigationState {
+  tab: AppTab;
+  title?: string;
+  titleBn?: string;
+  subView?: string | null;
+  subId?: string | null;
+  isFocusMode?: boolean;
+  fromMoreMenu?: boolean;
+}
+

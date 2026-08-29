@@ -6,6 +6,7 @@ import { DigitalCard } from './DigitalCard';
 import { DigitalMemberCardModal } from './DigitalMemberCardModal';
 import { CardTemplateEditorModal } from './CardTemplateEditorModal';
 import { MemberFormModal } from './MemberFormModal';
+import { MemberDetailView } from './MemberDetailView';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { uploadMemberPhoto } from '../../services/firebaseService';
@@ -36,7 +37,9 @@ import {
   LayoutGrid,
   Table,
   Shield,
-  UserCog
+  UserCog,
+  Eye,
+  ChevronRight
 } from 'lucide-react';
 
 export const MemberList: React.FC = () => {
@@ -52,10 +55,31 @@ export const MemberList: React.FC = () => {
     language, 
     role,
     selectedMemberId,
-    setSelectedMemberId
+    setSelectedMemberId,
+    currentNavState,
+    navigateWithHistory,
+    goBack
   } = useApp();
 
   const labels = t[language];
+
+  // If we are in the member_detail subView, show the full-screen MemberDetailView
+  if (currentNavState.subView === 'member_detail' && (currentNavState.subId || selectedMemberId)) {
+    const activeId = currentNavState.subId || selectedMemberId || '';
+    return <MemberDetailView memberId={activeId} onBack={() => goBack()} />;
+  }
+
+  const handleOpenMemberDetail = (member: Member) => {
+    setSelectedMemberId(member.id);
+    navigateWithHistory({
+      tab: 'members',
+      subView: 'member_detail',
+      subId: member.id,
+      title: member.fullName,
+      titleBn: member.fullName,
+      isFocusMode: true
+    });
+  };
 
   const getMemberDepositBreakdown = (member: Member) => {
     const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
@@ -364,7 +388,11 @@ export const MemberList: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-[#D4AF37]/10">
                 {filteredMembers.map((member) => (
-                  <tr key={member.id} className="hover:bg-[#112244] transition">
+                  <tr 
+                    key={member.id} 
+                    onClick={() => handleOpenMemberDetail(member)}
+                    className="hover:bg-[#112244] transition cursor-pointer group"
+                  >
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <PBCFramedAvatar
@@ -374,7 +402,7 @@ export const MemberList: React.FC = () => {
                           className="w-10 h-10 rounded-xl object-cover ring-2 ring-amber-500/50 shrink-0"
                         />
                         <div>
-                          <span className="font-bold text-white block">
+                          <span className="font-bold text-white block group-hover:text-amber-300 transition">
                             {member.fullName}
                           </span>
                           <span className="text-[11px] text-slate-400 truncate block">
@@ -429,8 +457,16 @@ export const MemberList: React.FC = () => {
                         {member.status}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                    <td className="py-4 px-4 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleOpenMemberDetail(member)}
+                          className="min-h-[40px] px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-300 font-bold flex items-center justify-center gap-1 text-xs active:scale-95"
+                          title="View Member Full Profile & Statement"
+                        >
+                          <Eye className="w-4 h-4 text-amber-400" />
+                          <span>{language === 'bn' ? 'বিবরণ' : 'Details'}</span>
+                        </button>
                         {member.status === 'pending' && (role === 'super_admin' || role === 'admin') && (
                           <>
                             <button
@@ -451,7 +487,7 @@ export const MemberList: React.FC = () => {
                         )}
                         <button
                           onClick={() => setActiveCardMember(member)}
-                          className="min-h-[40px] px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-300 font-bold flex items-center justify-center gap-1 text-xs active:scale-95"
+                          className="min-h-[40px] px-3 py-2 bg-[#070D1B] hover:bg-amber-500/20 border border-slate-700 rounded-xl text-slate-300 hover:text-amber-300 font-bold flex items-center justify-center gap-1 text-xs active:scale-95"
                           title="Card Pass"
                         >
                           <CreditCard className="w-4 h-4 text-amber-400" />
@@ -510,11 +546,12 @@ export const MemberList: React.FC = () => {
         {filteredMembers.map((member) => (
           <div
             key={member.id}
-            className="bg-[#0B1528] rounded-3xl border border-[#D4AF37]/30 p-5 shadow-xl hover:border-[#D4AF37]/60 transition duration-200 flex flex-col justify-between relative group"
+            onClick={() => handleOpenMemberDetail(member)}
+            className="bg-[#0B1528] rounded-3xl border border-[#D4AF37]/30 p-5 shadow-xl hover:border-[#D4AF37] hover:shadow-amber-500/10 transition duration-200 flex flex-col justify-between relative group cursor-pointer"
           >
             {/* Top Row: Status badge & Actions */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between mb-3" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[#070D1B] text-amber-300 border border-[#D4AF37]/30">
                     {member.id}
@@ -615,7 +652,7 @@ export const MemberList: React.FC = () => {
                   className="w-14 h-14 rounded-2xl object-cover ring-2 ring-amber-500/50 shadow-md shrink-0"
                 />
                 <div className="overflow-hidden">
-                  <h3 className="text-sm font-bold text-white truncate">
+                  <h3 className="text-sm font-bold text-white group-hover:text-amber-300 transition truncate">
                     {member.fullName}
                   </h3>
                   <p className="text-xs text-amber-300/80 flex items-center gap-1 mt-0.5 truncate">
@@ -642,8 +679,8 @@ export const MemberList: React.FC = () => {
               </div>
             </div>
 
-            {/* Bottom Row: Deposit Total & Digital Pass Trigger */}
-            <div className="pt-3 border-t border-[#D4AF37]/20 flex items-center justify-between gap-2">
+            {/* Bottom Row: Deposit Total & Action Triggers */}
+            <div className="pt-3 border-t border-[#D4AF37]/20 flex items-center justify-between gap-2" onClick={(e) => e.stopPropagation()}>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">TOTAL DEPOSIT</span>
                 <p className="text-sm font-extrabold text-amber-300">
@@ -661,13 +698,24 @@ export const MemberList: React.FC = () => {
                 )}
               </div>
 
-              <button
-                onClick={() => setActiveCardMember(member)}
-                className="flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-md active:scale-95 cursor-pointer shrink-0"
-              >
-                <CreditCard className="w-4 h-4 text-slate-950" />
-                <span>Card Pass</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => handleOpenMemberDetail(member)}
+                  className="flex items-center justify-center gap-1 px-3 py-2 min-h-[44px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-bold rounded-xl border border-amber-500/30 transition active:scale-95 cursor-pointer"
+                  title="View Profile"
+                >
+                  <Eye className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{language === 'bn' ? 'বিবরণ' : 'Details'}</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveCardMember(member)}
+                  className="flex items-center justify-center gap-1 px-3.5 py-2 min-h-[44px] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl transition shadow-md active:scale-95 cursor-pointer shrink-0"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Card</span>
+                </button>
+              </div>
             </div>
 
           </div>
