@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
 import { BoardOfDirectorsBanner } from './BoardOfDirectorsBanner';
+import { DailyMotivationBanner } from './DailyMotivationBanner';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { 
   Users, 
@@ -135,42 +136,33 @@ export const HomeDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Top Welcome & Quick Actions Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#070D1B] via-[#0E1C38] to-[#0B1528] p-6 sm:p-7 rounded-3xl text-white shadow-2xl relative overflow-hidden border border-[#D4AF37]/30">
-        <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-amber-500/10 via-amber-400/5 to-transparent blur-2xl pointer-events-none" />
+      {/* Top Header Banner - Sleek Luxury Royal Aesthetic */}
+      <div className="bg-gradient-to-r from-[#070D1B] via-[#0E1C38] to-[#0B1528] p-6 sm:p-8 rounded-3xl text-white shadow-2xl relative overflow-hidden border border-[#D4AF37]/40">
+        <div className="absolute right-0 top-0 bottom-0 w-2/3 bg-gradient-to-l from-amber-500/10 via-amber-400/5 to-transparent blur-3xl pointer-events-none" />
+        <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+        
         <div className="relative z-10">
-          <span className="px-3.5 py-1 text-xs font-extrabold bg-amber-500/10 text-amber-300 rounded-full border border-amber-500/30 backdrop-blur-xs tracking-wider uppercase">
-            ❖ PBC Executive Portal
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-extrabold mt-2.5 tracking-tight text-white uppercase">
-            Probashi <span className="text-[#E5A93C]">Business Club</span>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white drop-shadow-sm leading-tight uppercase">
+            {language === 'bn' ? (
+              <>
+                স্বাগতম <span className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent">প্রবাসী বিজনেস ক্লাব</span>
+              </>
+            ) : (
+              <>
+                WELCOME TO <span className="bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent">PROBASHI BUSINESS CLUB</span>
+              </>
+            )}
           </h2>
-          <p className="text-sm text-slate-300 mt-1 max-w-xl font-medium">
-            Real Estate Fund Management & Expat Capital Growth Platform
+          <p className="text-xs sm:text-sm text-slate-300/90 mt-1.5 max-w-2xl font-medium tracking-wide leading-relaxed">
+            {language === 'bn' 
+              ? 'প্রবাসী রিয়েল এস্টেট ফান্ড ম্যানেজমেন্ট ও যৌথ মূলধন সমৃদ্ধি প্ল্যাটফর্ম'
+              : 'Real Estate Fund Management & Expat Capital Growth Platform'}
           </p>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2.5 z-10">
-          {(role === 'super_admin' || role === 'admin') && (
-            <>
-              <button
-                onClick={() => setActiveTab('deposits')}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-black bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer active:scale-95"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Add Deposit</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('real_estate')}
-                className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-extrabold bg-[#0B1528] hover:bg-[#112244] text-amber-300 rounded-xl shadow-md transition border border-[#D4AF37]/50 cursor-pointer"
-              >
-                <Building2 className="w-4 h-4 text-amber-400" />
-                <span>New Project</span>
-              </button>
-            </>
-          )}
-        </div>
       </div>
+
+      {/* Daily Motivation / Inspirational Quote Card with Classic Gold Border */}
+      <DailyMotivationBanner />
 
       {/* Board of Directors Live Sliced Banner */}
       <BoardOfDirectorsBanner />
@@ -227,8 +219,8 @@ export const HomeDashboard: React.FC = () => {
 
         {/* Total Investments (BDT) */}
         <div 
-          onClick={() => setIsInvestmentsModalOpen(true)}
-          className="bg-[#0B1528] dark:bg-[#070D1B] p-5 rounded-2xl border border-[#D4AF37]/30 shadow-lg hover:border-[#D4AF37] transition cursor-pointer group relative overflow-hidden"
+          onClick={() => setActiveTab('real_estate')}
+          className="bg-[#0B1528] dark:bg-[#070D1B] p-5 rounded-2xl border border-[#D4AF37]/30 shadow-lg hover:border-[#D4AF37] transition cursor-pointer group relative overflow-hidden active:scale-[0.99]"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Total Investments (BDT)</span>
@@ -549,7 +541,7 @@ export const HomeDashboard: React.FC = () => {
 
       {/* Quick Investments Modal for Members & Admins */}
       {isInvestmentsModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
           <div className="bg-[#0B1528] text-white rounded-3xl border border-[#D4AF37]/50 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
             {/* Modal Header */}
@@ -742,7 +734,7 @@ export const HomeDashboard: React.FC = () => {
 
       {/* Full Detailed Project Inspection Modal with HD Gallery & Financial Breakdown */}
       {activePreviewProject && (
-        <div className="fixed inset-0 z-60 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+        <div className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
           <div className="bg-[#0B1528] text-white rounded-3xl border-2 border-[#D4AF37]/60 shadow-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
             {/* Detailed Header */}

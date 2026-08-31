@@ -63,6 +63,38 @@ export const MemberList: React.FC = () => {
 
   const labels = t[language];
 
+  // Filters & Search Hooks
+  const [searchTerm, setSearchTerm] = useState('');
+  const [countryFilter, setCountryFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
+  // Modal States
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [activeCardMember, setActiveCardMember] = useState<Member | null>(null);
+  const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
+
+  // Member Delete Confirmation State
+  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Form State for New Member
+  const [formData, setFormData] = useState({
+    fullName: '',
+    fullNameBn: '',
+    phone: '',
+    email: '',
+    country: 'United Arab Emirates',
+    city: 'Dubai',
+    joinDate: new Date().toISOString().split('T')[0],
+    status: 'active' as const,
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+    totalDeposit: 0,
+    role: 'member' as const,
+    notes: 'Expat Investor'
+  });
+
   // If we are in the member_detail subView, show the full-screen MemberDetailView
   if (currentNavState.subView === 'member_detail' && (currentNavState.subId || selectedMemberId)) {
     const activeId = currentNavState.subId || selectedMemberId || '';
@@ -102,22 +134,6 @@ export const MemberList: React.FC = () => {
     return getMemberDepositBreakdown(member).total;
   };
 
-  // Filters & Search
-  const [searchTerm, setSearchTerm] = useState('');
-  const [countryFilter, setCountryFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-
-  // Modal States
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [activeCardMember, setActiveCardMember] = useState<Member | null>(null);
-  const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false);
-
-  // Member Delete Confirmation State
-  const [memberToDelete, setMemberToDelete] = useState<Member | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
   const handleConfirmDelete = async () => {
     if (!memberToDelete) return;
     setIsDeleting(true);
@@ -146,22 +162,6 @@ export const MemberList: React.FC = () => {
       }
     }
   };
-
-  // Form State for New Member
-  const [formData, setFormData] = useState({
-    fullName: '',
-    fullNameBn: '',
-    phone: '',
-    email: '',
-    country: 'United Arab Emirates',
-    city: 'Dubai',
-    joinDate: new Date().toISOString().split('T')[0],
-    status: 'active' as const,
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-    totalDeposit: 0,
-    role: 'member' as const,
-    notes: 'Expat Investor'
-  });
 
   const countries = ['All', ...Array.from(new Set(members.map(m => m.country)))];
 

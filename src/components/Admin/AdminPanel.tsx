@@ -35,7 +35,8 @@ import {
   CreditCard,
   Image as ImageIcon,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  Quote
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
@@ -61,6 +62,8 @@ export const AdminPanel: React.FC = () => {
     updateUserRole,
     updateMember,
     updateSystemSettings,
+    quotes,
+    setIsQuotesManagerOpen,
     language, 
     role,
     currentMember,
@@ -92,6 +95,14 @@ export const AdminPanel: React.FC = () => {
   const [selectedAuditDeposit, setSelectedAuditDeposit] = useState<Deposit | null>(null);
   const [voucherFilter, setVoucherFilter] = useState<'pending' | 'all_receipts'>('pending');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
+
+  // Backup & Restore States
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreStatus, setRestoreStatus] = useState<string>('');
+  const [restoreResultModal, setRestoreResultModal] = useState<{
+    counts: { members: number; deposits: number; projects: number; reports: number; users: number; directors: number; total: number };
+    errors: string[];
+  } | null>(null);
 
   const pendingMembers = members.filter(m => m.status === 'pending');
   const pendingDeposits = deposits.filter(d => 
@@ -165,20 +176,47 @@ export const AdminPanel: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reset input so same file can be chosen again if needed
+    const fileInput = e.target;
+
+    setIsRestoring(true);
+    setRestoreStatus(isBn ? 'ব্যাকআপ ফাইলটি পড়া হচ্ছে...' : 'Reading backup file...');
+
     const reader = new FileReader();
     reader.onload = async (evt) => {
       try {
         const content = evt.target?.result as string;
-        const parsed = JSON.parse(content);
-        if (confirm(isBn ? "ডাটাবেজ রিস্টোর করলে বর্তমান সমস্ত রেকর্ড প্রতিস্থাপিত হবে। আপনি কি নিশ্চিত?" : "Restoring database backup will overwrite existing records. Proceed?")) {
-          await restoreBackupData(parsed);
-          alert(isBn ? "ডাটাবেজ ব্যাকআপ সফলভাবে রিস্টোর করা হয়েছে!" : "Database successfully restored from backup file!");
-          window.location.reload();
+        if (!content || !content.trim()) {
+          throw new Error('Selected backup file is completely empty.');
         }
+
+        const parsed = JSON.parse(content);
+        setRestoreStatus(isBn ? 'ফায়ারবেস ডাটাবেজে রেকর্ডগুলো যুক্ত করা হচ্ছে...' : 'Writing records to Firebase Firestore...');
+
+        const result = await restoreBackupData(parsed);
+        setRestoreStatus('');
+        setIsRestoring(false);
+        fileInput.value = '';
+
+        setRestoreResultModal({
+          counts: result.counts,
+          errors: result.errors
+        });
       } catch (err: any) {
-        alert("Invalid backup file: " + err.message);
+        setIsRestoring(false);
+        setRestoreStatus('');
+        fileInput.value = '';
+        alert((isBn ? "ব্যাকআপ ফাইল আপলোড করতে সমস্যা হয়েছে: " : "Error uploading backup file: ") + (err?.message || err));
       }
     };
+
+    reader.onerror = () => {
+      setIsRestoring(false);
+      setRestoreStatus('');
+      fileInput.value = '';
+      alert(isBn ? "ফাইলটি পড়তে ব্যর্থ হয়েছে।" : "Failed to read file.");
+    };
+
     reader.readAsText(file);
   };
 
@@ -416,6 +454,36 @@ export const AdminPanel: React.FC = () => {
                   {isBn 
                     ? 'ক্লাবের সকল মেম্বার, ডিপোজিট ও ইনভেস্টমেন্টের পূর্ণাঙ্গ ডাটা এক্সপোর্ট এবং রিস্টোর' 
                     : 'Download complete system backup file and restore database anytime'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* 7. Daily Motivation & Quotes Management */}
+          <div
+            onClick={() => setIsQuotesManagerOpen(true)}
+            className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/30 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-13 h-13 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                <Quote className="w-6 h-6" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                    {isBn ? 'দৈনিক উক্তি ও অনুপ্রেরণা (Daily Quotes)' : 'Daily Motivation & Quotes'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-bold">
+                    {quotes.length}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'ড্যাশবোর্ডের গোল্ডেন ব্যানারে প্রদর্শিত অনুপ্রেরণাদায়ক উক্তি যোগ, এডিট ও পরিচালনা করুন' 
+                    : 'Add, edit, reorder & manage business and investment quotes on the dashboard'}
                 </p>
               </div>
             </div>
@@ -1355,11 +1423,26 @@ export const AdminPanel: React.FC = () => {
               </p>
 
               {role === 'super_admin' ? (
-                <label className="w-full flex items-center justify-center gap-2 py-3 bg-[#070D1B] hover:bg-[#112244] text-cyan-300 hover:text-cyan-200 border-2 border-dashed border-cyan-500/50 font-black text-xs rounded-xl shadow-lg transition active:scale-95 cursor-pointer">
-                  <Upload className="w-4 h-4 stroke-[2.5]" />
-                  <span>{isBn ? 'JSON ব্যাকআপ ফাইল নির্বাচন করুন' : 'Select Backup JSON File'}</span>
-                  <input type="file" accept=".json" onChange={handleRestoreBackup} className="hidden" />
-                </label>
+                <div className="space-y-3">
+                  {isRestoring ? (
+                    <div className="p-4 bg-cyan-950/40 border border-cyan-500/50 rounded-2xl flex items-center justify-center gap-3 text-cyan-300 animate-pulse">
+                      <RefreshCw className="w-5 h-5 animate-spin text-cyan-400" />
+                      <span className="font-bold text-xs">{restoreStatus || (isBn ? 'ডাটাবেজে রিস্টোর হচ্ছে...' : 'Restoring to database...')}</span>
+                    </div>
+                  ) : (
+                    <label className="w-full flex items-center justify-center gap-2 py-3.5 bg-[#070D1B] hover:bg-[#112244] text-cyan-300 hover:text-cyan-200 border-2 border-dashed border-cyan-500/50 font-black text-xs rounded-xl shadow-lg transition active:scale-95 cursor-pointer">
+                      <Upload className="w-4 h-4 stroke-[2.5]" />
+                      <span>{isBn ? 'JSON ব্যাকআপ ফাইল নির্বাচন করুন' : 'Select Backup JSON File'}</span>
+                      <input 
+                        type="file" 
+                        accept=".json,application/json" 
+                        onChange={handleRestoreBackup} 
+                        className="hidden" 
+                        disabled={isRestoring}
+                      />
+                    </label>
+                  )}
+                </div>
               ) : (
                 <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs rounded-xl text-center font-bold">
                   Restricted to Super Admin Only
@@ -1367,6 +1450,67 @@ export const AdminPanel: React.FC = () => {
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Restore Result Modal */}
+      {restoreResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+          <div className="bg-[#0B1528] border-2 border-emerald-500/40 rounded-3xl p-6 max-w-md w-full text-white shadow-2xl space-y-5">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">
+                  {isBn ? 'ব্যাকআপ সফলভাবে রিস্টোর হয়েছে!' : 'Backup Restored Successfully!'}
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {isBn ? 'Firestore ডাটাবেজে সকল রেকর্ড আপডেট হয়েছে' : 'Records synchronized into Firebase Firestore'}
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-[#070D1B] p-4 rounded-2xl border border-[#D4AF37]/20 space-y-2 text-xs">
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? 'মেম্বার প্রোফাইল:' : 'Members:'}</span>
+                <span className="font-mono font-bold text-amber-300">{restoreResultModal.counts.members}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? 'ডিপোজিট ও ভাউচার:' : 'Deposits:'}</span>
+                <span className="font-mono font-bold text-emerald-400">{restoreResultModal.counts.deposits}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? 'রিয়েল এস্টেট প্রজেক্ট:' : 'Projects:'}</span>
+                <span className="font-mono font-bold text-cyan-300">{restoreResultModal.counts.projects}</span>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? 'বোর্ড অফ ডিরেক্টরস:' : 'Board Directors:'}</span>
+                <span className="font-mono font-bold text-purple-300">{restoreResultModal.counts.directors}</span>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span className="text-white font-bold">{isBn ? 'সর্বমোট রেকর্ড:' : 'Total Restored:'}</span>
+                <span className="font-mono font-black text-base text-yellow-400">{restoreResultModal.counts.total}</span>
+              </div>
+            </div>
+
+            {restoreResultModal.errors.length > 0 && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-[11px] text-amber-300">
+                <p className="font-bold">{restoreResultModal.errors.length} non-fatal item notices:</p>
+                <p className="truncate">{restoreResultModal.errors[0]}</p>
+              </div>
+            )}
+
+            <button
+              onClick={() => {
+                setRestoreResultModal(null);
+                window.location.reload();
+              }}
+              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs rounded-xl shadow-lg transition active:scale-95 cursor-pointer"
+            >
+              {isBn ? 'অ্যাপ রিফ্রেশ করে নতুন ডেটা দেখুন' : 'Refresh App & View Live Records'}
+            </button>
           </div>
         </div>
       )}

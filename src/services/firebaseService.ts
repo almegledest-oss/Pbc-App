@@ -26,9 +26,10 @@ import {
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
-import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession, resolveProjectCategory, InvestmentCategory } from '../types';
+import { Member, Deposit, RealEstateProject, NotificationItem, ActivityLog, SystemSettings, CardTemplateConfig, BoardDirector, TrashedItem, ActiveSession, resolveProjectCategory, InvestmentCategory, QuoteItem } from '../types';
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
+import { INITIAL_QUOTES } from '../data/seedQuotes';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
 import { safeStorage } from '../utils/safeStorage';
 
@@ -421,57 +422,378 @@ export async function deleteDirectorDoc(id: string) {
   }
 }
 
+// ----------------------------------------------------------------------
+// QUOTES & DAILY MOTIVATION CRUD
+// ----------------------------------------------------------------------
+export function subscribeQuotes(callback: (quotes: QuoteItem[]) => void) {
+  const colRef = collection(db, 'quotes');
+  return onSnapshot(colRef, (snapshot) => {
+    const list: QuoteItem[] = [];
+    snapshot.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      list.push({
+        id: docSnap.id,
+        quote: data.quote || '',
+        quoteBn: data.quoteBn || data.quote || '',
+        author: data.author || 'Probashi Business Club',
+        authorDesignation: data.authorDesignation || '',
+        authorPhotoUrl: data.authorPhotoUrl || '',
+        category: data.category || 'Motivation',
+        isActive: data.isActive !== false,
+        displayOrder: data.displayOrder ?? 99,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt
+      });
+    });
+
+    if (list.length === 0) {
+      setCachedItem('pbc_cached_quotes', INITIAL_QUOTES);
+      callback(INITIAL_QUOTES);
+      return;
+    }
+
+    list.sort((a, b) => (a.displayOrder ?? 99) - (b.displayOrder ?? 99));
+    setCachedItem('pbc_cached_quotes', list);
+    callback(list);
+  }, (err) => {
+    notifyQuotaExceeded(err);
+    console.warn('Firestore subscribeQuotes notice (Quota/Offline):', err?.message || err);
+    callback(getCachedItem<QuoteItem[]>('pbc_cached_quotes', INITIAL_QUOTES));
+  });
+}
+
+export async function addQuoteDoc(quote: Omit<QuoteItem, 'id'>) {
+  if (isGlobalQuotaExceeded) return `QUOTE-${Date.now().toString().slice(-4)}`;
+  const newId = `QUOTE-${Date.now().toString().slice(-4)}`;
+  const payload = cleanUndefined({
+    ...quote,
+    id: newId,
+    isActive: quote.isActive !== false,
+    displayOrder: quote.displayOrder ?? 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  try {
+    await setDoc(doc(db, 'quotes', newId), payload);
+  } catch (err: any) {
+    notifyQuotaExceeded(err);
+    console.warn('Failed to add quote doc to Firestore (cached locally):', err);
+  }
+  return newId;
+}
+
+export async function updateQuoteDoc(id: string, quote: Partial<QuoteItem>) {
+  if (isGlobalQuotaExceeded) return;
+  const payload = cleanUndefined({
+    ...quote,
+    updatedAt: new Date().toISOString()
+  });
+
+  try {
+    await updateDoc(doc(db, 'quotes', id), payload);
+  } catch (err: any) {
+    notifyQuotaExceeded(err);
+    console.warn('Failed to update quote doc in Firestore:', err);
+  }
+}
+
+export async function deleteQuoteDoc(id: string) {
+  if (isGlobalQuotaExceeded) return;
+  try {
+    await deleteDoc(doc(db, 'quotes', id));
+  } catch (err) {
+    notifyQuotaExceeded(err);
+    console.warn('Failed to delete quote doc:', err);
+  }
+}
+
+export function clearQuotaExceededState() {
+  isGlobalQuotaExceeded = false;
+  try {
+    safeStorage.removeItem('pbc_firestore_quota_exceeded_timestamp');
+  } catch {}
+}
 
 // BACKUP & RESTORE DATA
 export async function exportBackupData() {
-  const membersSnap = await getDocs(collection(db, 'members'));
-  const depositsSnap = await getDocs(collection(db, 'deposits'));
-  const projectsSnap = await getDocs(collection(db, 'projects'));
-  const reportsSnap = await getDocs(collection(db, 'reports'));
-  const usersSnap = await getDocs(collection(db, 'users'));
-  const logsSnap = await getDocs(collection(db, 'activity_logs'));
+  clearQuotaExceededState();
+  const membersSnap = await getDocs(collection(db, 'members')).catch(() => ({ docs: [] }));
+  const depositsSnap = await getDocs(collection(db, 'deposits')).catch(() => ({ docs: [] }));
+  const projectsSnap = await getDocs(collection(db, 'projects')).catch(() => ({ docs: [] }));
+  const reportsSnap = await getDocs(collection(db, 'reports')).catch(() => ({ docs: [] }));
+  const usersSnap = await getDocs(collection(db, 'users')).catch(() => ({ docs: [] }));
+  const logsSnap = await getDocs(collection(db, 'activity_logs')).catch(() => ({ docs: [] }));
+  const directorsSnap = await getDocs(collection(db, 'board_directors')).catch(() => ({ docs: [] }));
+  const quotesSnap = await getDocs(collection(db, 'quotes')).catch(() => ({ docs: [] }));
+  const settingsSnap = await getDoc(doc(db, 'system_settings', 'global_config')).catch(() => null);
+  const cardTemplateSnap = await getDoc(doc(db, 'system_settings', 'cardTemplate')).catch(() => null);
 
   const backupObj = {
-    version: '1.0',
+    version: '2.0',
     exportDate: new Date().toISOString(),
-    members: membersSnap.docs.map(d => d.data()),
-    deposits: depositsSnap.docs.map(d => d.data()),
-    projects: projectsSnap.docs.map(d => d.data()),
-    reports: reportsSnap.docs.map(d => d.data()),
-    users: usersSnap.docs.map(d => d.data()),
-    activity_logs: logsSnap.docs.map(d => d.data())
+    clubName: 'PROBASHI BUSINESS CLUB',
+    members: membersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    deposits: depositsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    projects: projectsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    reports: reportsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    users: usersSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    board_directors: directorsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    quotes: quotesSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    activity_logs: logsSnap.docs.map(d => ({ id: d.id, ...d.data() })),
+    system_settings: settingsSnap?.exists() ? settingsSnap.data() : null,
+    cardTemplate: cardTemplateSnap?.exists() ? cardTemplateSnap.data() : null
   };
 
   return backupObj;
 }
 
-export async function restoreBackupData(backupObj: any) {
-  if (!backupObj || typeof backupObj !== 'object' || isGlobalQuotaExceeded) throw new Error('Invalid backup file or quota exceeded');
+export interface RestoreResult {
+  success: boolean;
+  counts: {
+    members: number;
+    deposits: number;
+    projects: number;
+    reports: number;
+    users: number;
+    directors: number;
+    quotes: number;
+    total: number;
+  };
+  errors: string[];
+}
 
-  try {
-    if (Array.isArray(backupObj.members)) {
-      for (const m of backupObj.members) {
-        if (m.id) await setDoc(doc(db, 'members', m.id), cleanUndefined(m), { merge: true });
-      }
-    }
-    if (Array.isArray(backupObj.deposits)) {
-      for (const d of backupObj.deposits) {
-        if (d.id) await setDoc(doc(db, 'deposits', d.id), cleanUndefined(d), { merge: true });
-      }
-    }
-    if (Array.isArray(backupObj.projects)) {
-      for (const p of backupObj.projects) {
-        if (p.id) await setDoc(doc(db, 'projects', p.id), cleanUndefined(p), { merge: true });
-      }
-    }
-    if (Array.isArray(backupObj.reports)) {
-      for (const r of backupObj.reports) {
-        if (r.id) await setDoc(doc(db, 'reports', r.id), cleanUndefined(r), { merge: true });
-      }
-    }
-  } catch (err) {
-    notifyQuotaExceeded(err);
+export async function restoreBackupData(backupObj: any): Promise<RestoreResult> {
+  clearQuotaExceededState();
+
+  if (!backupObj || typeof backupObj !== 'object') {
+    throw new Error('Invalid JSON file format. Expected a valid JSON object or array.');
   }
+
+  const result: RestoreResult = {
+    success: true,
+    counts: {
+      members: 0,
+      deposits: 0,
+      projects: 0,
+      reports: 0,
+      users: 0,
+      directors: 0,
+      quotes: 0,
+      total: 0
+    },
+    errors: []
+  };
+
+  // Helper to normalize array or map of objects
+  const normalizeCollection = (input: any): any[] => {
+    if (!input) return [];
+    if (Array.isArray(input)) return input;
+    if (typeof input === 'object') {
+      return Object.entries(input).map(([k, v]) => {
+        if (v && typeof v === 'object') {
+          return { id: (v as any).id || k, ...(v as any) };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+    return [];
+  };
+
+  // Handle case where top-level JSON is directly an array of members or items
+  let membersList: any[] = [];
+  let depositsList: any[] = [];
+  let projectsList: any[] = [];
+  let reportsList: any[] = [];
+  let usersList: any[] = [];
+  let directorsList: any[] = [];
+  let quotesList: any[] = [];
+  let systemSettingsObj: any = null;
+  let cardTemplateObj: any = null;
+
+  if (Array.isArray(backupObj)) {
+    // Determine type by inspecting first item
+    const first = backupObj[0];
+    if (first && (first.fullName || first.memberId || first.phone || first.email)) {
+      membersList = backupObj;
+    } else if (first && (first.amount !== undefined || first.depositDate)) {
+      depositsList = backupObj;
+    } else if (first && (first.projectName || first.investmentAmount !== undefined)) {
+      projectsList = backupObj;
+    }
+  } else {
+    membersList = normalizeCollection(backupObj.members);
+    depositsList = normalizeCollection(backupObj.deposits);
+    projectsList = normalizeCollection(backupObj.projects || backupObj.realEstateProjects);
+    reportsList = normalizeCollection(backupObj.reports);
+    usersList = normalizeCollection(backupObj.users);
+    directorsList = normalizeCollection(backupObj.board_directors || backupObj.directors);
+    quotesList = normalizeCollection(backupObj.quotes);
+    systemSettingsObj = backupObj.system_settings || backupObj.systemSettings || null;
+    cardTemplateObj = backupObj.cardTemplate || null;
+  }
+
+  // 1. Restore Members
+  if (membersList.length > 0) {
+    for (const m of membersList) {
+      if (!m || typeof m !== 'object') continue;
+      const memId = m.id || m.memberId || (m.email ? m.email.toLowerCase().replace(/[^a-z0-9]/gi, '_') : `MEM-${Date.now()}`);
+      try {
+        let photoUrl = m.photoUrl || m.photo || '';
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+          photoUrl = await compressDataUrlIfNeeded(photoUrl, 600, 0.75);
+        }
+        const payload = cleanUndefined({
+          ...m,
+          id: memId,
+          photoUrl: photoUrl || m.photoUrl || ''
+        });
+        await setDoc(doc(db, 'members', memId), payload, { merge: true });
+        result.counts.members++;
+      } catch (err: any) {
+        console.warn(`Error restoring member ${memId}:`, err);
+        result.errors.push(`Member ${memId}: ${err.message || 'Save failed'}`);
+      }
+    }
+  }
+
+  // 2. Restore Deposits
+  if (depositsList.length > 0) {
+    for (const d of depositsList) {
+      if (!d || typeof d !== 'object') continue;
+      const depId = d.id || `DEP-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      try {
+        let receiptUrl = d.receiptUrl || '';
+        if (receiptUrl && typeof receiptUrl === 'string' && receiptUrl.startsWith('data:image')) {
+          receiptUrl = await compressDataUrlIfNeeded(receiptUrl, 600, 0.7);
+        }
+        const payload = cleanUndefined({
+          ...d,
+          id: depId,
+          receiptUrl: receiptUrl || d.receiptUrl || ''
+        });
+        await setDoc(doc(db, 'deposits', depId), payload, { merge: true });
+        result.counts.deposits++;
+      } catch (err: any) {
+        console.warn(`Error restoring deposit ${depId}:`, err);
+        result.errors.push(`Deposit ${depId}: ${err.message || 'Save failed'}`);
+      }
+    }
+  }
+
+  // 3. Restore Projects
+  if (projectsList.length > 0) {
+    for (const p of projectsList) {
+      if (!p || typeof p !== 'object') continue;
+      const projId = p.id || `PRJ-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      try {
+        const payload = cleanUndefined({
+          ...p,
+          id: projId
+        });
+        await setDoc(doc(db, 'projects', projId), payload, { merge: true });
+        result.counts.projects++;
+      } catch (err: any) {
+        console.warn(`Error restoring project ${projId}:`, err);
+        result.errors.push(`Project ${projId}: ${err.message || 'Save failed'}`);
+      }
+    }
+  }
+
+  // 4. Restore Directors
+  if (directorsList.length > 0) {
+    for (const dir of directorsList) {
+      if (!dir || typeof dir !== 'object') continue;
+      const dirId = dir.id || `DIR-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      try {
+        let photoUrl = dir.photoUrl || '';
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+          photoUrl = await compressDataUrlIfNeeded(photoUrl, 600, 0.75);
+        }
+        const payload = cleanUndefined({
+          ...dir,
+          id: dirId,
+          photoUrl: photoUrl || dir.photoUrl || ''
+        });
+        await setDoc(doc(db, 'board_directors', dirId), payload, { merge: true });
+        result.counts.directors++;
+      } catch (err: any) {
+        console.warn(`Error restoring director ${dirId}:`, err);
+        result.errors.push(`Director ${dirId}: ${err.message || 'Save failed'}`);
+      }
+    }
+  }
+
+  // 5. Restore Users
+  if (usersList.length > 0) {
+    for (const u of usersList) {
+      if (!u || typeof u !== 'object') continue;
+      const uid = u.uid || u.id || (u.email ? u.email.toLowerCase().replace(/[^a-z0-9]/gi, '_') : null);
+      if (!uid) continue;
+      try {
+        const cleanEmail = (u.email || '').toLowerCase().trim();
+        let role = u.role || 'member';
+        if (cleanEmail === 'fokrulislammir9897@gmail.com') {
+          role = 'super_admin';
+        } else if (role === 'super_admin') {
+          role = 'admin';
+        }
+        const payload = cleanUndefined({
+          ...u,
+          uid,
+          role
+        });
+        await setDoc(doc(db, 'users', uid), payload, { merge: true });
+        result.counts.users++;
+      } catch (err: any) {
+        console.warn(`Error restoring user ${uid}:`, err);
+      }
+    }
+  }
+
+  // 6. Restore Reports
+  if (reportsList.length > 0) {
+    for (const r of reportsList) {
+      if (!r || typeof r !== 'object') continue;
+      const repId = r.id || `RPT-${Date.now()}`;
+      try {
+        await setDoc(doc(db, 'reports', repId), cleanUndefined({ ...r, id: repId }), { merge: true });
+        result.counts.reports++;
+      } catch (err: any) {
+        console.warn(`Error restoring report ${repId}:`, err);
+      }
+    }
+  }
+
+  // 7. Restore Quotes
+  if (quotesList.length > 0) {
+    for (const q of quotesList) {
+      if (!q || typeof q !== 'object') continue;
+      const qId = q.id || `QUOTE-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      try {
+        await setDoc(doc(db, 'quotes', qId), cleanUndefined({ ...q, id: qId }), { merge: true });
+        result.counts.quotes++;
+      } catch (err: any) {
+        console.warn(`Error restoring quote ${qId}:`, err);
+      }
+    }
+  }
+
+  // 8. Restore System Settings & Card Template if present
+  if (systemSettingsObj && typeof systemSettingsObj === 'object') {
+    try {
+      await setDoc(doc(db, 'system_settings', 'global_config'), cleanUndefined(systemSettingsObj), { merge: true });
+    } catch {}
+  }
+  if (cardTemplateObj && typeof cardTemplateObj === 'object') {
+    try {
+      await setDoc(doc(db, 'system_settings', 'cardTemplate'), cleanUndefined(cardTemplateObj), { merge: true });
+    } catch {}
+  }
+
+  result.counts.total = result.counts.members + result.counts.deposits + result.counts.projects + result.counts.directors + result.counts.users + result.counts.reports + result.counts.quotes;
+
+  return result;
 }
 
 // ----------------------------------------------------------------------

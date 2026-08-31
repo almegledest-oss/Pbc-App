@@ -1,12 +1,11 @@
 {
-  "projectId": "polynomial-channel-lmbw7",
-  "appId": "1:435037390724:web:b0c9f8a133cdb3f6f47fd1",
-  "apiKey": "AIzaSyB_Imdo9rSjCTUMW68ePPMeA_E7FP80s94",
-  "authDomain": "polynomial-channel-lmbw7.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-pbcclub-50e750ba-26e9-49a5-b692-7bb3040bcbd7",
-  "storageBucket": "polynomial-channel-lmbw7.firebasestorage.app",
-  "messagingSenderId": "435037390724",
-  "measurementId": "",
-  "oAuthClientId": "435037390724-6vddk2jo081tb886p5gi7uue5slitv8d.apps.googleusercontent.com",
-  "recaptchaSiteKey": ""
+  "projectId": "pbcapp-29f99",
+  "appId": "1:927593717236:web:50efdd882d8df7fbc0eda1",
+  "apiKey": "AIzaSyC5ejeyXdMRm9rjn0QNqikAQ50hdicr0Vc",
+  "authDomain": "pbcapp-29f99.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "pbcapp-29f99.firebasestorage.app",
+  "messagingSenderId": "927593717236",
+  "measurementId": "G-PT6S18DZ7H",
+  "databaseURL": "https://pbcapp-29f99-default-rtdb.firebaseio.com"
 }

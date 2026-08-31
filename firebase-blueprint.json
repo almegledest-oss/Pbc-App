@@ -92,6 +92,19 @@
         "allowNewRegistrations": { "type": "boolean" }
       },
       "required": ["clubName"]
+    },
+    "quotes": {
+      "title": "Daily Quotes & Motivation",
+      "description": "Inspirational and investment quotes shown on home dashboard",
+      "properties": {
+        "quote": { "type": "string" },
+        "author": { "type": "string" },
+        "authorDesignation": { "type": "string" },
+        "category": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "displayOrder": { "type": "number" }
+      },
+      "required": ["quote", "author"]
     }
   }
 }

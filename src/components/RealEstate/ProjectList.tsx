@@ -61,22 +61,6 @@ export const ProjectList: React.FC = () => {
   const labels = t[language];
   const isAdmin = role === 'super_admin' || role === 'admin';
 
-  // If in project_detail sub-view, render ProjectDetailView
-  if (currentNavState.subView === 'project_detail' && currentNavState.subId) {
-    return <ProjectDetailView projectId={currentNavState.subId} onBack={() => goBack()} />;
-  }
-
-  const handleOpenProjectDetail = (project: RealEstateProject) => {
-    navigateWithHistory({
-      tab: 'real_estate',
-      subView: 'project_detail',
-      subId: project.id,
-      title: project.projectName,
-      titleBn: project.projectName,
-      isFocusMode: true
-    });
-  };
-
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [countryFilter, setCountryFilter] = useState<string>('All');
 
@@ -114,6 +98,22 @@ export const ProjectList: React.FC = () => {
     expectedRoiPercent: 0,
     totalInvestors: 1
   });
+
+  // If in project_detail sub-view, render ProjectDetailView
+  if (currentNavState.subView === 'project_detail' && currentNavState.subId) {
+    return <ProjectDetailView projectId={currentNavState.subId} onBack={() => goBack()} />;
+  }
+
+  const handleOpenProjectDetail = (project: RealEstateProject) => {
+    navigateWithHistory({
+      tab: 'real_estate',
+      subView: 'project_detail',
+      subId: project.id,
+      title: project.projectName,
+      titleBn: project.projectName,
+      isFocusMode: true
+    });
+  };
 
   const categoryIcons: Record<InvestmentCategory, React.ComponentType<{ className?: string }>> = {
     'Real Estate': Building2,

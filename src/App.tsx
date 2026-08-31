@@ -19,6 +19,7 @@ import { GlobalSearchModal } from './components/Search/GlobalSearchModal';
 import { NotificationDrawer } from './components/Notifications/NotificationDrawer';
 import { AuthModal } from './components/Auth/AuthModal';
 import { TrashBoxModal } from './components/Admin/TrashBoxModal';
+import { QuotesManagerModal } from './components/Admin/QuotesManagerModal';
 import { MobileFrame } from './components/Common/MobileFrame';
 import { MaintenanceNoticeScreen } from './components/Common/MaintenanceNoticeScreen';
 import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
@@ -128,6 +129,9 @@ const MainContent: React.FC = () => {
           isOpen={isTrashBoxOpen}
           onClose={() => setIsTrashBoxOpen(false)}
         />
+
+        {/* Quotes Manager Modal */}
+        <QuotesManagerModal />
 
         {/* Authentication & Role Modal */}
         <AuthModal />

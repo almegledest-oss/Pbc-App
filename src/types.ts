@@ -286,6 +286,20 @@ export interface BoardDirector {
 
 export type AppTab = 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now';
 
+export interface QuoteItem {
+  id: string; // e.g. QUOTE-101
+  quote: string; // Quote text (Bangla or English)
+  quoteBn?: string;
+  author: string; // e.g. "Shakil Rana"
+  authorDesignation?: string; // e.g. "Director & Investor, PBC"
+  authorPhotoUrl?: string;
+  category?: 'Investment' | 'Business' | 'Savings' | 'Motivation' | 'Leadership';
+  isActive?: boolean;
+  displayOrder?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface NavigationState {
   tab: AppTab;
   title?: string;

@@ -15,10 +15,12 @@ import {
   TrashedItem, 
   ActiveSession,
   AppTab,
-  NavigationState
+  NavigationState,
+  QuoteItem
 } from '../types';
 import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATIONS } from '../data/seedData';
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
+import { INITIAL_QUOTES } from '../data/seedQuotes';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
 import { safeStorage } from '../utils/safeStorage';
 import {
@@ -48,6 +50,10 @@ import {
   addDirectorDoc,
   updateDirectorDoc,
   deleteDirectorDoc,
+  subscribeQuotes,
+  addQuoteDoc,
+  updateQuoteDoc,
+  deleteQuoteDoc,
   subscribeTrashedItems,
   addTrashedItemDoc,
   deleteTrashedItemDoc,
@@ -96,6 +102,7 @@ interface AppContextType {
   notifications: NotificationItem[];
   directors: BoardDirector[];
   canManageDirectors: boolean;
+  quotes: QuoteItem[];
   
   // Actions
   addMember: (member: Partial<Member> & { fullName: string; email: string; phone: string }) => Promise<void>;
@@ -121,6 +128,12 @@ interface AppContextType {
   addDirector: (director: Omit<BoardDirector, 'id'>) => Promise<void>;
   updateDirector: (id: string, director: Partial<BoardDirector>) => Promise<void>;
   deleteDirector: (id: string) => Promise<void>;
+
+  addQuote: (quote: Omit<QuoteItem, 'id'>) => Promise<void>;
+  updateQuote: (id: string, quote: Partial<QuoteItem>) => Promise<void>;
+  deleteQuote: (id: string) => Promise<void>;
+  isQuotesManagerOpen: boolean;
+  setIsQuotesManagerOpen: (open: boolean) => void;
 
   addActivityLog: (action: string, details: string) => Promise<void>;
   updateSystemSettings: (settings: Partial<SystemSettings>) => Promise<void>;
@@ -241,6 +254,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
   const [cardTemplate, setCardTemplate] = useState<CardTemplateConfig>(DEFAULT_CARD_TEMPLATE);
+  const [quotes, setQuotes] = useState<QuoteItem[]>(INITIAL_QUOTES);
+  const [isQuotesManagerOpen, setIsQuotesManagerOpen] = useState<boolean>(false);
 
   const [currentMember, setCurrentMember] = useState<Member>(() => {
     return members[0] || INITIAL_MEMBERS[0] || {
@@ -509,6 +524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubSettings: (() => void) | undefined;
     let unsubTemplate: (() => void) | undefined;
     let unsubDirectors: (() => void) | undefined;
+    let unsubQuotes: (() => void) | undefined;
     let unsubTrash: (() => void) | undefined;
     let unsubActive: (() => void) | undefined;
 
@@ -541,6 +557,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       unsubDirectors = subscribeBoardDirectors((data) => {
         setDirectors(data || []);
+      });
+
+      unsubQuotes = subscribeQuotes((data) => {
+        setQuotes(data || []);
       });
 
       unsubTrash = subscribeTrashedItems((data) => {
@@ -626,6 +646,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubSettings) unsubSettings();
       if (unsubTemplate) unsubTemplate();
       if (unsubDirectors) unsubDirectors();
+      if (unsubQuotes) unsubQuotes();
       if (unsubTrash) unsubTrash();
       if (unsubActive) unsubActive();
       if (unsubscribeAuth) unsubscribeAuth();
@@ -1548,6 +1569,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notifications,
         directors,
         canManageDirectors,
+        quotes,
+        addQuote: async (quote) => {
+          await addQuoteDoc(quote);
+          await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Add Quote', `Added daily quote by: ${quote.author}`);
+        },
+        updateQuote: async (id, quote) => {
+          await updateQuoteDoc(id, quote);
+          await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Update Quote', `Updated quote ID: ${id}`);
+        },
+        deleteQuote: async (id) => {
+          await deleteQuoteDoc(id);
+          await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Delete Quote', `Deleted quote ID: ${id}`);
+        },
+        isQuotesManagerOpen,
+        setIsQuotesManagerOpen,
         addMember,
         updateMember,
         deleteMember,

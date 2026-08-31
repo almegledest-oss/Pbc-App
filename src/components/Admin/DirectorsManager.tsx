@@ -54,22 +54,6 @@ export const DirectorsManager: React.FC = () => {
     goBack 
   } = useApp();
 
-  // If in director_detail sub-view, render DirectorDetailView
-  if (currentNavState.subView === 'director_detail' && currentNavState.subId) {
-    return <DirectorDetailView directorId={currentNavState.subId} onBack={() => goBack()} />;
-  }
-
-  const handleOpenDirectorDetail = (director: BoardDirector) => {
-    navigateWithHistory({
-      tab: 'directors',
-      subView: 'director_detail',
-      subId: director.id,
-      title: director.name,
-      titleBn: director.name,
-      isFocusMode: true
-    });
-  };
-
   const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,16 +70,6 @@ export const DirectorsManager: React.FC = () => {
   const [slideEffect, setSlideEffect] = useState<string>(() => {
     return safeStorage.getItem('pbc_director_slide_effect') || 'slide';
   });
-
-  const handleSpeedChange = (ms: number) => {
-    setSlideIntervalMs(ms);
-    safeStorage.setItem('pbc_director_slide_interval', ms.toString());
-  };
-
-  const handleEffectChange = (effect: string) => {
-    setSlideEffect(effect);
-    safeStorage.setItem('pbc_director_slide_effect', effect);
-  };
 
   // Form State for 11 fields + photo
   const [formData, setFormData] = useState({
@@ -117,6 +91,32 @@ export const DirectorsManager: React.FC = () => {
   });
 
   const [photoError, setPhotoError] = useState(false);
+
+  // If in director_detail sub-view, render DirectorDetailView
+  if (currentNavState.subView === 'director_detail' && currentNavState.subId) {
+    return <DirectorDetailView directorId={currentNavState.subId} onBack={() => goBack()} />;
+  }
+
+  const handleOpenDirectorDetail = (director: BoardDirector) => {
+    navigateWithHistory({
+      tab: 'directors',
+      subView: 'director_detail',
+      subId: director.id,
+      title: director.name,
+      titleBn: director.name,
+      isFocusMode: true
+    });
+  };
+
+  const handleSpeedChange = (ms: number) => {
+    setSlideIntervalMs(ms);
+    safeStorage.setItem('pbc_director_slide_interval', ms.toString());
+  };
+
+  const handleEffectChange = (effect: string) => {
+    setSlideEffect(effect);
+    safeStorage.setItem('pbc_director_slide_effect', effect);
+  };
 
   // If user has no permission to manage directors
   if (!canManageDirectors) {
