@@ -28,8 +28,43 @@ import {
   Image as ImageIcon,
   ShieldAlert,
   ArrowRight,
-  Lock
+  Lock,
+  Calendar,
+  User,
+  Tag,
+  Receipt,
+  Headphones,
+  Landmark,
+  ChevronDown,
+  Info
 } from 'lucide-react';
+
+const MONTH_NAMES_EN = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+const MONTH_NAMES_BN = [
+  'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+  'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+];
+
+const GENERATED_MONTH_OPTIONS = [2027, 2026, 2025, 2024].flatMap(year => 
+  MONTH_NAMES_EN.map((monthEn, idx) => ({
+    value: `${monthEn} ${year}`,
+    labelEn: `${monthEn} ${year}`,
+    labelBn: `${MONTH_NAMES_BN[idx]} ${year}`,
+    year,
+    monthIdx: idx
+  }))
+);
+
+const QUICK_MONTH_PRESETS = [
+  { value: 'August 2026', labelEn: 'Aug 2026', labelBn: 'আগস্ট ২০২৬' },
+  { value: 'September 2026', labelEn: 'Sep 2026', labelBn: 'সেপ্টেম্বর ২০২৬' },
+  { value: 'October 2026', labelEn: 'Oct 2026', labelBn: 'অক্টোবর ২০২৬' },
+  { value: 'general', labelEn: 'Non-Monthly', labelBn: 'সাধারণ জমা' },
+];
 
 export const DepositList: React.FC = () => {
   const { 
@@ -45,7 +80,8 @@ export const DepositList: React.FC = () => {
     switchRoleMode,
     currentMember,
     authUser,
-    triggerSecurityAlert
+    triggerSecurityAlert,
+    navigateWithHistory
   } = useApp();
 
   const labels = t[language];
@@ -72,8 +108,37 @@ export const DepositList: React.FC = () => {
     depositDate: new Date().toISOString().split('T')[0],
     paymentMethod: 'Bank' as const,
     referenceNumber: `TXN-BD-${Math.floor(100000 + Math.random() * 900000)}`,
-    notes: 'Monthly Capital Contribution'
+    targetMonth: 'August 2026',
+    notes: language === 'bn' ? 'মাসিক মূলধন কিস্তি - আগস্ট ২০২৬' : 'Monthly Capital Contribution - August 2026'
   });
+
+  const handleModalMonthChange = (selected: string) => {
+    setFormData(prev => {
+      const prevNotes = prev.notes;
+      let newNotes = prevNotes;
+      if (
+        !prevNotes ||
+        prevNotes === 'Monthly Capital Contribution' ||
+        prevNotes.includes('Monthly Capital Contribution') ||
+        prevNotes.includes('মাসিক মূলধন কিস্তি') ||
+        prevNotes.includes('সাধারণ জমা') ||
+        prevNotes.includes('General Deposit')
+      ) {
+        if (selected === 'general') {
+          newNotes = language === 'bn' ? 'সাধারণ জমা / মূলধন বিনিয়োগ' : 'General Deposit / Capital Investment';
+        } else {
+          const found = GENERATED_MONTH_OPTIONS.find(m => m.value === selected);
+          const displayLabel = language === 'bn' && found ? found.labelBn : selected;
+          newNotes = language === 'bn' ? `মাসিক মূলধন কিস্তি - ${displayLabel}` : `Monthly Capital Contribution - ${selected}`;
+        }
+      }
+      return {
+        ...prev,
+        targetMonth: selected,
+        notes: newNotes
+      };
+    });
+  };
 
   const handleReceiptUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -146,6 +211,14 @@ export const DepositList: React.FC = () => {
 
     const isMemberSubmit = role === 'member';
 
+    const monthLabel = formData.targetMonth && formData.targetMonth !== 'general' 
+      ? `Contribution Month: ${formData.targetMonth}` 
+      : null;
+    const finalNotes = [
+      monthLabel,
+      formData.notes?.trim()
+    ].filter(Boolean).join(' | ');
+
     addDeposit({
       memberId: memberObj.id,
       memberName: memberObj.fullName,
@@ -155,7 +228,8 @@ export const DepositList: React.FC = () => {
       depositDate: formData.depositDate,
       paymentMethod: formData.paymentMethod,
       referenceNumber: formData.referenceNumber,
-      notes: formData.notes,
+      notes: finalNotes,
+      targetMonth: formData.targetMonth !== 'general' ? formData.targetMonth : undefined,
       receiptUrl: receiptPreview || undefined,
       status: isMemberSubmit ? 'pending' : 'Approved',
       approvedByAdminName: isMemberSubmit ? undefined : (currentMember?.fullName || 'PBC Admin'),
@@ -173,11 +247,13 @@ export const DepositList: React.FC = () => {
     setFormData({
       memberId: currentMember?.id || members[0]?.id || 'PBC-1001',
       amount: 5000,
+      category: 'Fund Raising',
       currency: 'BDT',
       depositDate: new Date().toISOString().split('T')[0],
       paymentMethod: 'Bank Wire',
       referenceNumber: `TXN-BD-${Math.floor(100000 + Math.random() * 900000)}`,
-      notes: isMemberSubmit ? 'Monthly Capital Contribution' : 'Real Estate Capital Fund Injection'
+      targetMonth: 'August 2026',
+      notes: language === 'bn' ? 'মাসিক মূলধন কিস্তি - আগস্ট ২০২৬' : 'Monthly Capital Contribution - August 2026'
     });
     setReceiptPreview('');
   };
@@ -211,7 +287,40 @@ export const DepositList: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => {
+              navigateWithHistory('deposit_accounts');
+            }}
+            className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-emerald-950/70 hover:bg-emerald-900/70 text-emerald-300 text-xs font-bold rounded-xl border border-emerald-500/50 transition shrink-0 active:scale-95 cursor-pointer shadow-md"
+            title={language === 'bn' ? 'অফিসিয়াল বিকাশ, নগদ ও ব্যাংক একাউন্ট নম্বর' : 'Official bKash, Nagad & Bank Accounts'}
+          >
+            <Landmark className="w-4 h-4 text-emerald-400" />
+            <span>
+              {language === 'bn' ? 'বিকাশ ও ব্যাংক একাউন্ট নম্বর' : 'bKash & Bank Accounts'}
+            </span>
+          </button>
+
+          {(role === 'super_admin' || role === 'admin') && (
+            <button
+              onClick={() => {
+                navigateWithHistory({
+                  tab: 'admin_panel',
+                  subView: 'manual_deposit',
+                  title: 'Admin Manual Deposit',
+                  titleBn: 'অ্যাডমিন ম্যানুয়াল ডিপোজিট অ্যান্ট্রি',
+                  isFocusMode: true
+                });
+              }}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 min-h-[48px] bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition shrink-0 active:scale-95 cursor-pointer"
+            >
+              <Wallet className="w-4 h-4 stroke-[2.5]" />
+              <span>
+                {language === 'bn' ? 'ম্যানুয়াল ডিপোজিট' : 'Admin Manual Deposit'}
+              </span>
+            </button>
+          )}
+
           {(role === 'super_admin' || role === 'admin') && (
             <button
               onClick={exportToCsv}
@@ -222,16 +331,14 @@ export const DepositList: React.FC = () => {
             </button>
           )}
 
-          {((role === 'super_admin' || role === 'admin') || (role === 'member' && currentMember?.status === 'active')) && (
+          {role === 'member' && currentMember?.status === 'active' && (
             <button
               onClick={handleAddDepositClick}
               className="flex items-center justify-center gap-1.5 px-4 py-3 min-h-[48px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition shrink-0 active:scale-95 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>
-                {role === 'member'
-                  ? (language === 'bn' ? 'জমা ভাউচার দিন' : 'Submit Deposit Voucher')
-                  : (language === 'bn' ? 'জমা যুক্ত করুন' : 'Add Deposit')}
+                {language === 'bn' ? 'জমা ভাউচার দিন' : 'Submit Deposit Voucher'}
               </span>
             </button>
           )}
@@ -309,8 +416,203 @@ export const DepositList: React.FC = () => {
         </div>
       )}
 
-      {/* Deposits Table */}
-      <div className="bg-[#0B1528] rounded-3xl border border-[#D4AF37]/30 shadow-xl overflow-hidden">
+      {/* Mobile Transaction Cards Feed (< md screens) */}
+      <div className="block md:hidden space-y-3">
+        {filteredDeposits.length > 0 ? (
+          filteredDeposits.map((d) => (
+            <div 
+              key={d.id} 
+              className="bg-[#0B1528] rounded-2xl border border-[#D4AF37]/35 p-4 shadow-lg shadow-black/40 text-white relative transition active:scale-[0.99]"
+            >
+              {/* Header: Member Name & Amount */}
+              <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-white text-sm tracking-tight truncate">
+                      {d.memberName}
+                    </span>
+                    <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-900 text-[#D4AF37] border border-[#D4AF37]/30 shrink-0">
+                      {d.memberId}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      ID: <span className="text-amber-300/90 font-bold">{d.id}</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Amount & Status Badge */}
+                <div className="text-right shrink-0">
+                  <div className="font-black text-emerald-400 text-sm sm:text-base tracking-tight">
+                    ৳{d.amount.toLocaleString()} <span className="text-[10px] font-bold text-emerald-400/80">BDT</span>
+                  </div>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase mt-1 border ${
+                    d.status?.toLowerCase() === 'approved' || d.status?.toLowerCase() === 'completed' || d.status?.toLowerCase() === 'active'
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                      : d.status?.toLowerCase() === 'pending'
+                      ? 'bg-amber-500/15 text-amber-300 border-amber-500/40'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+                  }`}>
+                    {d.status?.toLowerCase() === 'approved' || d.status?.toLowerCase() === 'completed' || d.status?.toLowerCase() === 'active' ? (
+                      <>
+                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                        <span>{language === 'bn' ? 'অনুমোদিত' : 'Approved'}</span>
+                      </>
+                    ) : d.status?.toLowerCase() === 'pending' ? (
+                      <>
+                        <Clock className="w-2.5 h-2.5 text-amber-400" />
+                        <span>{language === 'bn' ? 'অপেক্ষমাণ' : 'Pending'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="w-2.5 h-2.5 text-rose-400" />
+                        <span>{language === 'bn' ? 'বাতিল' : 'Rejected'}</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Transaction Meta Details */}
+              <div className="grid grid-cols-2 gap-2 py-2.5 text-xs border-b border-slate-800/80">
+                {/* Category */}
+                <div className="flex items-center gap-1.5">
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border ${
+                    d.category === 'Real Estate'
+                      ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                      : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  }`}>
+                    {d.category === 'Real Estate' ? '🏢 Real Estate' : '🌱 Fund Raising'}
+                  </span>
+                </div>
+
+                {/* Date & Month */}
+                <div className="flex flex-col items-end justify-center text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Calendar className="w-3 h-3 text-amber-400" />
+                    <span>{d.depositDate}</span>
+                  </div>
+                  {d.targetMonth && (
+                    <span className="text-[10px] text-amber-300 font-bold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md mt-0.5">
+                      {d.targetMonth}
+                    </span>
+                  )}
+                </div>
+
+                {/* Payment Method & Ref */}
+                <div className="col-span-2 flex items-center justify-between text-[11px] text-slate-300 bg-[#070D1B] px-2.5 py-1.5 rounded-xl border border-slate-800">
+                  <div className="flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    <span className="font-semibold">{d.paymentMethod}</span>
+                  </div>
+                  {d.referenceNumber && (
+                    <span className="font-mono text-[10px] text-slate-400 truncate max-w-[140px]">
+                      Ref: {d.referenceNumber}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Buttons Row */}
+              <div className="pt-2.5 flex items-center justify-between gap-2 flex-wrap">
+                {/* Left: Receipt actions */}
+                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                  {((role === 'super_admin' || role === 'admin') || d.status?.toLowerCase() === 'approved' || d.status?.toLowerCase() === 'completed' || d.status?.toLowerCase() === 'active') ? (
+                    <>
+                      <button
+                        onClick={() => setSelectedReceipt(d)}
+                        className="flex-1 py-2 px-3 bg-emerald-500/20 hover:bg-emerald-600 text-emerald-300 hover:text-slate-950 font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs transition border border-emerald-500/40 shadow-sm active:scale-95 cursor-pointer"
+                        title={language === 'bn' ? "অফিসিয়াল জমা রসিদ ডাউনলোড / দেখুন" : "View & Download Official Receipt"}
+                      >
+                        <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>{language === 'bn' ? 'রসিদ (Receipt)' : 'View Receipt'}</span>
+                      </button>
+
+                      {d.receiptUrl && (
+                        <button
+                          onClick={() => setSelectedReceipt(d)}
+                          className="py-2 px-2.5 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold rounded-xl flex items-center justify-center gap-1 text-xs transition border border-amber-500/30 active:scale-95 cursor-pointer shrink-0"
+                          title={language === 'bn' ? "মানি রিসিট স্লিপ দেখুন" : "View Money Receipt Image"}
+                        >
+                          <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{language === 'bn' ? 'স্লিপ' : 'Slip'}</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <div 
+                      className="py-1.5 px-2.5 bg-[#070D1B] text-slate-400 font-medium rounded-xl flex items-center gap-1.5 text-[11px] border border-[#D4AF37]/20"
+                    >
+                      <Lock className="w-3 h-3 text-amber-400/80" />
+                      <span>{language === 'bn' ? (d.status?.toLowerCase() === 'rejected' ? 'বাতিলকৃত' : 'অনুমোদনের পর রসিদ') : (d.status?.toLowerCase() === 'rejected' ? 'Rejected' : 'Pending Approval')}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Admin Approve/Reject/Delete Controls */}
+                {(role === 'super_admin' || role === 'admin') && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => {
+                        const isOwn = currentMember && (
+                          d.memberId === currentMember.id || 
+                          (d.memberName && currentMember.fullName && d.memberName.toLowerCase().trim() === currentMember.fullName.toLowerCase().trim()) ||
+                          (authUser?.email && d.memberEmail && d.memberEmail.toLowerCase().trim() === authUser.email.toLowerCase().trim())
+                        );
+                        if (isOwn) {
+                          triggerSecurityAlert();
+                          return;
+                        }
+                        setSignatureModalDeposit(d);
+                      }}
+                      className={`p-2 rounded-xl transition flex items-center justify-center active:scale-95 cursor-pointer ${
+                        d.status?.toLowerCase() === 'approved'
+                          ? 'bg-emerald-600 text-white shadow-md'
+                          : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950 border border-emerald-500/30'
+                      }`}
+                      title={language === 'bn' ? "সাক্ষর সহ অনুমোদন করুন" : "Approve Deposit with Signature"}
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        if (window.confirm(language === 'bn' ? 'আপনি কি এই ডিপোজিটটি বাতিল করতে নিশ্চিত?' : 'Are you sure you want to reject this deposit?')) {
+                          await rejectDeposit(d.id);
+                        }
+                      }}
+                      className={`p-2 rounded-xl transition flex items-center justify-center active:scale-95 cursor-pointer ${
+                        d.status?.toLowerCase() === 'rejected'
+                          ? 'bg-rose-600 text-white shadow-md'
+                          : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white border border-rose-500/30'
+                      }`}
+                      title="Reject Deposit"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => setDepositToDelete(d)}
+                      className="p-2 hover:bg-rose-500/20 rounded-xl text-slate-400 hover:text-rose-400 flex items-center justify-center active:scale-95 border border-transparent hover:border-rose-500/30"
+                      title="Delete Deposit"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="bg-[#0B1528] rounded-2xl border border-[#D4AF37]/30 p-8 text-center text-slate-400">
+            {language === 'bn' ? 'কোনো ডিপোজিট রেকর্ড পাওয়া যায়নি।' : 'No deposit records found.'}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Deposits Table (>= md screens) */}
+      <div className="hidden md:block bg-[#0B1528] rounded-3xl border border-[#D4AF37]/30 shadow-xl overflow-hidden">
         <div className="overflow-x-auto touch-pan-x overscroll-x-contain">
           <table className="w-full min-w-[700px] text-left border-collapse text-xs">
             <thead>
@@ -355,7 +657,12 @@ export const DepositList: React.FC = () => {
                     </span>
                   </td>
                   <td className="py-4 px-4 text-slate-300 whitespace-nowrap">
-                    {d.depositDate}
+                    <div>{d.depositDate}</div>
+                    {d.targetMonth && (
+                      <span className="inline-block text-[10px] text-amber-300 font-bold bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md mt-1">
+                        {d.targetMonth}
+                      </span>
+                    )}
                   </td>
                   {(role === 'super_admin' || role === 'admin') && (
                     <td className="py-4 px-4 whitespace-nowrap">
@@ -400,7 +707,7 @@ export const DepositList: React.FC = () => {
                             className={`min-w-[40px] min-h-[40px] p-2 rounded-xl transition flex items-center justify-center active:scale-95 cursor-pointer ${
                               d.status?.toLowerCase() === 'approved'
                                 ? 'bg-emerald-600 text-white shadow-md'
-                                : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950'
+                              : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500 hover:text-slate-950'
                             }`}
                             title={language === 'bn' ? "সাক্ষর সহ অনুমোদন করুন" : "Approve Deposit with Signature"}
                           >
@@ -477,7 +784,7 @@ export const DepositList: React.FC = () => {
       {/* Add Deposit Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
-          <div className="bg-[#070D1B] rounded-3xl p-5 sm:p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto border border-[#D4AF37]/40 relative shadow-2xl text-white my-auto">
+          <div className="bg-[#070D1B] rounded-3xl p-5 sm:p-6 max-w-xl w-full max-h-[90vh] overflow-y-auto border border-[#D4AF37]/40 relative shadow-2xl text-white my-auto">
             <button
               onClick={() => setIsAddModalOpen(false)}
               className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-[#0B1528] border border-[#D4AF37]/30 transition"
@@ -485,7 +792,7 @@ export const DepositList: React.FC = () => {
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-extrabold text-white mb-4 flex items-center justify-between pr-8">
+            <h3 className="text-lg font-extrabold text-white mb-2 flex items-center justify-between pr-8">
               <span>
                 {role === 'member' 
                   ? (language === 'bn' ? 'জমা ভাউচার প্রেরণ করুন' : 'Submit Deposit Voucher') 
@@ -497,6 +804,24 @@ export const DepositList: React.FC = () => {
                 </span>
               )}
             </h3>
+
+            {/* Quick helper banner: View official payment accounts */}
+            <div className="mb-3 p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[11px] text-emerald-300">
+                <Landmark className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{language === 'bn' ? 'ক্লাবের বিকাশ, নগদ ও ব্যাংক একাউন্ট প্রয়োজন?' : 'Need club bKash or Bank details?'}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  navigateWithHistory('deposit_accounts');
+                }}
+                className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] rounded-lg border border-emerald-500/40 transition cursor-pointer shrink-0"
+              >
+                {language === 'bn' ? 'নম্বর দেখুন' : 'View Accounts'}
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-3 text-xs">
               <div>
@@ -693,15 +1018,88 @@ export const DepositList: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-amber-300 font-semibold mb-1">Notes / Remarks</label>
-                <textarea
-                  rows={2}
-                  value={formData.notes}
-                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#0B1528] border border-[#D4AF37]/30 rounded-xl text-white"
-                  placeholder="Monthly deposit or project capital details"
-                />
+              {/* Contribution Month (পদ্ধতি ২) & Remarks / Notes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* Contribution Month Dropdown */}
+                <div className="text-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-amber-300 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                      <span>
+                        {language === 'bn' ? 'কোন মাসের কিস্তি / জমা' : 'Contribution Month / Period'}
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-amber-400/90 font-medium">
+                      {language === 'bn' ? 'মাস নির্বাচন' : 'Target Month'}
+                    </span>
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={formData.targetMonth}
+                      onChange={(e) => handleModalMonthChange(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#0B1528] border border-[#D4AF37]/30 rounded-xl text-white text-xs font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 appearance-none cursor-pointer pr-10"
+                    >
+                      <optgroup label={language === 'bn' ? "চলতি ও সাম্প্রতিক মাসসমূহ" : "Select Contribution Month"}>
+                        {GENERATED_MONTH_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value} className="bg-[#0B1528] text-white">
+                            {language === 'bn' ? `${opt.labelBn} (${opt.value})` : opt.labelEn}
+                          </option>
+                        ))}
+                      </optgroup>
+                      <option value="general" className="bg-[#0B1528] text-amber-300 font-semibold">
+                        {language === 'bn' ? '📌 সাধারণ জমা (কোনো নির্দিষ্ট মাসের নয়)' : '📌 General Deposit (Non-Monthly)'}
+                      </option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+
+                  {/* Quick Select Preset Buttons */}
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-medium mr-0.5">
+                      {language === 'bn' ? 'কুইক:' : 'Quick:'}
+                    </span>
+                    {QUICK_MONTH_PRESETS.map((preset) => {
+                      const isSelected = formData.targetMonth === preset.value;
+                      return (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => handleModalMonthChange(preset.value)}
+                          className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-sm ring-1 ring-amber-400/40'
+                              : 'bg-slate-900/70 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                          }`}
+                        >
+                          {language === 'bn' ? preset.labelBn : preset.labelEn}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Remarks / Notes */}
+                <div className="text-xs">
+                  <label className="block text-amber-300 font-semibold mb-1">
+                    {language === 'bn' ? 'মন্তব্য / বিবরণ (Notes / Remarks)' : 'Notes / Remarks'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.notes}
+                    onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#0B1528] border border-[#D4AF37]/30 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    placeholder="Monthly deposit or project capital details"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                    <Info className="w-3 h-3 text-amber-400/80 shrink-0" />
+                    <span>
+                      {language === 'bn'
+                        ? 'মাস পরিবর্তন করলে মন্তব্য স্বয়ংক্রিয়ভাবে আপডেট হয়।'
+                        : 'Notes auto-sync with selected month.'}
+                    </span>
+                  </p>
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-2">

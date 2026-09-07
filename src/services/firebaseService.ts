@@ -11,6 +11,7 @@ import {
   query,
   where,
   orderBy,
+  limit,
   serverTimestamp
 } from 'firebase/firestore';
 import {
@@ -84,9 +85,11 @@ let isGlobalQuotaExceeded = (() => {
     const timestampStr = safeStorage.getItem('pbc_firestore_quota_exceeded_timestamp');
     if (timestampStr) {
       const time = parseInt(timestampStr, 10);
-      // If quota exceeded within the last 60 minutes, keep safe offline mode enabled
-      if (Date.now() - time < 60 * 60 * 1000) {
+      // Auto-expire quota exceeded flag after 10 minutes so normal operations can resume
+      if (Date.now() - time < 10 * 60 * 1000) {
         return true;
+      } else {
+        safeStorage.removeItem('pbc_firestore_quota_exceeded_timestamp');
       }
     }
   } catch {}
@@ -102,16 +105,15 @@ export function isQuotaExceededError(err: any): boolean {
   if (!err) return false;
   const code = (err.code || '').toString().toLowerCase();
   const msg = (err.message || err.toString() || '').toLowerCase();
+  // Do NOT treat generic "unavailable", "network", or "closing" as quota exhausted!
   const hit = (
     code.includes('resource-exhausted') ||
     code.includes('quota') ||
-    code.includes('unavailable') ||
     msg.includes('quota limit exceeded') ||
     msg.includes('quota exceeded') ||
     msg.includes('resource_exhausted') ||
     msg.includes('free daily read units') ||
     msg.includes('free daily write units') ||
-    msg.includes('maximum backoff delay') ||
     msg.includes('retry after quota limits are reset')
   );
   if (hit) {
@@ -194,19 +196,39 @@ export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
 
 export async function addActivityLogDoc(userEmail: string, action: string, details: string) {
   if (isGlobalQuotaExceeded) return;
+  const newLog: ActivityLog = {
+    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    userEmail: userEmail || 'system@pbcclub.org',
+    action: action || 'System Action',
+    details: details || '',
+    timestamp: new Date().toISOString()
+  };
+
+  // Optimistically store in local cache so audit log is instantly accessible
+  try {
+    const cached = getCachedItem<ActivityLog[]>('pbc_cached_activity_logs', []);
+    setCachedItem('pbc_cached_activity_logs', [newLog, ...cached.filter(l => l.id !== newLog.id)].slice(0, 100));
+  } catch {
+    // Non-blocking cache fallback
+  }
+
   try {
     const newRef = doc(collection(db, 'activity_logs'));
     await setDoc(newRef, cleanUndefined({
       id: newRef.id,
-      userEmail,
-      action,
-      details,
-      timestamp: new Date().toISOString(),
+      userEmail: newLog.userEmail,
+      action: newLog.action,
+      details: newLog.details,
+      timestamp: newLog.timestamp,
       createdAt: serverTimestamp()
     }));
-  } catch (err) {
+  } catch (err: any) {
     notifyQuotaExceeded(err);
-    console.error('Error adding activity log:', err);
+    if (err?.code === 'permission-denied' || err?.message?.includes('permission') || err?.message?.includes('insufficient')) {
+      console.warn('Firestore activity log notice (permissions/offline fallback active):', err?.message || err);
+    } else {
+      console.warn('Firestore activity log warning:', err?.message || err);
+    }
   }
 }
 
@@ -284,8 +306,14 @@ export async function updateSystemSettingsDoc(settings: Partial<SystemSettings>)
   }
 }
 
-// BOARD DIRECTORS CRUD
+// BOARD DIRECTORS CRUD - With persistent local cache & delta real-time updates
 export function subscribeBoardDirectors(callback: (directors: BoardDirector[]) => void) {
+  // 1. Deliver local cache immediately so UI appears in 0ms without waiting or consuming server reads
+  const cached = getCachedItem<BoardDirector[]>('pbc_cached_directors', INITIAL_DIRECTORS);
+  if (cached && cached.length > 0) {
+    callback(cached);
+  }
+
   const colRef = collection(db, 'board_directors');
   return onSnapshot(colRef, (snapshot) => {
     if (snapshot.empty) {
@@ -426,6 +454,12 @@ export async function deleteDirectorDoc(id: string) {
 // QUOTES & DAILY MOTIVATION CRUD
 // ----------------------------------------------------------------------
 export function subscribeQuotes(callback: (quotes: QuoteItem[]) => void) {
+  // 1. Deliver local cache immediately so UI appears in 0ms without waiting or consuming server reads
+  const cached = getCachedItem<QuoteItem[]>('pbc_cached_quotes', INITIAL_QUOTES);
+  if (cached && cached.length > 0) {
+    callback(cached);
+  }
+
   const colRef = collection(db, 'quotes');
   return onSnapshot(colRef, (snapshot) => {
     const list: QuoteItem[] = [];
@@ -850,9 +884,24 @@ export async function seedFirestoreIfEmpty() {
 // Firestore Collection CRUD Operations
 // ----------------------------------------------------------------------
 
-// MEMBERS CRUD
-export function subscribeMembers(callback: (members: Member[]) => void) {
-  const colRef = collection(db, 'members');
+// MEMBERS CRUD - With persistent local cache & delta real-time updates
+export function subscribeMembers(
+  callback: (members: Member[]) => void,
+  options?: { limit?: number }
+) {
+  // 1. Deliver local cache immediately so UI appears in 0ms without waiting or consuming server reads
+  const cached = getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS);
+  if (cached && cached.length > 0) {
+    if (options?.limit && options.limit > 0) {
+      callback(cached.slice(0, options.limit));
+    } else {
+      callback(cached);
+    }
+  }
+
+  const colRef = options?.limit && options.limit > 0
+    ? query(collection(db, 'members'), limit(options.limit))
+    : collection(db, 'members');
   return onSnapshot(colRef, (snapshot) => {
     const list: Member[] = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
@@ -1026,9 +1075,26 @@ export async function deleteMemberDoc(id: string) {
   }
 }
 
-// DEPOSITS CRUD
-export function subscribeDeposits(callback: (deposits: Deposit[]) => void) {
-  const colRef = collection(db, 'deposits');
+// DEPOSITS CRUD - With persistent local cache & delta real-time updates
+export function subscribeDeposits(
+  callback: (deposits: Deposit[]) => void,
+  options?: { memberId?: string }
+) {
+  // 1. Immediately deliver local cache so UI appears in 0ms without waiting or consuming server reads
+  const cached = getCachedItem<Deposit[]>('pbc_cached_deposits', INITIAL_DEPOSITS);
+  if (cached && cached.length > 0) {
+    if (options?.memberId) {
+      callback(cached.filter(d => d.memberId === options.memberId));
+    } else {
+      callback(cached);
+    }
+  }
+
+  // 2. Query target: scoped to member for regular members (saves 95%+ reads), full collection for admins
+  const colRef = options?.memberId
+    ? query(collection(db, 'deposits'), where('memberId', '==', options.memberId))
+    : collection(db, 'deposits');
+
   return onSnapshot(colRef, (snapshot) => {
     const list: Deposit[] = snapshot.docs.map(docSnap => {
       const data = docSnap.data();
@@ -1051,12 +1117,27 @@ export function subscribeDeposits(callback: (deposits: Deposit[]) => void) {
         approvedByAdminSignature: data.approvedByAdminSignature || ''
       } as Deposit;
     });
-    setCachedItem('pbc_cached_deposits', list);
-    callback(list);
+
+    if (options?.memberId) {
+      // Merge scoped results with cached full list so offline/other views preserve records
+      const existingAll = getCachedItem<Deposit[]>('pbc_cached_deposits', INITIAL_DEPOSITS);
+      const otherDeposits = existingAll.filter(d => d.memberId !== options.memberId);
+      const combined = [...list, ...otherDeposits];
+      setCachedItem('pbc_cached_deposits', combined);
+      callback(list);
+    } else {
+      setCachedItem('pbc_cached_deposits', list);
+      callback(list);
+    }
   }, (err) => {
     notifyQuotaExceeded(err);
     console.warn('Firestore subscribeDeposits notice (Quota/Offline):', err?.message || err);
-    callback(getCachedItem<Deposit[]>('pbc_cached_deposits', INITIAL_DEPOSITS));
+    const fallback = getCachedItem<Deposit[]>('pbc_cached_deposits', INITIAL_DEPOSITS);
+    if (options?.memberId) {
+      callback(fallback.filter(d => d.memberId === options.memberId));
+    } else {
+      callback(fallback);
+    }
   });
 }
 
@@ -1133,8 +1214,14 @@ export async function deleteDepositDoc(id: string) {
   }
 }
 
-// PROJECTS CRUD
+// PROJECTS CRUD - With persistent local cache & delta real-time updates
 export function subscribeProjects(callback: (projects: RealEstateProject[]) => void) {
+  // 1. Deliver local cache immediately so UI appears in 0ms without waiting or consuming server reads
+  const cached = getCachedItem<RealEstateProject[]>('pbc_cached_projects', INITIAL_PROJECTS);
+  if (cached && cached.length > 0) {
+    callback(cached);
+  }
+
   const colRef = collection(db, 'projects');
   return onSnapshot(colRef, (snapshot) => {
     const list: RealEstateProject[] = snapshot.docs.map(docSnap => {
@@ -1920,22 +2007,21 @@ function cleanDocId(email: string): string {
   return email.toLowerCase().replace(/[^a-z0-9]/gi, '_');
 }
 
-let lastActiveSessionWriteTime = 0;
-let lastActiveSessionKey = '';
+const lastActiveSessionWriteTimes = new Map<string, number>();
 
 export async function updateActiveSessionDoc(session: Partial<ActiveSession> & { email: string }) {
   if (!session.email || isGlobalQuotaExceeded) return;
   const docId = cleanDocId(session.email.toLowerCase().trim());
   const nowMs = Date.now();
-  const sessionKey = `${docId}_${session.activeTab}_${session.role}`;
+  const lastWrite = lastActiveSessionWriteTimes.get(docId) || 0;
 
-  // Throttle writes: skip if same key and updated within 60 seconds
-  if (sessionKey === lastActiveSessionKey && nowMs - lastActiveSessionWriteTime < 60000) {
+  // Strict per-user throttling: maximum once every 5 minutes (300,000 ms)
+  // This prevents continuous ping loops from burning Firestore read/write quotas
+  if (nowMs - lastWrite < 300000) {
     return;
   }
 
-  lastActiveSessionWriteTime = nowMs;
-  lastActiveSessionKey = sessionKey;
+  lastActiveSessionWriteTimes.set(docId, nowMs);
 
   const now = new Date().toISOString();
   const payload = cleanUndefined({

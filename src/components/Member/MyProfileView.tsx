@@ -4,7 +4,6 @@ import { t } from '../../utils/translations';
 import { DigitalCard } from '../Members/DigitalCard';
 import { uploadMemberPhoto } from '../../services/firebaseService';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
-import { AppUpdateSettingCard } from '../Common/AppUpdateSettingCard';
 import { 
   User, 
   Wallet, 
@@ -27,16 +26,20 @@ import {
 } from 'lucide-react';
 
 export const MyProfileView: React.FC = () => {
-  const { currentMember, setCurrentMember, updateMember, deposits, language, setActiveTab, role } = useApp();
+  const { currentMember, setCurrentMember, updateMember, deposits, language, setActiveTab, role, systemSettings } = useApp();
   const labels = t[language];
   const [uploading, setUploading] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [savingInfo, setSavingInfo] = useState(false);
 
   const isAdmin = role === 'super_admin' || role === 'admin';
+  const canUploadPhoto = isAdmin || (systemSettings?.allowMemberPhotoUpload !== false);
+  const canEditInfo = isAdmin || (systemSettings?.allowMemberSelfEdit !== false);
+  const canDownloadCard = isAdmin || (systemSettings?.allowMemberCardDownload !== false);
 
-  // Form state for member editable fields (Personal & Family details only - photo is locked for members)
+  // Form state for member editable fields (Personal, Batch & Family details)
   const [formData, setFormData] = useState({
+    batchNumber: '',
     phone: '',
     email: '',
     country: '',
@@ -62,7 +65,12 @@ export const MyProfileView: React.FC = () => {
   const myTotalDeposited = myDeposits.reduce((sum, d) => sum + d.amount, 0);
 
   const openEditModal = () => {
+    if (!canEditInfo) {
+      alert('সদস্য তথ্য পরিবর্তন সাময়িকভাবে অ্যাডমিন প্যানেল থেকে লক রয়েছে।');
+      return;
+    }
     setFormData({
+      batchNumber: currentMember.batchNumber || '',
       phone: currentMember.phone || '',
       email: currentMember.email || '',
       country: currentMember.country || '',
@@ -79,10 +87,15 @@ export const MyProfileView: React.FC = () => {
 
   const handleSaveInfo = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditInfo) {
+      alert('সদস্য তথ্য পরিবর্তন সাময়িকভাবে অ্যাডমিন প্যানেল থেকে লক রয়েছে।');
+      return;
+    }
     setSavingInfo(true);
 
     try {
       const updatedData = {
+        batchNumber: formData.batchNumber.trim(),
         phone: formData.phone.trim(),
         email: formData.email.trim(),
         country: formData.country.trim(),
@@ -103,7 +116,7 @@ export const MyProfileView: React.FC = () => {
       await updateMember(currentMember.id, updatedData);
       setCurrentMember({ ...currentMember, ...updatedData });
       setIsEditModalOpen(false);
-      alert('আপনার তথ্য সফলভাবে আপডেট হয়েছে!');
+      alert('আপনার তথ্য ও ব্যাচ নম্বর সফলভাবে আপডেট হয়েছে!');
     } catch (err: any) {
       console.error('Failed to update member info:', err);
       alert('Error updating profile: ' + (err.message || 'Failed'));
@@ -113,8 +126,8 @@ export const MyProfileView: React.FC = () => {
   };
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isAdmin) {
-      alert('প্রোফাইল ছবি পরিবর্তন শুধুমাত্র ক্লাব অ্যাডমিন দ্বারা সম্পন্ন করা যাবে।');
+    if (!canUploadPhoto) {
+      alert('প্রোফাইল ছবি পরিবর্তন বর্তমানে অ্যাডমিন কর্তৃক লক করা রয়েছে।');
       return;
     }
 
@@ -126,6 +139,7 @@ export const MyProfileView: React.FC = () => {
       const downloadUrl = await uploadMemberPhoto(file, currentMember.id);
       await updateMember(currentMember.id, { photoUrl: downloadUrl });
       setCurrentMember({ ...currentMember, photoUrl: downloadUrl });
+      alert('প্রোফাইল ছবি সফলভাবে আপডেট করা হয়েছে!');
     } catch (err: any) {
       alert('Error uploading photo: ' + (err.message || 'Failed'));
     } finally {
@@ -146,10 +160,10 @@ export const MyProfileView: React.FC = () => {
               alt={currentMember.fullName}
               className="w-20 h-20 rounded-2xl object-cover ring-4 ring-[#D4AF37] shadow-lg"
             />
-            {isAdmin ? (
+            {canUploadPhoto ? (
               <label 
                 className="absolute -bottom-1 -right-1 p-2 bg-[#112244] hover:bg-[#1A3366] text-amber-300 rounded-full shadow-lg border-2 border-[#D4AF37] cursor-pointer transition transform hover:scale-105 active:scale-95 flex items-center justify-center"
-                title="Change Profile Photo (Admin Only)"
+                title="Change Profile Photo (ছবি পরিবর্তন করুন)"
               >
                 {uploading ? (
                   <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
@@ -166,8 +180,8 @@ export const MyProfileView: React.FC = () => {
               </label>
             ) : (
               <div 
-                className="absolute -bottom-1 -right-1 p-1.5 bg-slate-900/90 text-amber-400 rounded-full shadow-md border border-[#D4AF37]/60 flex items-center justify-center"
-                title="প্রোফাইল ছবি সুরক্ষিত (Admin Managed)"
+                className="absolute -bottom-1 -right-1 p-1.5 bg-slate-900/90 text-amber-400 rounded-full shadow-md border border-[#D4AF37]/60 flex items-center justify-center cursor-not-allowed"
+                title="প্রোফাইল ছবি পরিবর্তন সাময়িকভাবে অ্যাডমিন কর্তৃক লক রয়েছে"
               >
                 <Lock className="w-3.5 h-3.5" />
               </div>
@@ -178,6 +192,11 @@ export const MyProfileView: React.FC = () => {
               <span className="px-2.5 py-0.5 text-[10px] font-bold font-mono bg-[#D4AF37] text-slate-950 rounded-full uppercase tracking-wider">
                 {currentMember.id}
               </span>
+              {currentMember.batchNumber && (
+                <span className="px-2.5 py-0.5 text-[10px] font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full uppercase tracking-wider">
+                  BATCH: {currentMember.batchNumber}
+                </span>
+              )}
               <span className="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full capitalize">
                 {currentMember.status} Member
               </span>
@@ -200,10 +219,14 @@ export const MyProfileView: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <button
             onClick={openEditModal}
-            className="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-2xl shadow-lg transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            className={`px-4 py-2.5 font-bold text-xs rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer ${
+              canEditInfo 
+                ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 active:scale-95' 
+                : 'bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed'
+            }`}
           >
-            <Edit3 className="w-4 h-4" />
-            <span>Edit My Info (তথ্য এডিট করুন)</span>
+            {canEditInfo ? <Edit3 className="w-4 h-4" /> : <Lock className="w-4 h-4 text-amber-400" />}
+            <span>{canEditInfo ? 'Edit Personal & Family Info' : 'Info Edit Locked'}</span>
           </button>
 
           <div className="bg-[#070D1B]/80 backdrop-blur-md p-4 rounded-2xl border border-[#D4AF37]/30 text-xs space-y-2 min-w-[200px]">
@@ -231,9 +254,17 @@ export const MyProfileView: React.FC = () => {
               <CreditCard className="w-5 h-5 text-amber-400" />
               <span>{labels.digitalMemberCard}</span>
             </h3>
-            <span className="text-xs text-amber-300 font-bold bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-              Official Pass
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-300 font-bold bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                Official Pass
+              </span>
+              {!canDownloadCard && (
+                <span className="text-[11px] text-rose-300 font-bold bg-rose-500/20 px-2.5 py-0.5 rounded-full border border-rose-500/30 flex items-center gap-1">
+                  <Lock className="w-3 h-3 text-rose-400" />
+                  ডাউনলোড লক
+                </span>
+              )}
+            </div>
           </div>
 
           <DigitalCard member={currentMember} />
@@ -280,11 +311,6 @@ export const MyProfileView: React.FC = () => {
           </div>
         </div>
 
-        {/* App Version & System Updates */}
-        <div className="pt-1">
-          <AppUpdateSettingCard />
-        </div>
-
       </div>
 
       {/* Member Editable Info Modal (Personal & Family Data Only) */}
@@ -314,23 +340,77 @@ export const MyProfileView: React.FC = () => {
             {/* Modal Form */}
             <form onSubmit={handleSaveInfo} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
               
-              {/* Note on Locked Photo */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex items-start gap-2.5">
-                <Lock className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
-                <div>
-                  <strong className="block text-amber-300">নিরাপত্তা ও নিয়মকানুন:</strong>
-                  আইডি কার্ডের প্রোফাইল ছবি এবং সদস্যপদ নম্বর লক করা থাকে। আপনি কেবল যোগাযোগ ও ফ্যামিলি তথ্য পরিবর্তন করতে পারবেন।
+              {/* Photo Upload Box (When Unlocked by Admin) */}
+              {canUploadPhoto ? (
+                <div className="p-3.5 bg-gradient-to-r from-[#0B1528] to-[#112244] border border-[#D4AF37]/40 rounded-2xl flex items-center justify-between gap-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <PBCFramedAvatar
+                      photoUrl={currentMember.photoUrl}
+                      name={currentMember.fullName}
+                      alt={currentMember.fullName}
+                      className="w-14 h-14 rounded-xl object-cover ring-2 ring-[#D4AF37] shrink-0"
+                    />
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white">Profile Photo (প্রোফাইল ছবি)</span>
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                          Unlocked
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        আইডি কার্ড ও প্রোফাইলের ছবি আপডেট করতে পাশের বাটনে চাপুন
+                      </p>
+                    </div>
+                  </div>
+                  <label className="px-3.5 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow cursor-pointer transition flex items-center gap-1.5 shrink-0 active:scale-95">
+                    {uploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Camera className="w-3.5 h-3.5" />
+                    )}
+                    <span>{uploading ? 'আপলোড হচ্ছে...' : 'ছবি পরিবর্তন'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      disabled={uploading}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
-              </div>
+              ) : (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 flex items-start gap-2.5">
+                  <Lock className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                  <div>
+                    <strong className="block text-amber-300">প্রোফাইল ছবি লক করা রয়েছে:</strong>
+                    প্রোফাইল ছবি পরিবর্তন সাময়িকভাবে অ্যাডমিন প্যানেল থেকে লক রয়েছে।
+                  </div>
+                </div>
+              )}
 
               {/* Personal Section */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" />
-                  <span>Personal Details (ব্যক্তিগত তথ্য)</span>
+                  <span>Personal Details (ব্যক্তিগত ও সদস্যপদ তথ্য)</span>
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  {/* Batch Number */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                      <span>Batch Number (ব্যাচ নম্বর)</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Digital Card Batch</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.batchNumber}
+                      onChange={(e) => setFormData({ ...formData, batchNumber: e.target.value })}
+                      placeholder="e.g. 01, Batch-2, 2024"
+                      className="w-full bg-[#071220] border border-slate-700 rounded-xl px-3 py-2 text-white focus:border-amber-400 outline-hidden font-mono"
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-slate-300 font-semibold mb-1">Mobile / Phone</label>
                     <input

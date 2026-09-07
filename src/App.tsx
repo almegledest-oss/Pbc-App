@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { VersionProvider } from './context/VersionContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import { Splash } from './components/Splash';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -23,6 +23,9 @@ import { QuotesManagerModal } from './components/Admin/QuotesManagerModal';
 import { MobileFrame } from './components/Common/MobileFrame';
 import { MaintenanceNoticeScreen } from './components/Common/MaintenanceNoticeScreen';
 import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
+import { HelpDeskView } from './components/HelpDesk/HelpDeskView';
+import { DepositAccountsView } from './components/HelpDesk/DepositAccountsView';
+import { ClubRulesView } from './components/ClubRules/ClubRulesView';
 
 const MainContent: React.FC = () => {
   const {
@@ -40,6 +43,7 @@ const MainContent: React.FC = () => {
     canGoBack
   } = useApp();
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
+  const { currentTheme } = useTheme();
 
   // Requirement 1: Disable guest access completely. Redirect unauthenticated users to Login.
   if (!isLoggedIn) {
@@ -51,15 +55,15 @@ const MainContent: React.FC = () => {
     return <MaintenanceNoticeScreen onOpenSuperAdminLogin={() => setIsAuthModalOpen(true)} />;
   }
 
-  // Member role tab restrictions - allow dashboard, my_profile, deposits, real_estate and directors if authorized
+  // Member role tab restrictions - allow dashboard, my_profile, deposits, real_estate, help_desk and directors if authorized
   const isMemberAuthorized = role === 'member' 
-    ? (activeTab === 'dashboard' || activeTab === 'my_profile' || activeTab === 'deposits' || activeTab === 'real_estate' || (activeTab === 'directors' && canManageDirectors)) 
+    ? (activeTab === 'dashboard' || activeTab === 'my_profile' || activeTab === 'deposits' || activeTab === 'real_estate' || activeTab === 'help_desk' || (activeTab === 'directors' && canManageDirectors)) 
     : true;
   const currentTab = !isMemberAuthorized ? 'dashboard' : activeTab;
 
   return (
     <MobileFrame>
-      <div className="min-h-screen bg-[#030712] text-white flex flex-col font-sans w-full max-w-full overflow-x-hidden">
+      <div className={`min-h-screen ${currentTheme.mode === 'light' ? 'bg-[#F8FAFC] text-slate-900' : 'bg-[#030712] text-white'} flex flex-col font-sans w-full max-w-full overflow-x-hidden transition-colors duration-200`}>
         
         {/* Super Admin Maintenance Active Banner */}
         {systemSettings.maintenanceMode && role === 'super_admin' && (
@@ -109,6 +113,9 @@ const MainContent: React.FC = () => {
             {currentTab === 'directors' && <DirectorsManager />}
             {currentTab === 'active_now' && <ActiveNowScreen />}
             {currentTab === 'my_profile' && <MyProfileView />}
+            {currentTab === 'help_desk' && <HelpDeskView />}
+            {currentTab === 'deposit_accounts' && <DepositAccountsView />}
+            {currentTab === 'club_rules' && <ClubRulesView />}
           </main>
         </div>
 

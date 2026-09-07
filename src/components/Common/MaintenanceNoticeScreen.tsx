@@ -23,12 +23,23 @@ Normal service will resume as soon as the updates are complete. Thank you for yo
 
   const displayMessage = systemSettings.maintenanceMessage || (language === 'bn' ? defaultBnMessage : defaultEnMessage);
 
+  const [statusFeedback, setStatusFeedback] = useState<string | null>(null);
+
   const handleRefresh = () => {
     setCheckingStatus(true);
+    setStatusFeedback(null);
     setTimeout(() => {
       setCheckingStatus(false);
-      window.location.reload();
-    }, 1000);
+      if (systemSettings.maintenanceMode) {
+        setStatusFeedback(
+          language === 'bn' 
+            ? 'সিস্টেম মেইনটেন্যান্স এখনও সক্রিয় রয়েছে। অ্যাডমিনের কাজ শেষ হলে স্বয়ংক্রিয়ভাবে প্রবেশ করতে পারবেন।' 
+            : 'Maintenance is still active. Access will resume automatically once completed.'
+        );
+      } else {
+        window.location.reload();
+      }
+    }, 700);
   };
 
   return (
@@ -146,6 +157,13 @@ Normal service will resume as soon as the updates are complete. Thank you for yo
             </button>
           )}
         </div>
+
+        {/* Feedback message when checking status */}
+        {statusFeedback && (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs font-semibold animate-fadeIn">
+            {statusFeedback}
+          </div>
+        )}
 
         {/* Footer info */}
         <p className="text-[11px] text-slate-500 pt-1">

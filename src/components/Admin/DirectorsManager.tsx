@@ -54,7 +54,7 @@ export const DirectorsManager: React.FC = () => {
     goBack 
   } = useApp();
 
-  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com';
+  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com' || authUser?.email === 'almegledest@gmail.com';
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDirector, setEditingDirector] = useState<BoardDirector | null>(null);

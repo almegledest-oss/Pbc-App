@@ -4,7 +4,6 @@ import { t } from '../../utils/translations';
 import { DepositReceiptModal } from '../Deposits/DepositReceiptModal';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { AdminSignatureModal } from './AdminSignatureModal';
-import { AppUpdateSettingCard } from '../Common/AppUpdateSettingCard';
 import { Deposit } from '../../types';
 import { 
   ShieldCheck, 
@@ -36,13 +35,22 @@ import {
   Image as ImageIcon,
   ArrowLeft,
   ChevronRight,
-  Quote
+  Quote,
+  Headphones,
+  MessageCircle,
+  Phone,
+  Building,
+  ExternalLink,
+  BookOpen
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
 import { PbcAirplaneHeaderLogo } from '../Members/PbcCardGraphics';
 import { safeStorage } from '../../utils/safeStorage';
 import { ThemeSelectorCard } from './ThemeSelectorCard';
+import { AdminManualDepositView } from './AdminManualDepositView';
+import { AdminSupportSettingsView } from './AdminSupportSettingsView';
+import { AdminClubRulesEditor } from './AdminClubRulesEditor';
 
 export const AdminPanel: React.FC = () => {
   const { 
@@ -221,7 +229,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   const openSubView = (
-    subViewKey: 'approvals' | 'users' | 'logs' | 'broadcast' | 'settings' | 'backup',
+    subViewKey: 'approvals' | 'users' | 'logs' | 'broadcast' | 'settings' | 'backup' | 'manual_deposit' | 'permissions' | 'support_settings' | 'club_rules_settings',
     title: string,
     titleBn: string
   ) => {
@@ -278,6 +286,36 @@ export const AdminPanel: React.FC = () => {
 
         {/* The List of Super Admin Modules (Formulated List View) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          {/* 0. Admin Manual Deposit (Highlighted Luxury Gold Card) */}
+          <div
+            onClick={() => openSubView('manual_deposit', 'Admin Manual Deposit', 'অ্যাডমিন ম্যানুয়াল ডিপোজিট অ্যান্ট্রি')}
+            className="p-5 bg-gradient-to-r from-[#0B1528] via-[#0E1D38] to-[#122448] hover:to-[#172e5c] rounded-3xl border-2 border-amber-400/80 hover:border-amber-300 shadow-2xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4 relative overflow-hidden"
+          >
+            <div className="flex items-center gap-4 min-w-0 relative z-10">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 border border-amber-300 flex items-center justify-center text-slate-950 shrink-0 group-hover:scale-105 transition shadow-lg">
+                <Wallet className="w-6 h-6 stroke-[2.5]" />
+              </div>
+              <div className="overflow-hidden">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-black text-amber-300 group-hover:text-amber-200 transition truncate">
+                    {isBn ? 'ম্যানুয়াল ডিপোজিট অ্যান্ট্রি' : 'Admin Manual Deposit'}
+                  </h3>
+                  <span className="px-2 py-0.5 text-[9px] bg-amber-400 text-slate-950 rounded-full font-black uppercase tracking-wider shadow">
+                    DIRECT CREDIT
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                  {isBn 
+                    ? 'প্রবাসী ও সাধারণ সদস্যদের প্রাপ্ত নগদ টাকা, ব্যাংক বা রেমিট্যান্স সরাসরি জমা ও রসিদ তৈরি' 
+                    : 'Directly credit manual deposits (Cash, Wire, Remittance) and issue official receipts'}
+                </p>
+              </div>
+            </div>
+            <div className="p-2 rounded-xl bg-[#070D1B] text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-amber-400/40 relative z-10">
+              <ChevronRight className="w-5 h-5" />
+            </div>
+          </div>
           
           {/* 1. Approval Queue */}
           <div
@@ -403,7 +441,7 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* 5. System Settings */}
+          {/* 5. System Settings - SUPER ADMIN ONLY */}
           {role === 'super_admin' && (
             <div
               onClick={() => openSubView('settings', 'System Settings', 'সিস্টেম কনফিগারেশন ও থিম')}
@@ -492,6 +530,102 @@ export const AdminPanel: React.FC = () => {
             </div>
           </div>
 
+          {/* 8. Member Access & Permissions Controls (The 3 Options: Photo, Self-Edit, Card Download) */}
+          {(role === 'super_admin' || role === 'admin') && (
+            <div
+              onClick={() => openSubView('permissions', 'Member Permissions & ID Card Controls', 'সদস্য এক্সেস ও আইডি কার্ড কন্ট্রোল')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-emerald-500/40 hover:border-emerald-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'সদস্য পারমিশন ও এক্সেস কন্ট্রোল' : 'Member Permissions & Controls'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full font-bold shrink-0">
+                      {isBn ? '৩টি অপশন' : '3 Options'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'ছবি আপলোড, তথ্য ও ব্যাচ এডিট এবং মেম্বার আইডি কার্ড ডাউনলোড সুবিধা অন/অফ করুন' 
+                      : 'Control member photo upload, profile info & batch edit, and ID card download permissions'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
+          {/* 9. Support, WhatsApp & Payment Accounts Settings */}
+          {(role === 'super_admin' || role === 'admin') && (
+            <div
+              onClick={() => openSubView('support_settings', 'Help Desk, WhatsApp & Payment Accounts', 'হেল্প ডেস্ক, হোয়াটসঅ্যাপ ও পেমেন্ট একাউন্টস')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-amber-500/40 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <Headphones className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'হেল্প ডেস্ক ও পেমেন্ট একাউন্টস সেটিংস' : 'Help Desk & Payment Accounts'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-bold shrink-0">
+                      {isBn ? 'bKash/Bank/WA' : 'bKash/Bank/WA'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'অফিসিয়াল বিকাশ, নগদ, ব্যাংক অ্যাকাউন্ট ও WhatsApp গ্রুপ লিংক ও প্রতিনিধি নম্বর কনফিগার করুন' 
+                      : 'Configure official bKash, Nagad, bank account details, and WhatsApp group & support agents'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
+          {/* 10. Club Constitution & By-Laws Editor */}
+          {(role === 'super_admin' || role === 'admin') && (
+            <div
+              onClick={() => openSubView('club_rules_settings', 'Club By-Laws & Constitution', 'ক্লাবের নীতিমালা ও গঠনতন্ত্র')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-[#D4AF37]/40 hover:border-[#D4AF37] shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'ক্লাবের নীতিমালা ও গঠনতন্ত্র এডিটর' : 'Club By-Laws & Constitution Editor'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full font-bold shrink-0">
+                      {isBn ? 'By-Laws' : 'By-Laws'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'ক্লাবের সকল ধারা, নিয়মাবলী, সদস্যপদের শর্ত, কিস্তি নীতি ও অধ্যায়সমূহ এডিট ও আপডেট করুন' 
+                      : 'Edit club constitution, clauses, membership terms, and deposit policies'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
         </div>
 
       </div>
@@ -501,6 +635,21 @@ export const AdminPanel: React.FC = () => {
   // If a subView is active, render the dedicated Sub-View in full screen
   return (
     <div className="space-y-6 pb-12">
+      {/* Sub-View: Support, WhatsApp & Payment Accounts Settings */}
+      {currentSubView === 'support_settings' && (
+        <AdminSupportSettingsView onBack={() => goBack()} />
+      )}
+
+      {/* Sub-View: Club Constitution & By-Laws Editor */}
+      {currentSubView === 'club_rules_settings' && (
+        <AdminClubRulesEditor onBack={() => goBack()} />
+      )}
+
+      {/* Sub-View: Admin Manual Deposit Entry */}
+      {currentSubView === 'manual_deposit' && (
+        <AdminManualDepositView onBack={() => goBack()} />
+      )}
+
       {/* Sub-View: Approval Queue */}
       {currentSubView === 'approvals' && (
         <div className="space-y-6">
@@ -887,7 +1036,7 @@ export const AdminPanel: React.FC = () => {
 
               <div className="divide-y divide-[#D4AF37]/20">
                 {users.map((u, idx) => {
-                  const isSuperAdminAccount = u.role === 'super_admin' || u.email.toLowerCase() === 'fokrulislammir9897@gmail.com';
+                  const isSuperAdminAccount = u.role === 'super_admin' || u.email.toLowerCase() === 'fokrulislammir9897@gmail.com' || u.email.toLowerCase() === 'almegledest@gmail.com';
                   return (
                     <div key={u.uid || `user-${idx}`} className="py-3 flex items-center justify-between gap-3">
                       <div>
@@ -950,15 +1099,17 @@ export const AdminPanel: React.FC = () => {
               </p>
             </div>
 
+            {/* Theme Customizer Box - Available to Admin & Super Admin */}
+            <ThemeSelectorCard />
+
             {role !== 'super_admin' ? (
               <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-2xl text-xs">
-                System Settings and global parameters are locked. Only <strong>System Admin</strong> can modify global club settings.
+                {isBn 
+                  ? 'গ্লোবাল সিস্টেম সেটিংস শুধুমাত্র সুপার অ্যাডমিনদের জন্য উন্মুক্ত।' 
+                  : 'System Settings and global club parameters are locked. Only Super Admin can modify global club settings.'}
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Theme Customizer Box */}
-                <ThemeSelectorCard />
-
                 {/* App Logo Customization Box */}
                 <div className="p-5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30 space-y-4">
                   <div className="flex items-center justify-between">
@@ -1131,6 +1282,18 @@ export const AdminPanel: React.FC = () => {
                   </div>
 
                   <div className="space-y-1">
+                    <label className="block font-semibold text-slate-300">Admin Helpline WhatsApp Number (হোয়াটসঅ্যাপ নম্বর)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. +8801711000000 or +966500000000"
+                      value={systemSettings.adminWhatsApp ?? ''}
+                      onChange={e => updateSystemSettings({ adminWhatsApp: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#070D1B] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-bold placeholder-slate-500"
+                    />
+                    <span className="text-[10px] text-slate-400 block">মেম্বাররা সাইন-আপ ও পেন্ডিং স্ক্রিনে এই নম্বরে সরাসরি হোয়াটসঅ্যাপ করতে পারবেন।</span>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="block font-semibold text-slate-300">Primary Operating Currency</label>
                     <input
                       type="text"
@@ -1162,6 +1325,81 @@ export const AdminPanel: React.FC = () => {
                       type="checkbox"
                       checked={!!systemSettings.registrationOpen}
                       onChange={e => updateSystemSettings({ registrationOpen: e.target.checked })}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Member Photo Upload Permission Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white block text-sm">Member Photo Upload (ছবি আপলোড)</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          systemSettings.allowMemberPhotoUpload !== false 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {systemSettings.allowMemberPhotoUpload !== false ? '🔓 Unlocked' : '🔒 Locked'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        মেম্বাররা তাদের প্রোফাইল পিকচার নিজে আপলোড/পরিবর্তন করতে পারবে
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberPhotoUpload !== false}
+                      onChange={e => updateSystemSettings({ allowMemberPhotoUpload: e.target.checked })}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Member Self-Edit (Personal, Family & Batch Number) Permission Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white block text-sm">Member Self-Edit & Batch No (তথ্য ও ব্যাচ এডিট)</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          systemSettings.allowMemberSelfEdit !== false 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {systemSettings.allowMemberSelfEdit !== false ? '🔓 Unlocked' : '🔒 Locked'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        মেম্বাররা তথ্য এডিট ও ব্যাচ নম্বর (Batch No) নিজে পরিবর্তন করতে পারবে
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberSelfEdit !== false}
+                      onChange={e => updateSystemSettings({ allowMemberSelfEdit: e.target.checked })}
+                      className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Member Digital ID Card Download Permission Toggle */}
+                  <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white block text-sm">Member ID Card Download (কার্ড ডাউনলোড)</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                          systemSettings.allowMemberCardDownload !== false 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {systemSettings.allowMemberCardDownload !== false ? '🔓 Unlocked' : '🔒 Locked'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        মেম্বাররা তাদের প্রোফাইল থেকে ডিজিটাল মেম্বার কার্ড নিজে ডাউনলোড ও প্রিন্ট করতে পারবে (লক থাকলে শুধুমাত্র অ্যাডমিনরা কার্ড ডাউনলোড করতে পারবে)
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberCardDownload !== false}
+                      onChange={e => updateSystemSettings({ allowMemberCardDownload: e.target.checked })}
                       className="w-5 h-5 accent-amber-500 rounded cursor-pointer"
                     />
                   </div>
@@ -1216,11 +1454,6 @@ export const AdminPanel: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Application Version & Update Control */}
-                  <div className="pt-2 col-span-1 md:col-span-2">
-                    <AppUpdateSettingCard />
-                  </div>
-
                 </div>
               </div>
             )}
@@ -1228,7 +1461,166 @@ export const AdminPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Sub-View 4: Activity Log */}
+      {/* Sub-View: Member Access & Permissions Controls (The 3 Options: Photo, Self-Edit, Card Download) */}
+      {currentSubView === 'permissions' && (
+        <div className="space-y-6">
+          <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#D4AF37]/20 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2 uppercase tracking-wide">
+                  <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                  <span>{isBn ? 'সদস্য পারমিশন ও এক্সেস কন্ট্রোল' : 'Member Permissions & Access Controls'}</span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-1">
+                  {isBn 
+                    ? 'সাধারণ সদস্যদের ছবি আপলোড, তথ্য ও ব্যাচ এডিট এবং আইডি কার্ড ডাউনলোড সুবিধা নিয়ন্ত্রণ করুন' 
+                    : 'Manage member photo upload, profile info/batch edit, and ID card download permissions'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-bold">
+                  {isBn ? 'অ্যাডমিন ও সুপার অ্যাডমিন সুবিধা' : 'Admin & Super Admin Accessible'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Option 1: Member Photo Upload */}
+              <div className="p-5 bg-[#070D1B] rounded-2xl border-2 border-[#D4AF37]/30 hover:border-amber-400/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-black text-white text-base">
+                        1. {isBn ? 'মেম্বার ছবি আপলোড (Photo Upload)' : 'Member Photo Upload'}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${
+                        systemSettings.allowMemberPhotoUpload !== false 
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}>
+                        {systemSettings.allowMemberPhotoUpload !== false 
+                          ? (isBn ? '🔓 আনলকড (চালু)' : '🔓 Unlocked') 
+                          : (isBn ? '🔒 লকড (বন্ধ)' : '🔒 Locked')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                      {isBn 
+                        ? 'মেম্বাররা তাদের প্রোফাইল থেকে ছবি নিজে আপলোড বা পরিবর্তন করতে পারবে। লক করা থাকলে মেম্বারদের ছবি পরিবর্তন বন্ধ থাকবে।' 
+                        : 'Members can upload or change their profile photos directly. When locked, photo uploading is disabled for members.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-3 sm:self-center">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberPhotoUpload !== false}
+                      onChange={e => updateSystemSettings({ allowMemberPhotoUpload: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-14 h-8 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Option 2: Member Self-Edit & Batch No */}
+              <div className="p-5 bg-[#070D1B] rounded-2xl border-2 border-[#D4AF37]/30 hover:border-amber-400/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-blue-500/10 rounded-xl border border-blue-500/20 text-blue-400 shrink-0 mt-0.5">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-black text-white text-base">
+                        2. {isBn ? 'মেম্বার তথ্য ও ব্যাচ নম্বর এডিট (Self-Edit & Batch No)' : 'Member Self-Edit & Batch No'}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${
+                        systemSettings.allowMemberSelfEdit !== false 
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}>
+                        {systemSettings.allowMemberSelfEdit !== false 
+                          ? (isBn ? '🔓 আনলকড (চালু)' : '🔓 Unlocked') 
+                          : (isBn ? '🔒 লকড (বন্ধ)' : '🔒 Locked')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                      {isBn 
+                        ? 'মেম্বাররা প্রোফাইলের ব্যক্তিগত তথ্য, পরিবারের বিবরণ ও ব্যাচ নম্বর নিজে পরিবর্তন করতে পারবে। লক থাকলে মেম্বার এডিট ফর্ম সম্পূর্ণ বন্ধ থাকবে।' 
+                        : 'Members can edit their personal details, nominee info, and batch number. When locked, editing is restricted.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-3 sm:self-center">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberSelfEdit !== false}
+                      onChange={e => updateSystemSettings({ allowMemberSelfEdit: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-14 h-8 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Option 3: Member ID Card Download */}
+              <div className="p-5 bg-[#070D1B] rounded-2xl border-2 border-[#D4AF37]/30 hover:border-amber-400/50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-purple-500/10 rounded-xl border border-purple-500/20 text-purple-400 shrink-0 mt-0.5">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-black text-white text-base">
+                        3. {isBn ? 'মেম্বার আইডি কার্ড ডাউনলোড (ID Card Download)' : 'Member ID Card Download'}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wide ${
+                        systemSettings.allowMemberCardDownload !== false 
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                      }`}>
+                        {systemSettings.allowMemberCardDownload !== false 
+                          ? (isBn ? '🔓 আনলকড (চালু)' : '🔓 Unlocked') 
+                          : (isBn ? '🔒 লকড (বন্ধ)' : '🔒 Locked')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                      {isBn 
+                        ? 'মেম্বাররা তাদের প্রোফাইল থেকে ডিজিটাল কার্ড সরাসরি ডাউনলোড ও প্রিন্ট (CR80 PDF, PNG, A4) করতে পারবে। লক করা থাকলে শুধুমাত্র অ্যাডমিন ও সুপার অ্যাডমিন কার্ড প্রিন্ট করতে পারবেন।' 
+                        : 'Members can download & print digital ID passes. When locked, card download & print controls are hidden for regular members.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-3 sm:self-center">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={systemSettings.allowMemberCardDownload !== false}
+                      onChange={e => updateSystemSettings({ allowMemberCardDownload: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-14 h-8 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Reassuring Info Banner */}
+            <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center gap-3 text-xs text-emerald-300">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>
+                {isBn 
+                  ? 'এই ৩টি অপশন Admin এবং Super Admin উভয়ই নিয়ন্ত্রণ করতে পারবেন। এখানে যেকোনো পরিবর্তন করা মাত্রই ক্লাবের ডাটাবেজে তাৎক্ষণিকভাবে সেভ হয়।' 
+                  : 'These 3 control options are accessible to both Admins and Super Admins. Changes take effect across the system instantly.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
       {currentSubView === 'logs' && (
         <div className="space-y-6">
 

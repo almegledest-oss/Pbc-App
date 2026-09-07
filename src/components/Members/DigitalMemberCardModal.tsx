@@ -36,7 +36,7 @@ export const DigitalMemberCardModal: React.FC<DigitalMemberCardModalProps> = ({ 
       <div
         id="digital-card-modal-content"
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#070D1B] border border-[#D4AF37]/50 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-white my-auto max-h-[92vh] flex flex-col relative"
+        className="bg-[#070D1B] border border-[#D4AF37]/50 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 text-white my-auto max-h-[92vh] flex flex-col relative official-document-isolated"
       >
         
         {/* Header toolbar (sticky at top) */}

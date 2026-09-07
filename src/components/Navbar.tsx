@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { t } from '../utils/translations';
 import { PbcLogo } from './Common/PbcLogo';
 import { PBCFramedAvatar } from './Common/PBCFramedAvatar';
@@ -48,9 +49,33 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
     stats,
     members
   } = useApp();
+  const { currentTheme, setAppTheme } = useTheme();
 
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const langDropdownRef = useRef<HTMLDivElement>(null);
+  const mobileLangDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node;
+      const insideDesktop = langDropdownRef.current && langDropdownRef.current.contains(target);
+      const insideMobile = mobileLangDropdownRef.current && mobileLangDropdownRef.current.contains(target);
+      
+      if (!insideDesktop && !insideMobile) {
+        setIsLangDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, []);
 
   const labels = t[language];
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -60,18 +85,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
   const totalInvestedVal = stats?.totalInvestment || 0;
 
   return (
-    <header className="sticky top-0 z-30 bg-[#070D1B] border-b border-[#D4AF37]/30 transition-colors text-white shadow-xl w-full max-w-full">
+    <header className={`sticky top-0 z-30 ${currentTheme.mode === 'light' ? 'bg-white/95 text-slate-900 border-b border-amber-500/30' : 'bg-[#070D1B] border-b border-[#D4AF37]/30 text-white'} transition-colors shadow-xl w-full max-w-full pt-safe safe-area-top`}>
       {/* Main Top Header Bar */}
-      <div className="h-16 sm:h-20 flex items-center px-3 sm:px-6 lg:px-8 justify-between gap-2 sm:gap-4 min-w-0">
+      <div className="h-14 sm:h-20 flex items-center px-3 sm:px-6 lg:px-8 justify-between gap-2 sm:gap-4 min-w-0">
         
         {/* Left: Branding (Mobile view / Header title) */}
         <div className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0" onClick={() => setActiveTab('dashboard')}>
           <PbcLogo variant="gold" className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 shadow-md" />
           <div className="flex flex-col">
-            <h1 className="text-xs xs:text-sm sm:text-base font-black tracking-wider text-white uppercase leading-tight whitespace-nowrap">
+            <h1 className={`text-xs xs:text-sm sm:text-base font-black tracking-wider ${currentTheme.mode === 'light' ? 'text-slate-900' : 'text-white'} uppercase leading-tight whitespace-nowrap`}>
               PROBASHI <span className="text-[#E5A93C]">BUSINESS CLUB</span>
             </h1>
-            <p className="text-[8px] xs:text-[9px] sm:text-[10px] text-amber-300/80 font-bold tracking-[0.15em] uppercase">
+            <p className="text-[8px] xs:text-[9px] sm:text-[10px] text-amber-500 font-bold tracking-[0.15em] uppercase">
               Official Portal
             </p>
           </div>
@@ -80,7 +105,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
         {/* Center: Live Quick Stats & Language Button (Desktop/Tablet Only) */}
         <div className="hidden md:flex items-center gap-3">
           {/* Quick Stats Pill */}
-          <div className="flex items-center gap-3.5 px-3.5 py-1.5 rounded-full bg-[#0B1528] border border-[#D4AF37]/40 shadow-md">
+          <div className={`flex items-center gap-3.5 px-3.5 py-1.5 rounded-full ${currentTheme.mode === 'light' ? 'bg-slate-50 border border-amber-500/40 text-slate-800' : 'bg-[#0B1528] border border-[#D4AF37]/40'} shadow-md`}>
             {/* Total Deposits */}
             <div className="flex items-center gap-1.5 text-xs">
               <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
@@ -113,40 +138,210 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
             </div>
           </div>
 
-          {/* Quick Language Switcher */}
-          <button
-            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/50 text-xs font-bold text-amber-400 transition-all cursor-pointer shadow-md group"
-            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
-          >
-            <Languages className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-12 transition-transform shrink-0" />
-            <span className={language === 'bn' ? 'text-amber-300 font-black' : 'text-slate-400 font-normal'}>বাং</span>
-            <span className="text-slate-600">/</span>
-            <span className={language === 'en' ? 'text-amber-300 font-black' : 'text-slate-400 font-normal'}>EN</span>
-          </button>
+          {/* Quick Language Switcher Dropdown (Desktop/Tablet) */}
+          <div className="relative" ref={langDropdownRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLangDropdownOpen(!isLangDropdownOpen);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/60 text-xs font-bold text-amber-400 transition-all cursor-pointer shadow-md group active:scale-95"
+              title={language === 'bn' ? 'ভাষা পরিবর্তন করুন (Language)' : 'Change Language'}
+            >
+              <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 group-hover:rotate-45 transition-transform">
+                <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              </div>
+              <span className="text-amber-300 font-extrabold text-xs tracking-wide">
+                {language === 'bn' ? 'বাংলা' : 'EN'}
+              </span>
+              <ChevronDown className={`w-3 h-3 text-amber-400/80 group-hover:text-amber-300 transition-transform duration-200 ${isLangDropdownOpen ? 'rotate-180 text-amber-300' : ''}`} />
+            </button>
+
+            {/* Language Dropdown Menu */}
+            {isLangDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-2 w-36 bg-[#070D1B] border border-[#D4AF37]/50 rounded-2xl p-1.5 shadow-2xl shadow-black/90 backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLanguage('bn');
+                    setIsLangDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    language === 'bn'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      : 'text-slate-300 hover:text-white hover:bg-[#112244]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🇧🇩</span>
+                    <span>বাংলা</span>
+                  </div>
+                  {language === 'bn' && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLanguage('en');
+                    setIsLangDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all mt-1 cursor-pointer ${
+                    language === 'en'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                      : 'text-slate-300 hover:text-white hover:bg-[#112244]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">🌐</span>
+                    <span>English</span>
+                  </div>
+                  {language === 'en' && <Check className="w-3.5 h-3.5 text-amber-400" />}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Actions & Switches */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Mobile Language Button (Always visible on mobile in header!) */}
+          {/* Mobile Language Button with Globe & ChevronDown (Always visible on mobile in header!) */}
+          <div className="relative md:hidden" ref={mobileLangDropdownRef}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsLangDropdownOpen(!isLangDropdownOpen);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0B1528] border border-[#D4AF37]/50 text-xs font-bold text-amber-400 active:scale-95 shadow-sm cursor-pointer"
+              title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] font-black text-amber-300">{language === 'bn' ? 'বাং' : 'EN'}</span>
+              <ChevronDown className={`w-3 h-3 text-amber-400/80 transition-transform duration-200 ${isLangDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Mobile Dropdown Menu */}
+            {isLangDropdownOpen && (
+              <div 
+                className="absolute right-0 mt-2 w-32 bg-[#070D1B] border border-[#D4AF37]/50 rounded-2xl p-1 shadow-2xl shadow-black/90 backdrop-blur-xl z-50 animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLanguage('bn');
+                    setIsLangDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    language === 'bn'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-300 hover:bg-[#112244]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>🇧🇩</span>
+                    <span>বাংলা</span>
+                  </div>
+                  {language === 'bn' && <Check className="w-3 h-3 text-amber-400" />}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLanguage('en');
+                    setIsLangDropdownOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-bold transition-all mt-1 cursor-pointer ${
+                    language === 'en'
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      : 'text-slate-300 hover:bg-[#112244]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>🌐</span>
+                    <span>English</span>
+                  </div>
+                  {language === 'en' && <Check className="w-3 h-3 text-amber-400" />}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Quick Theme Toggle Button (Mobile) - Switch between Royal Dark & Ivory White & Gold */}
           <button
-            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
-            className="md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#0B1528] border border-[#D4AF37]/40 text-xs font-bold text-amber-400 active:scale-95 shadow-sm"
-            title={language === 'bn' ? 'Switch to English' : 'বাংলায় দেখুন'}
+            type="button"
+            onClick={() => {
+              if (currentTheme.mode === 'dark') {
+                setAppTheme('pearl-white-gold');
+              } else {
+                setAppTheme('pbc-royal-gold');
+              }
+            }}
+            className={`md:hidden p-1.5 rounded-xl ${currentTheme.mode === 'light' ? 'bg-amber-50 border-amber-500/50 text-amber-800' : 'bg-[#0B1528] border-[#D4AF37]/50 text-amber-300'} border active:scale-95 transition cursor-pointer shadow-xs`}
+            title={currentTheme.mode === 'dark' ? (language === 'bn' ? 'সাদা-গোল্ডেন থিম চালু করুন' : 'Switch to White & Gold Theme') : (language === 'bn' ? 'রয়েল ডার্ক থিমে ফিরে যান' : 'Switch to Royal Dark Theme')}
           >
-            <Languages className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="text-[11px] font-black">{language === 'bn' ? 'বাং' : 'EN'}</span>
+            {currentTheme.mode === 'dark' ? (
+              <Sun className="w-4 h-4 text-amber-400" />
+            ) : (
+              <Moon className="w-4 h-4 text-amber-600" />
+            )}
           </button>
 
           {/* Quick Search Mobile Icon */}
           {(role === 'super_admin' || role === 'admin') && (
             <button
               onClick={() => setIsSearchOpen(true)}
-              className="md:hidden p-1.5 text-slate-300 hover:bg-[#112244] rounded-lg border border-[#D4AF37]/20 active:scale-95"
+              className={`md:hidden p-1.5 ${currentTheme.mode === 'light' ? 'text-slate-700 hover:bg-amber-500/10 border-amber-500/30' : 'text-slate-300 hover:bg-[#112244] border-[#D4AF37]/20'} rounded-lg border active:scale-95`}
             >
-              <Search className="w-4 h-4 text-amber-400" />
+              <Search className="w-4 h-4 text-amber-500" />
             </button>
           )}
+
+          {/* Desktop/Tablet Quick Theme Toggle (Ivory White & Gold <-> Royal Dark) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (currentTheme.mode === 'dark') {
+                setAppTheme('pearl-white-gold');
+              } else {
+                setAppTheme('pbc-royal-gold');
+              }
+            }}
+            className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold ${
+              currentTheme.mode === 'light' 
+                ? 'bg-amber-50 hover:bg-amber-100 text-slate-800 border-amber-500/40' 
+                : 'bg-[#0B1528] hover:bg-[#112244] text-slate-200 border-[#D4AF37]/40'
+            } rounded-xl border transition shadow-sm active:scale-95 cursor-pointer group`}
+            title={
+              currentTheme.mode === 'dark'
+                ? (language === 'bn' ? 'আইভরি হোয়াইট ও গোল্ডেন থিমে স্যুইচ করুন' : 'Switch to Ivory White & Gold Theme')
+                : (language === 'bn' ? 'রয়েল ডার্ক থিমে স্যুইচ করুন' : 'Switch to Royal Dark Theme')
+            }
+          >
+            {currentTheme.mode === 'dark' ? (
+              <>
+                <Sun className="w-4 h-4 text-amber-400 group-hover:rotate-45 transition-transform" />
+                <span className="text-amber-300 font-extrabold text-xs tracking-wide">
+                  {language === 'bn' ? 'সাদা-গোল্ডেন' : 'White & Gold'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4 text-amber-600 group-hover:-rotate-12 transition-transform" />
+                <span className="text-slate-800 font-extrabold text-xs tracking-wide">
+                  {language === 'bn' ? 'রয়েল ডার্ক' : 'Royal Dark'}
+                </span>
+              </>
+            )}
+          </button>
 
           {/* Mobile Frame Simulator Toggle */}
           <button
@@ -345,42 +540,44 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
         </div>
       </div>
 
-      {/* MOBILE ONLY LIVE STATS STRIP (Always shown on phone screens right under top bar) */}
-      <div className="md:hidden bg-[#0B1528] border-t border-[#D4AF37]/30 px-3 py-2 flex items-center justify-around text-xs shadow-inner">
-        {/* Total Deposits */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
-            <Wallet className="w-2.5 h-2.5" />
+      {/* MOBILE ONLY LIVE STATS CAPSULE (Floating Rounded Pill on phone screens) */}
+      <div className="md:hidden px-3 py-1.5 bg-[#070D1B]">
+        <div className="bg-[#0B1528] border border-[#D4AF37]/50 rounded-full px-3 py-1.5 flex items-center justify-around text-xs shadow-lg shadow-black/50">
+          {/* Total Deposits */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+              <Wallet className="w-2.5 h-2.5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-semibold leading-none">{language === 'bn' ? 'মোট জমা' : 'Deposit'}</span>
+              <span className="font-black text-emerald-400 text-[11px] leading-tight tracking-tight">৳{totalDepositsVal.toLocaleString()}</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'মোট জমা' : 'Deposit'}</span>
-            <span className="font-extrabold text-emerald-400 text-[11px] leading-tight">৳{totalDepositsVal.toLocaleString()}</span>
-          </div>
-        </div>
 
-        <div className="w-[1px] h-4 bg-slate-700" />
+          <div className="w-[1px] h-4 bg-slate-700/80 shrink-0" />
 
-        {/* Total Members */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-            <Users className="w-2.5 h-2.5" />
+          {/* Total Members */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 shadow-inner">
+              <Users className="w-2.5 h-2.5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-semibold leading-none">{language === 'bn' ? 'সদস্য' : 'Members'}</span>
+              <span className="font-black text-blue-400 text-[11px] leading-tight tracking-tight">{totalMembersVal} {language === 'bn' ? 'জন' : ''}</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'সদস্য' : 'Members'}</span>
-            <span className="font-extrabold text-blue-400 text-[11px] leading-tight">{totalMembersVal} {language === 'bn' ? 'জন' : ''}</span>
-          </div>
-        </div>
 
-        <div className="w-[1px] h-4 bg-slate-700" />
+          <div className="w-[1px] h-4 bg-slate-700/80 shrink-0" />
 
-        {/* Total Invested */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-            <Briefcase className="w-2.5 h-2.5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-[9px] text-slate-400 font-medium leading-none">{language === 'bn' ? 'বিনিয়োগ' : 'Invested'}</span>
-            <span className="font-extrabold text-amber-400 text-[11px] leading-tight">৳{totalInvestedVal.toLocaleString()}</span>
+          {/* Total Invested */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+              <Briefcase className="w-2.5 h-2.5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-semibold leading-none">{language === 'bn' ? 'বিনিয়োগ' : 'Invested'}</span>
+              <span className="font-black text-amber-400 text-[11px] leading-tight tracking-tight">৳{totalInvestedVal.toLocaleString()}</span>
+            </div>
           </div>
         </div>
       </div>

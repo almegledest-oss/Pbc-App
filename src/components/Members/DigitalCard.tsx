@@ -15,8 +15,10 @@ import {
   Users,
   Home,
   Image as ImageIcon,
-  Scissors
+  Scissors,
+  Lock
 } from 'lucide-react';
+import { useApp } from '../../context/AppContext';
 import { 
   PbcAirplaneHeaderLogo, 
   PbcCircularLogo,
@@ -33,6 +35,10 @@ interface DigitalCardProps {
 }
 
 export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
+  const { role, systemSettings } = useApp();
+  const isAdmin = role === 'super_admin' || role === 'admin';
+  const canDownload = isAdmin || (systemSettings?.allowMemberCardDownload !== false);
+
   const [isFlipped, setIsFlipped] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingA4, setDownloadingA4] = useState(false);
@@ -394,7 +400,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
       {/* Main Interactive Portrait Card Container */}
       <div 
         id={`printable-card-wrapper-${member.id}`}
-        className="relative w-[340px] h-[525px] rounded-[24px] cursor-pointer perspective-1000 transition-transform duration-700 shadow-2xl shrink-0"
+        className="relative w-[340px] h-[525px] rounded-[24px] cursor-pointer perspective-1000 transition-transform duration-700 shadow-2xl shrink-0 official-document-isolated pbc-digital-id-card"
         onClick={() => setIsFlipped(!isFlipped)}
         title="কার্ড উল্টাতে ক্লিক করুন (Tap to flip)"
         style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
@@ -404,7 +410,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
           {/* ==================== ON-SCREEN FRONT ==================== */}
           <div 
             id={`card-front-${member.id}`}
-            className={`absolute inset-0 w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] shadow-2xl overflow-hidden backface-hidden transition-opacity duration-300 flex flex-col justify-between box-border ${
+            className={`absolute inset-0 w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] shadow-2xl overflow-hidden backface-hidden transition-opacity duration-300 flex flex-col justify-between box-border official-document-isolated pbc-digital-id-card ${
               isFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
             style={{
@@ -514,7 +520,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                     className="h-[26px] px-1 text-center flex items-center justify-center"
                     style={{ background: 'linear-gradient(90deg, #DFB338 0%, #FFF0A5 50%, #C89722 100%)' }}
                   >
-                    <span className="text-[15px] font-black text-[#040D1B] font-mono tracking-widest block leading-none" style={{ letterSpacing: '1px' }}>
+                    <span 
+                      className="text-[15px] font-black text-[#040D1B] font-mono tracking-widest block leading-none" 
+                      style={{ letterSpacing: '1px', position: 'relative', top: '-2px' }}
+                    >
                       {numericMemberId}
                     </span>
                   </div>
@@ -528,7 +537,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
             <div className="relative z-10 text-left my-1 pb-1 border-b-[1.5px] border-[#DFB338]">
               <h2 
                 className="text-[17.5px] font-black text-white uppercase tracking-wide block leading-normal truncate" 
-                style={{ letterSpacing: '0.5px', lineHeight: '1.3' }}
+                style={{ color: '#FFFFFF', letterSpacing: '0.5px', lineHeight: '1.3' }}
               >
                 {member.fullName || 'RAKIB HOSSAIN'}
               </h2>
@@ -546,7 +555,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>COUNTRY</span>
                 </div>
                 <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="font-bold text-white flex-1 text-left leading-normal block truncate" style={{ color: '#FFFFFF', letterSpacing: '0px' }}>
                   {member.country || 'Saudi Arabia'}
                 </span>
               </div>
@@ -560,7 +569,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>BLOOD GROUP</span>
                 </div>
                 <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
+                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ color: '#FFFFFF', letterSpacing: '0px' }}>
                   {member.bloodGroup || 'O+'}
                 </span>
               </div>
@@ -574,7 +583,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>DATE OF BIRTH</span>
                 </div>
                 <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ letterSpacing: '0px' }}>
+                <span className="font-bold text-white flex-1 text-left leading-normal block" style={{ color: '#FFFFFF', letterSpacing: '0px' }}>
                   {formatDateDisplay(member.dateOfBirth)}
                 </span>
               </div>
@@ -588,7 +597,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>MOBILE</span>
                 </div>
                 <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-                <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="font-mono font-bold text-white flex-1 text-left leading-normal block truncate" style={{ color: '#FFFFFF', letterSpacing: '0px' }}>
                   {member.phone || '0503342655'}
                 </span>
               </div>
@@ -602,7 +611,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   <span className="font-extrabold text-[#FDF0A6] uppercase leading-normal block" style={{ letterSpacing: '0.3px' }}>EMAIL</span>
                 </div>
                 <span className="text-[#DFB338] font-black px-1.5 leading-normal">:</span>
-                <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ letterSpacing: '0px' }}>
+                <span className="font-mono text-[9.5px] font-semibold text-[#F1F5F9] flex-1 text-left leading-normal block truncate" style={{ color: '#F1F5F9', letterSpacing: '0px' }}>
                   {member.email || 'rakib.ahamed318749@gmail.com'}
                 </span>
               </div>
@@ -649,7 +658,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
           {/* ==================== ON-SCREEN BACK ==================== */}
           <div 
             id={`card-back-${member.id}`}
-            className={`absolute inset-0 w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] shadow-2xl overflow-hidden rotate-y-180 backface-hidden transition-opacity duration-300 flex flex-col justify-between box-border ${
+            className={`absolute inset-0 w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] shadow-2xl overflow-hidden rotate-y-180 backface-hidden transition-opacity duration-300 flex flex-col justify-between box-border official-document-isolated pbc-digital-id-card ${
               !isFlipped ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
             style={{
@@ -677,7 +686,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                 {/* TOGETHER WE RISE Slogan */}
                 <div className="flex items-center justify-center gap-2 mt-1">
                   <div className="w-10 h-[1.5px] bg-gradient-to-r from-transparent via-[#DFB338] to-[#FDF0A6]"></div>
-                  <span className="text-[8.5px] font-black text-[#FDF0A6] uppercase tracking-wider px-1 leading-normal" style={{ letterSpacing: '0.8px' }}>
+                  <span className="text-[8.5px] font-black text-[#FDF0A6] uppercase tracking-wider px-1 leading-normal" style={{ color: '#FDF0A6', letterSpacing: '0.8px' }}>
                     TOGETHER WE RISE
                   </span>
                   <div className="w-10 h-[1.5px] bg-gradient-to-r from-[#FDF0A6] via-[#DFB338] to-transparent"></div>
@@ -719,8 +728,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   {/* Nominee Name */}
                   <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
                     <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                        <User className="w-2.5 h-2.5 text-white" />
+                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: '#061224', color: '#FFFFFF' }}>
+                        <User className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                       </div>
                       <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>N. NAME</span>
                     </div>
@@ -733,8 +742,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   {/* Relation */}
                   <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
                     <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                        <Users className="w-2.5 h-2.5 text-white" />
+                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: '#061224', color: '#FFFFFF' }}>
+                        <Users className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                       </div>
                       <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>RELATION</span>
                     </div>
@@ -747,8 +756,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   {/* Mobile */}
                   <div className="flex items-center text-[10px] py-1.5 border-b border-slate-200">
                     <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                        <Phone className="w-2.5 h-2.5 text-white" />
+                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: '#061224', color: '#FFFFFF' }}>
+                        <Phone className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                       </div>
                       <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>MOBILE</span>
                     </div>
@@ -761,8 +770,8 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   {/* Address */}
                   <div className="flex items-center text-[10px] pt-1.5">
                     <div className="flex items-center gap-1.5 min-w-[90px] shrink-0">
-                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0">
-                        <Home className="w-2.5 h-2.5 text-white" />
+                      <div className="w-4 h-4 rounded-[4px] bg-[#061224] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: '#061224', color: '#FFFFFF' }}>
+                        <Home className="w-2.5 h-2.5 text-white" style={{ color: '#FFFFFF' }} />
                       </div>
                       <span className="font-extrabold text-slate-800 uppercase leading-normal" style={{ letterSpacing: '0px', color: '#0F172A' }}>ADDRESS</span>
                     </div>
@@ -837,50 +846,59 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         <button
           id="btn-flip-card-view"
           onClick={() => setIsFlipped(!isFlipped)}
-          className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-md transition active:scale-95 flex items-center gap-1.5"
+          className="px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
         >
           <RotateCw className="w-3.5 h-3.5" />
           <span>{isFlipped ? 'সামনের পাশ (Front)' : 'পেছনের পাশ (Back)'}</span>
         </button>
 
-        <button
-          id="btn-download-cr80-pdf"
-          onClick={handleDownloadPDF}
-          disabled={downloading}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
-        >
-          {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Download className="w-3.5 h-3.5 text-amber-400" />}
-          <span>PVC PDF (CR80)</span>
-        </button>
+        {canDownload ? (
+          <>
+            <button
+              id="btn-download-cr80-pdf"
+              onClick={handleDownloadPDF}
+              disabled={downloading}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Download className="w-3.5 h-3.5 text-amber-400" />}
+              <span>PVC PDF (CR80)</span>
+            </button>
 
-        <button
-          id="btn-download-a4-sheet"
-          onClick={handleDownloadA4Sheet}
-          disabled={downloadingA4}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
-        >
-          {downloadingA4 ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Scissors className="w-3.5 h-3.5 text-amber-400" />}
-          <span>A4 শিট (কাটার দাগ সহ)</span>
-        </button>
+            <button
+              id="btn-download-a4-sheet"
+              onClick={handleDownloadA4Sheet}
+              disabled={downloadingA4}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              {downloadingA4 ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Scissors className="w-3.5 h-3.5 text-amber-400" />}
+              <span>A4 শিট (কাটার দাগ সহ)</span>
+            </button>
 
-        <button
-          id="btn-download-png-image"
-          onClick={handleDownloadPNG}
-          disabled={downloadingImage}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50"
-        >
-          {downloadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <ImageIcon className="w-3.5 h-3.5 text-amber-400" />}
-          <span>ছবি (PNG)</span>
-        </button>
+            <button
+              id="btn-download-png-image"
+              onClick={handleDownloadPNG}
+              disabled={downloadingImage}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              {downloadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <ImageIcon className="w-3.5 h-3.5 text-amber-400" />}
+              <span>ছবি (PNG)</span>
+            </button>
 
-        <button
-          id="btn-print-card-direct"
-          onClick={handlePrint}
-          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5"
-        >
-          <Printer className="w-3.5 h-3.5 text-amber-400" />
-          <span>প্রিন্ট (Print)</span>
-        </button>
+            <button
+              id="btn-print-card-direct"
+              onClick={handlePrint}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 hover:border-amber-400 shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span>প্রিন্ট (Print)</span>
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/15 border border-rose-500/40 rounded-xl text-rose-300 text-xs font-semibold">
+            <Lock className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            <span>কার্ড ডাউনলোড ও প্রিন্ট সুবিধা অ্যাডমিন দ্বারা সাময়িকভাবে লক করা</span>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -903,7 +921,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         {/* EXPORT FRONT */}
         <div 
           id={`export-front-${member.id}`}
-          className="relative w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
+          className="relative w-[340px] h-[525px] rounded-[24px] p-[16px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border official-document-isolated pbc-digital-id-card"
           style={{
             position: 'relative',
             backgroundColor: '#040D1B',
@@ -1009,7 +1027,10 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
                   className="h-[26px] px-1 text-center flex items-center justify-center"
                   style={{ background: 'linear-gradient(90deg, #DFB338 0%, #FFF0A5 50%, #C89722 100%)' }}
                 >
-                  <span className="text-[15px] font-black text-[#040D1B] font-mono tracking-widest block leading-none" style={{ letterSpacing: '1px' }}>
+                  <span 
+                    className="text-[15px] font-black text-[#040D1B] font-mono tracking-widest block leading-none" 
+                    style={{ letterSpacing: '1px', position: 'relative', top: '-2px' }}
+                  >
                     {numericMemberId}
                   </span>
                 </div>
@@ -1023,7 +1044,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
           <div className="relative z-10 text-left my-1 pb-1 border-b-[1.5px] border-[#DFB338]">
             <h2 
               className="text-[17.5px] font-black text-white uppercase tracking-wide block leading-normal truncate" 
-              style={{ letterSpacing: '0.5px', lineHeight: '1.3' }}
+              style={{ color: '#FFFFFF', letterSpacing: '0.5px', lineHeight: '1.3' }}
             >
               {member.fullName || 'RAKIB HOSSAIN'}
             </h2>
@@ -1144,7 +1165,7 @@ export const DigitalCard: React.FC<DigitalCardProps> = ({ member }) => {
         {/* EXPORT BACK */}
         <div 
           id={`export-back-${member.id}`}
-          className="relative w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border"
+          className="relative w-[340px] h-[525px] rounded-[24px] text-white border-2 border-[#D4AF37] overflow-hidden flex flex-col justify-between box-border official-document-isolated pbc-digital-id-card"
           style={{
             position: 'relative',
             backgroundColor: '#040D1B',

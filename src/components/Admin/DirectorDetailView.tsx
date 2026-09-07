@@ -36,7 +36,7 @@ export const DirectorDetailView: React.FC<DirectorDetailViewProps> = ({ director
   } = useApp();
 
   const isBn = language === 'bn';
-  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com';
+  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || currentMember?.role === 'super_admin' || authUser?.email === 'fokrulislammir9897@gmail.com' || authUser?.email === 'almegledest@gmail.com';
   
   const director = directors.find(d => d.id === directorId);
 

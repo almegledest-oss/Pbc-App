@@ -26,7 +26,8 @@ import {
   Calendar,
   Layers,
   Sparkles,
-  Maximize2
+  Maximize2,
+  BookOpen
 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -537,6 +538,38 @@ export const HomeDashboard: React.FC = () => {
           </div>
         </div>
 
+      </div>
+
+      {/* Club Rules & By-Laws Highlights Card */}
+      <div 
+        onClick={() => setActiveTab('club_rules')}
+        className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-[#0B1528] via-[#070D1B] to-[#0E1C38] border-2 border-amber-500/30 hover:border-amber-400 shadow-xl transition-all cursor-pointer group flex flex-col sm:flex-row items-center justify-between gap-4"
+      >
+        <div className="flex items-center gap-4 text-center sm:text-left">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-105 transition shadow-md">
+            <BookOpen className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center justify-center sm:justify-start gap-2">
+              <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition">
+                {language === 'bn' ? 'প্রবাসী বিজনেস ক্লাব নীতিমালা ও নিয়মাবলী' : 'PBC Constitution & Member By-Laws'}
+              </h3>
+              <span className="px-2 py-0.5 text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full font-bold">
+                {language === 'bn' ? 'অফিসিয়াল' : 'Official'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl">
+              {language === 'bn' 
+                ? 'সদস্যপদ লাভের যোগ্যতা, মাসিক কিস্তির সময়সীমা, হালাল বিনিয়োগ নীতি ও মূলধন ফেরত সংক্রান্ত ক্লাবের নিয়মানুযায়ী সকল ধারা পড়ে নিন।' 
+                : 'Read official terms on membership, monthly deposit deadlines, 100% Halal investments, and refund policies.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="px-4 py-2.5 rounded-xl bg-[#070D1B] text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-2 group-hover:bg-amber-500 group-hover:text-slate-950 transition shrink-0 shadow-md">
+          <span>{language === 'bn' ? 'সম্পূর্ণ নিয়মাবলী পড়ুন' : 'Read Full Rules'}</span>
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition" />
+        </div>
       </div>
 
       {/* Quick Investments Modal for Members & Admins */}

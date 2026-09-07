@@ -34,6 +34,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ projectId,
   const { 
     projects, 
     members, 
+    currentMember,
     role, 
     language, 
     goBack, 
@@ -215,6 +216,38 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({ projectId,
               <span className="text-[10px] text-slate-500 block mt-0.5">Club Members Allocated</span>
             </div>
           </div>
+
+          {/* Personal Stake Banner if current member is allocated */}
+          {(() => {
+            const myAlloc = currentMember ? project.memberAllocations?.find(a => a.memberId === currentMember.id) : null;
+            if (!myAlloc) return null;
+            const mySharePct = targetAmount > 0 ? ((Number(myAlloc.allocatedAmount) / targetAmount) * 100).toFixed(2) : '0';
+            return (
+              <div className="bg-gradient-to-r from-amber-500/25 via-yellow-500/15 to-emerald-500/25 border-2 border-amber-400/60 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-amber-500/20 rounded-xl text-amber-300 border border-amber-400/40">
+                    <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                      {isBn ? '🌟 এই প্রজেক্টে আপনার ব্যক্তিগত বিনিয়োগ' : '🌟 Your Personal Investment Stake'}
+                    </h4>
+                    <p className="text-lg font-black text-white mt-0.5">
+                      ৳{Number(myAlloc.allocatedAmount).toLocaleString()} BDT
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-extrabold text-xs rounded-xl">
+                    {isBn ? `আপনার শেয়ার: ${mySharePct}%` : `Your Share: ${mySharePct}%`}
+                  </span>
+                  <span className="px-3 py-1.5 bg-slate-900/80 border border-slate-700 text-slate-300 text-xs rounded-xl">
+                    {myAlloc.allocationDate || 'Allocated'}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Funding Progress Bar */}
           <div className="bg-[#070D1B] p-4 rounded-2xl border border-slate-800 space-y-2">

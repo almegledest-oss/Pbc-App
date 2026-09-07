@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check } from 'lucide-react';
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
@@ -81,7 +81,32 @@ export const AuthModal: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(false);
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'registration-success' | 'pending-review'>('login');
+  
+  // Submitted applicant state for success modal
+  const [submittedApplicant, setSubmittedApplicant] = useState<{
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    country: string;
+    city: string;
+  } | null>(null);
+
+  // Pending applicant info when logging in before approval
+  const [pendingApplicantInfo, setPendingApplicantInfo] = useState<{
+    id: string;
+    fullName: string;
+    email: string;
+  } | null>(null);
+
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyId = (idToCopy: string) => {
+    navigator.clipboard.writeText(idToCopy);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
 
   const handleAutoDetectLocation = async () => {
     setDetectingLocation(true);
@@ -206,18 +231,7 @@ export const AuthModal: React.FC = () => {
         }
         newMemberId = formattedId;
 
-        // 3. Attempt Firebase Auth registration
-        let uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        try {
-          const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, signupPassword);
-          if (userCred?.user?.uid) {
-            uid = userCred.user.uid;
-          }
-        } catch (signupErr: any) {
-          console.warn('Firebase auth registration notice:', signupErr?.message);
-        }
-
-        // 4. Create Member data structure
+        // 3. Create Member data structure
         const existingById = members.find(m => m.id.toUpperCase() === newMemberId.toUpperCase());
         const newMemberData: Member = {
           id: newMemberId,
@@ -230,25 +244,46 @@ export const AuthModal: React.FC = () => {
           status: 'pending', // Pending Admin Verification
           photoUrl: existingById?.photoUrl || '',
           totalDeposit: existingById?.totalDeposit || 0,
-          qrCodeData: `PBC-MEMBER:${newMemberId}:${signupFullName.trim()}:pending`,
-          barcodeData: `PBC-BC-${newMemberId}`,
+          qrCodeData: 'PBC-MEMBER:' + newMemberId + ':' + signupFullName.trim() + ':pending',
+          barcodeData: 'PBC-BC-' + newMemberId,
           role: 'member',
           password: signupPassword,
-          notes: existingById?.notes ? `${existingById.notes} | Self-Registered` : 'Self-Registered Member (Pending Approval)'
+          notes: existingById?.notes ? existingById.notes + ' | Self-Registered' : 'Self-Registered Member (Pending Approval)'
         };
 
-        // 5. Persist Member to Firestore permanently
-        await addMemberDoc(newMemberId, newMemberData);
+        // 4. Persist Member to Firestore permanently
+        try {
+          await Promise.race([
+            addMemberDoc(newMemberId, newMemberData),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000))
+          ]);
+        } catch (e) {
+          console.warn('Member doc save notice:', e);
+        }
 
-        // 6. Persist User Profile to Firestore permanently
-        await setUserProfileDoc(uid, {
-          email: cleanEmail,
-          displayName: signupFullName.trim(),
-          role: 'member',
-          status: 'pending',
-          memberId: newMemberId
-        });
+        // 5. Attempt Firebase Auth registration & profile doc
+        let uid = 'usr-' + cleanEmail.replace(/[^a-zA-Z0-9]/g, '_');
+        try {
+          const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, signupPassword);
+          if (userCred?.user?.uid) {
+            uid = userCred.user.uid;
+          }
+          await signOut(auth).catch(() => {});
+        } catch (signupErr: any) {
+          console.warn('Firebase auth registration notice:', signupErr?.message);
+        }
 
+        try {
+          await setUserProfileDoc(uid, {
+            email: cleanEmail,
+            displayName: signupFullName.trim(),
+            role: 'member',
+            status: 'pending',
+            memberId: newMemberId
+          });
+        } catch (e) {
+          console.warn('User profile doc save notice:', e);
+        }
         // 7. System notification
         addNotification(
           'New Member Registration',
@@ -256,13 +291,18 @@ export const AuthModal: React.FC = () => {
           'system'
         );
 
-        alert(`অভিনন্দন! আপনার মেম্বার অ্যাকাউন্ট (${newMemberId}) সফলভাবে তৈরি ও ডাটাবেজে স্থায়ীভাবে জমা হয়েছে।\n\nনিরাপত্তার স্বার্থে অ্যাকাউন্টটি বর্তমানে প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে। এডমিন অনুমোদন করলেই আপনি এই ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করতে পারবেন।`);
-
-        // Switch to login view
-        setMode('login');
+        // Set submitted applicant details and show Success Confirmation Screen
+        setSubmittedApplicant({
+          id: newMemberId,
+          fullName: signupFullName.trim(),
+          email: cleanEmail,
+          phone: signupPhone.trim(),
+          country: signupCountry.trim() || 'Saudi Arabia',
+          city: signupCity.trim() || 'Riyadh'
+        });
+        setMode('registration-success');
         setLoginInput(cleanEmail);
         setPassword('');
-        setIsAuthModalOpen(true);
         setLoading(false);
         return;
       } else {
@@ -398,7 +438,14 @@ export const AuthModal: React.FC = () => {
 
             if (status === 'pending') {
               await signOut(auth);
-              throw new Error('আপনার অ্যাকাউন্টটি প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে।');
+              setPendingApplicantInfo({
+                id: member?.id || targetMember?.id || 'PBC-Applicant',
+                fullName: member?.fullName || targetMember?.fullName || targetUser?.displayName || 'Applicant',
+                email: cleanEmail
+              });
+              setMode('pending-review');
+              setLoading(false);
+              return;
             }
             if (status === 'rejected' || status === 'inactive' || status === 'suspended') {
               await signOut(auth);
@@ -434,7 +481,14 @@ export const AuthModal: React.FC = () => {
           }
 
           if (targetMember.status === 'pending') {
-            throw new Error('আপনার অ্যাকাউন্টটি প্রশাসনিক অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে। এডমিন অনুমোদন করলেই লগইন করতে পারবেন।');
+            setPendingApplicantInfo({
+              id: targetMember.id,
+              fullName: targetMember.fullName,
+              email: targetMember.email || cleanEmail
+            });
+            setMode('pending-review');
+            setLoading(false);
+            return;
           }
           if (targetMember.status === 'rejected' || targetMember.status === 'suspended') {
             throw new Error('আপনার মেম্বারশিপ অ্যাকাউন্টটি সক্রিয় নয়। বিস্তারিত জানতে PBC এডমিনের সাথে যোগাযোগ করুন।');
@@ -547,8 +601,8 @@ export const AuthModal: React.FC = () => {
           </div>
         </div>
 
-        {/* Mode Switcher Tabs (Sign In vs Register Member) */}
-        {!isForgotOpen && (
+        {/* Mode Switcher Tabs (Sign In vs Register Member) - Only show in login/signup modes */}
+        {!isForgotOpen && (mode === 'login' || mode === 'signup') && (
           <div className="grid grid-cols-2 p-1.5 bg-[#030816] rounded-2xl border border-[#D4AF37]/30 mb-5">
             <button
               type="button"
@@ -585,7 +639,193 @@ export const AuthModal: React.FC = () => {
           </div>
         )}
 
-        {!isForgotOpen ? (
+        {/* 1. REGISTRATION SUCCESS CONFIRMATION STATE */}
+        {mode === 'registration-success' && submittedApplicant && (
+          <div className="space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border-2 border-emerald-500/40 shadow-lg shadow-emerald-500/20">
+              <CheckCircle2 className="w-9 h-9" />
+            </div>
+
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Application Submitted Successfully</span>
+              </div>
+              <h3 className="text-xl font-black text-white">আবেদন সফলভাবে গৃহীত হয়েছে!</h3>
+              <p className="text-xs text-slate-300 mt-1">
+                আপনার মেম্বারশিপ অ্যাকাউন্ট ও ডকুমেন্টস ক্লাবের ডেটাবেজে সংরক্ষিত হয়েছে।
+              </p>
+            </div>
+
+            {/* Applicant Summary Card */}
+            <div className="bg-[#040914] border border-[#D4AF37]/40 rounded-2xl p-4 text-left space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between pb-2 border-b border-[#D4AF37]/20">
+                <span className="text-xs text-slate-400">সদস্য আইডি (Member ID):</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-black text-amber-300 text-sm tracking-wider bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/30">
+                    {submittedApplicant.id}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyId(submittedApplicant.id)}
+                    className="p-1 text-slate-400 hover:text-amber-300 transition rounded"
+                    title="Copy ID"
+                  >
+                    {copiedId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">নাম (Full Name):</span>
+                <span className="text-white font-bold">{submittedApplicant.fullName}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">ইমেইল (Email):</span>
+                <span className="text-slate-200 font-mono">{submittedApplicant.email}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">অবস্থান (Location):</span>
+                <span className="text-slate-200">{submittedApplicant.city}, {submittedApplicant.country}</span>
+              </div>
+
+              <div className="pt-2 border-t border-[#D4AF37]/20 flex items-center justify-between text-xs">
+                <span className="text-slate-400">বর্তমান স্ট্যাটাস:</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 font-bold">
+                  <Clock className="w-3 h-3 text-amber-400 animate-spin" />
+                  <span>এডমিন ভেরিফিকেশন চলছে (Pending)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Explanatory Notice */}
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left text-xs text-amber-200/90 leading-relaxed flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                ক্লাবের নিরাপত্তা ও পলিসি অনুযায়ী এডমিন কর্তৃক মেম্বারশিপ এবং আইডি ভেরিফিকেশন সম্পন্ন হওয়ার পর আপনার অ্যাকাউন্টটি সক্রিয় (Active) হবে। এরপর আপনি আপনার ইমেইল ও পাসওয়ার্ড দিয়ে সম্পূর্ণ পোর্টালে প্রবেশ করতে পারবেন।
+              </span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setLoginInput(submittedApplicant.email);
+                  setPassword('');
+                }}
+                className="w-full py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>লগইন পেজে যান (Go to Sign In)</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <a
+                href={`https://wa.me/${(systemSettings.adminWhatsApp || "+8801711000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Hello PBC Admin, I have submitted my membership application with ID: " + submittedApplicant.id + " (" + submittedApplicant.fullName + "). Please review my account approval.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 bg-[#030816] hover:bg-[#0c172e] border border-amber-500/30 text-amber-300 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>প্রয়োজনে এডমিনকে হোয়াটসঅ্যাপে জানান</span>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* 2. PENDING REVIEW LOGIN STATE */}
+        {mode === 'pending-review' && pendingApplicantInfo && (
+          <div className="space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border-2 border-amber-500/40 shadow-lg shadow-amber-500/20">
+              <Clock className="w-8 h-8 text-amber-400 animate-pulse" />
+            </div>
+
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[11px] font-extrabold uppercase tracking-wider mb-2">
+                <span>Account Under Review</span>
+              </div>
+              <h3 className="text-xl font-black text-white">অ্যাকাউন্ট ভেরিফিকেশন চলছে</h3>
+              <p className="text-xs text-slate-300 mt-1">
+                আপনার আবেদনটি বর্তমানে এডমিন অনুমোদনের (Admin Approval) অপেক্ষায় রয়েছে।
+              </p>
+            </div>
+
+            {/* Applicant Details */}
+            <div className="bg-[#040914] border border-amber-500/40 rounded-2xl p-4 text-left space-y-2.5 shadow-inner">
+              <div className="flex items-center justify-between pb-2 border-b border-amber-500/20">
+                <span className="text-xs text-slate-400">সদস্য আইডি (Member ID):</span>
+                <span className="font-mono font-black text-amber-300 text-sm tracking-wider bg-amber-500/10 px-2.5 py-0.5 rounded-lg border border-amber-500/30">
+                  {pendingApplicantInfo.id}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">আবেদনকারীর নাম:</span>
+                <span className="text-white font-bold">{pendingApplicantInfo.fullName}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">ইমেইল:</span>
+                <span className="text-slate-300 font-mono">{pendingApplicantInfo.email}</span>
+              </div>
+
+              <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between text-xs">
+                <span className="text-slate-400">স্ট্যাটাস:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-[11px]">
+                  ⏳ Pending Admin Approval
+                </span>
+              </div>
+            </div>
+
+            {/* Verification Progress Timeline */}
+            <div className="bg-[#030816] border border-slate-800 rounded-2xl p-3.5 text-left space-y-2">
+              <div className="text-[11px] font-bold text-slate-300 mb-2">আবেদনের অগ্রগতি (Timeline):</div>
+              <div className="flex items-center gap-2.5 text-xs text-emerald-400">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>১. সাইন-আপ ও মেম্বার তথ্য গ্রহণ সম্পন্ন</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-amber-300 font-bold">
+                <div className="w-4 h-4 rounded-full border-2 border-amber-400 flex items-center justify-center shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                </div>
+                <span>২. এডমিন কর্তৃক পরিচয় ও ডকুমেন্ট যাচাইকরণ (চলমান)</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-xs text-slate-500">
+                <div className="w-4 h-4 rounded-full border border-slate-700 shrink-0" />
+                <span>৩. একাউন্ট সক্রিয়করণ ও ডিজিটাল কার্ড আনলক</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setPendingApplicantInfo(null);
+                }}
+                className="w-full py-3 bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/50 text-amber-300 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>অন্য অ্যাকাউন্টে সাইন ইন করুন</span>
+              </button>
+
+              <a
+                href={`https://wa.me/${(systemSettings.adminWhatsApp || "+8801711000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Assalamu Alaikum, I am PBC Member Applicant (" + pendingApplicantInfo.id + ") - " + pendingApplicantInfo.fullName + ". Please review my account approval.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold rounded-xl transition flex items-center justify-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span>এডমিনের সাথে দ্রুত যোগাযোগের জন্য হোয়াটসঅ্যাপ করুন</span>
+              </a>
+            </div>
+          </div>
+        )}
+
+        {!isForgotOpen && mode !== 'registration-success' && mode !== 'pending-review' ? (
           <>
             {mode === 'login' ? (
               /* SIGN IN FORM */

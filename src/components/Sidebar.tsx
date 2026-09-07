@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { useVersion } from '../context/VersionContext';
+import { useTheme } from '../context/ThemeContext';
 import { t } from '../utils/translations';
 import { PbcLogo } from './Common/PbcLogo';
 import { PBCFramedAvatar } from './Common/PBCFramedAvatar';
-import { AppUpdateSettingCard } from './Common/AppUpdateSettingCard';
 import { 
   LayoutDashboard, 
   Users, 
@@ -27,7 +26,10 @@ import {
   Crown,
   Activity,
   Camera,
-  Sparkles
+  Sparkles,
+  Headphones,
+  MessageCircle,
+  BookOpen
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -52,8 +54,8 @@ export const Sidebar: React.FC = () => {
     isMoreMenuOpen: isMoreOpen,
     setIsMoreMenuOpen: setIsMoreOpen
   } = useApp();
+  const { currentTheme, setAppTheme } = useTheme();
   
-  const { hasNewVersion } = useVersion();
   const labels = t[language];
 
   // Check if user has admin/super_admin privileges
@@ -69,7 +71,8 @@ export const Sidebar: React.FC = () => {
         { id: 'dashboard', label: labels.dashboard, icon: LayoutDashboard },
         { id: 'my_profile', label: labels.myProfile, icon: User },
         { id: 'deposits', label: 'My Deposits', icon: Wallet },
-        { id: 'real_estate', label: 'Approved Investments', icon: Building2 }
+        { id: 'real_estate', label: 'Approved Investments', icon: Building2 },
+        { id: 'help_desk', label: language === 'bn' ? 'হেল্প ডেস্ক ও অ্যাকাউন্টস' : 'Help Desk & Accounts', icon: Headphones }
       ]
     : [
         { id: 'dashboard', label: labels.dashboard, icon: LayoutDashboard },
@@ -83,35 +86,36 @@ export const Sidebar: React.FC = () => {
               { id: 'active_now', label: language === 'bn' ? `অ্যাক্টিভ নাও (${onlineCount})` : `Active Now (${onlineCount})`, icon: Activity }
             ]
           : []),
+        { id: 'help_desk', label: language === 'bn' ? 'হেল্প ডেস্ক ও অ্যাকাউন্টস' : 'Help Desk & Accounts', icon: Headphones },
         { id: 'my_profile', label: labels.myProfile, icon: User }
       ];
 
-  // Fixed 5 items for Mobile Bottom Nav
-  // For Admins: Dashboard, Members, Deposits, Admin Panel, More
-  // For Regular Members: Dashboard, Members, Deposits, Investments, More
+  // Fixed 5 items for Mobile Bottom Nav:
+  // 1. Dashboard (ড্যাশবোর্ড)
+  // 2. Members (মেম্বারস)
+  // 3. Deposits (ডিপোজিটস)
+  // 4. Investments (ইনভেস্টমেন্ট)
+  // 5. More (আরো)
   const mobileBottomNavItems = [
     { id: 'dashboard', label: language === 'bn' ? 'ড্যাশবোর্ড' : 'Dashboard', icon: LayoutDashboard },
     { id: 'members', label: language === 'bn' ? 'মেম্বারস' : 'Members', icon: Users },
     { id: 'deposits', label: language === 'bn' ? 'ডিপোজিটস' : 'Deposits', icon: Wallet },
-    ...(isAdmin
-      ? [{ id: 'admin_panel', label: language === 'bn' ? 'এডমিন প্যানেল' : 'Admin Panel', icon: Shield }]
-      : [{ id: 'real_estate', label: language === 'bn' ? 'ইনভেস্টমেন্ট' : 'Investments', icon: Building2 }]
-    ),
+    { id: 'real_estate', label: language === 'bn' ? 'ইনভেস্টমেন্ট' : 'Investments', icon: Building2 },
   ];
 
   return (
     <>
       {/* Desktop Navigation Sidebar - Royal Navy & Gold Theme */}
-      <aside className="hidden md:flex flex-col w-64 bg-[#070D1B] text-white shrink-0 border-r border-[#D4AF37]/20 shadow-2xl transition-colors">
+      <aside className={`hidden md:flex flex-col w-64 ${currentTheme.mode === 'light' ? 'bg-white text-slate-900 border-r border-amber-500/30' : 'bg-[#070D1B] text-white border-r border-[#D4AF37]/20'} shrink-0 shadow-2xl transition-colors`}>
         {/* Brand Header */}
-        <div className="p-5 border-b border-[#D4AF37]/20 bg-[#030712]/50">
+        <div className={`p-5 border-b ${currentTheme.mode === 'light' ? 'bg-slate-50 border-amber-500/20' : 'border-[#D4AF37]/20 bg-[#030712]/50'}`}>
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
             <PbcLogo variant="gold" className="w-12 h-12 shrink-0" />
             <div>
-              <h1 className="text-white font-extrabold text-sm sm:text-base tracking-wider leading-tight uppercase">
+              <h1 className={`${currentTheme.mode === 'light' ? 'text-slate-900' : 'text-white'} font-extrabold text-sm sm:text-base tracking-wider leading-tight uppercase`}>
                 PROBASHI <span className="text-[#E5A93C]">BUSINESS CLUB</span>
               </h1>
-              <p className="text-[10px] text-amber-300/80 font-bold tracking-[0.2em] uppercase mt-0.5">
+              <p className="text-[10px] text-amber-500 font-bold tracking-[0.2em] uppercase mt-0.5">
                 Official Portal
               </p>
             </div>
@@ -129,8 +133,12 @@ export const Sidebar: React.FC = () => {
                 onClick={() => setActiveTab(item.id as any)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-gradient-to-r from-[#112244] to-[#0E1B38] text-amber-300 border border-[#D4AF37]/80 shadow-lg shadow-amber-500/10 font-bold'
-                    : 'text-slate-300 hover:bg-amber-500/10 hover:text-amber-200'
+                    ? (currentTheme.mode === 'light' 
+                        ? 'bg-amber-50 text-amber-900 border border-amber-500/80 shadow-md font-bold' 
+                        : 'bg-gradient-to-r from-[#112244] to-[#0E1B38] text-amber-300 border border-[#D4AF37]/80 shadow-lg shadow-amber-500/10 font-bold')
+                    : (currentTheme.mode === 'light' 
+                        ? 'text-slate-600 hover:bg-amber-500/10 hover:text-amber-800' 
+                        : 'text-slate-300 hover:bg-amber-500/10 hover:text-amber-200')
                 }`}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
@@ -160,14 +168,14 @@ export const Sidebar: React.FC = () => {
 
         {/* Current Role & Mode Switcher Badge */}
         <div className="p-4">
-          <div className="bg-[#030816] rounded-2xl p-4 border border-[#D4AF37]/30 space-y-2">
+          <div className={`${currentTheme.mode === 'light' ? 'bg-slate-50 border-amber-500/30 text-slate-800' : 'bg-[#030816] border-[#D4AF37]/30 text-white'} rounded-2xl p-4 border space-y-2`}>
             {(accountRole === 'super_admin' || accountRole === 'admin') ? (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                  <span className={`text-[10px] ${currentTheme.mode === 'light' ? 'text-slate-500' : 'text-slate-400'} uppercase tracking-widest font-bold`}>
                     Active Mode
                   </span>
-                  <span className="text-[10px] font-bold text-amber-400 capitalize">
+                  <span className="text-[10px] font-bold text-amber-500 capitalize">
                     {role === 'member' ? 'Member Mode' : 'Admin Mode'}
                   </span>
                 </div>
@@ -177,7 +185,7 @@ export const Sidebar: React.FC = () => {
                     switchRoleMode(nextMode);
                     setActiveTab(nextMode === 'member' ? 'dashboard' : 'admin_panel');
                   }}
-                  className="w-full mt-1.5 py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-amber-500/30 cursor-pointer"
+                  className="w-full mt-1.5 py-1.5 px-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-amber-500/30 cursor-pointer"
                 >
                   <span>Switch to {role === 'member' ? 'Admin Mode' : 'Member Mode'}</span>
                 </button>
@@ -188,20 +196,45 @@ export const Sidebar: React.FC = () => {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                  <span className="text-[11px] text-slate-300 font-medium">System Online</span>
+                  <span className={`text-[11px] ${currentTheme.mode === 'light' ? 'text-slate-600 font-semibold' : 'text-slate-300 font-medium'}`}>System Online</span>
                 </div>
               </div>
 
-              {/* Desktop App Version Card */}
-              <div className="py-1">
-                <AppUpdateSettingCard compact />
-              </div>
+              {/* Theme Toggle Button in Desktop Sidebar */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentTheme.mode === 'dark') {
+                    setAppTheme('pearl-white-gold');
+                  } else {
+                    setAppTheme('pbc-royal-gold');
+                  }
+                }}
+                className={`w-full py-2 px-3 ${currentTheme.mode === 'light' ? 'bg-amber-50 hover:bg-amber-100/80 text-slate-800 border-amber-500/40' : 'bg-[#0B1528] hover:bg-[#112244] text-slate-200 hover:text-amber-300 border-[#D4AF37]/30'} font-bold text-xs rounded-xl transition flex items-center justify-between border cursor-pointer shadow-xs active:scale-95 group`}
+                title={currentTheme.mode === 'dark' ? (language === 'bn' ? 'সাদা-গোল্ডেন থিম চালু করুন' : 'Switch to White & Gold Theme') : (language === 'bn' ? 'রয়েল ডার্ক থিমে ফিরে যান' : 'Switch to Royal Dark Theme')}
+              >
+                <div className="flex items-center gap-2">
+                  {currentTheme.mode === 'dark' ? (
+                    <Sun className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-45 transition-transform" />
+                  ) : (
+                    <Moon className="w-3.5 h-3.5 text-amber-600 group-hover:-rotate-12 transition-transform" />
+                  )}
+                  <span>
+                    {currentTheme.mode === 'dark'
+                      ? (language === 'bn' ? 'সাদা-গোল্ডেন থিম' : 'White & Gold Theme')
+                      : (language === 'bn' ? 'রয়েল ডার্ক থিম' : 'Royal Dark Theme')}
+                  </span>
+                </div>
+                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/30">
+                  {currentTheme.mode === 'dark' ? 'Light' : 'Dark'}
+                </span>
+              </button>
 
               <button 
                 onClick={() => logout()}
-                className="w-full py-2 px-3 bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-rose-500/30 cursor-pointer shadow-xs active:scale-95"
+                className="w-full py-2 px-3 bg-rose-500/15 hover:bg-rose-600 text-rose-500 hover:text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-rose-500/30 cursor-pointer shadow-xs active:scale-95"
               >
-                <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                <LogOut className="w-3.5 h-3.5 text-rose-500" />
                 <span>{language === 'bn' ? 'সাইন আউট করুন' : 'Log Out'}</span>
               </button>
             </div>
@@ -211,7 +244,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Mobile Bottom Navigation Bar (Strict 5 Buttons: Dashboard, Members, Deposits, Admin/Investment, More) */}
       {activeTab === 'dashboard' && (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#070D1B]/95 backdrop-blur-xl border-t border-[#D4AF37]/40 px-1 py-1.5 flex items-center justify-around text-white shadow-2xl">
+        <nav className={`md:hidden fixed bottom-0 left-0 right-0 z-40 ${currentTheme.mode === 'light' ? 'bg-white/95 text-slate-800 border-t border-amber-500/40 shadow-slate-200' : 'bg-[#070D1B]/95 text-white border-t border-[#D4AF37]/40'} backdrop-blur-xl px-1 py-1.5 flex items-center justify-around shadow-2xl`}>
           {mobileBottomNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id && !isMoreOpen;
@@ -249,12 +282,6 @@ export const Sidebar: React.FC = () => {
           >
             <div className="relative">
               <MoreHorizontal className={`w-5 h-5 ${isMoreOpen ? 'text-amber-300 animate-bounce' : 'text-slate-400'}`} />
-              {hasNewVersion && (
-                <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                </span>
-              )}
             </div>
             <span className="text-[10px] tracking-tight whitespace-nowrap font-bold">
               {language === 'bn' ? 'আরো' : 'More'}
@@ -270,19 +297,19 @@ export const Sidebar: React.FC = () => {
           <div className="flex-1" onClick={() => setIsMoreOpen(false)} />
 
           {/* Drawer Box */}
-          <div className="bg-[#070D1B] border-t-2 border-[#D4AF37]/60 rounded-t-3xl max-h-[85vh] overflow-y-auto p-4 sm:p-6 shadow-2xl text-white space-y-5 animate-slideUp border-x border-[#D4AF37]/20">
+          <div className={`${currentTheme.mode === 'light' ? 'bg-white text-slate-900 border-t-2 border-amber-500 border-x border-amber-500/20' : 'bg-[#070D1B] text-white border-t-2 border-[#D4AF37]/60 border-x border-[#D4AF37]/20'} rounded-t-3xl max-h-[85vh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-5 animate-slideUp`}>
             
             {/* Header / Close handle */}
-            <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+            <div className={`flex items-center justify-between pb-3 border-b ${currentTheme.mode === 'light' ? 'border-amber-500/30' : 'border-amber-500/20'}`}>
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></div>
-                <h3 className="font-extrabold text-base text-amber-300 tracking-wide uppercase">
+                <h3 className={`font-extrabold text-base ${currentTheme.mode === 'light' ? 'text-amber-800' : 'text-amber-300'} tracking-wide uppercase`}>
                   {language === 'bn' ? 'সকল মেনু ও অপশনসমূহ' : 'All Menus & Options'}
                 </h3>
               </div>
               <button
                 onClick={() => setIsMoreOpen(false)}
-                className="p-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-full border border-amber-500/30 transition cursor-pointer"
+                className={`p-1.5 ${currentTheme.mode === 'light' ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-amber-500/30'} rounded-full border transition cursor-pointer`}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -333,6 +360,7 @@ export const Sidebar: React.FC = () => {
               <p className="text-[11px] font-extrabold text-amber-400/80 uppercase tracking-wider mb-2">
                 {language === 'bn' ? 'অন্যান্য সেকশনস' : 'Other Sections'}
               </p>
+              
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
@@ -354,18 +382,41 @@ export const Sidebar: React.FC = () => {
 
                 <button
                   onClick={() => {
-                    navigateWithHistory('my_profile', { fromMoreMenu: true });
+                    navigateWithHistory('deposits', { 
+                      fromMoreMenu: true,
+                      title: role === 'member' ? 'My Deposits & Receipts' : 'Deposit & Payment Management',
+                      titleBn: role === 'member' ? 'আমার জমা ও পেমেন্ট হিস্ট্রি' : 'পেমেন্ট ও ডিপোজিট হিস্ট্রি'
+                    });
                     setIsMoreOpen(false);
                   }}
                   className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
-                    activeTab === 'my_profile'
+                    activeTab === 'deposits'
                       ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
                       : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <CreditCard className="w-4 h-4 text-amber-400" />
-                    <span>{language === 'bn' ? 'মাই প্রোফাইল ও আইডি' : 'My Profile & ID'}</span>
+                    <Wallet className="w-4 h-4 text-amber-400" />
+                    <span>{language === 'bn' ? 'পেমেন্ট হিস্ট্রি' : 'Payment History'}</span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                </button>
+
+                {/* Club Rules & By-Laws */}
+                <button
+                  onClick={() => {
+                    navigateWithHistory('club_rules', { fromMoreMenu: true, title: 'Club By-Laws', titleBn: 'ক্লাবের নীতিমালা' });
+                    setIsMoreOpen(false);
+                  }}
+                  className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
+                    activeTab === 'club_rules'
+                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
+                      : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <BookOpen className="w-4 h-4 text-amber-400" />
+                    <span>{language === 'bn' ? 'নীতিমালা ও নিয়মাবলী' : 'Club Rules'}</span>
                   </div>
                   <ChevronRight className="w-3.5 h-3.5 opacity-50" />
                 </button>
@@ -498,7 +549,84 @@ export const Sidebar: React.FC = () => {
                   </button>
                 )}
 
+                {/* Separated Cards: 1. Deposit Accounts (bKash/Nagad/Bank), 2. Help Desk & Support (WhatsApp/Helpline) */}
+                <div className="col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1">
+                  
+                  {/* Card 1: Deposit Accounts */}
+                  <button
+                    onClick={() => {
+                      navigateWithHistory('deposit_accounts', { 
+                        fromMoreMenu: true,
+                        title: 'Official Deposit Accounts',
+                        titleBn: 'অফিসিয়াল ডিপোজিট অ্যাকাউন্টসমূহ'
+                      });
+                      setIsMoreOpen(false);
+                    }}
+                    className={`flex items-center justify-between p-3.5 rounded-2xl border-2 text-xs font-black transition text-left cursor-pointer shadow-md ${
+                      activeTab === 'deposit_accounts'
+                        ? 'bg-gradient-to-r from-amber-500/25 to-amber-600/20 border-amber-400 text-white shadow-amber-500/10'
+                        : 'bg-gradient-to-r from-amber-950/40 via-[#0B1528] to-[#070D1B] border-amber-500/40 hover:border-amber-400 text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                        <CreditCard className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs sm:text-sm font-black text-amber-300">
+                            {language === 'bn' ? 'ডিপোজিট অ্যাকাউন্টস' : 'Deposit Accounts'}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-300 text-[9px] font-bold border border-amber-500/40">
+                            Payment
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-300 font-normal mt-0.5">
+                          {language === 'bn' ? 'বিকাশ, নগদ ও ব্যাংক নম্বর' : 'bKash, Nagad & Bank info'}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-amber-400 opacity-80 shrink-0" />
+                  </button>
 
+                  {/* Card 2: Help Desk & Support */}
+                  <button
+                    onClick={() => {
+                      navigateWithHistory('help_desk', { 
+                        fromMoreMenu: true,
+                        subView: 'whatsapp',
+                        title: 'Help Desk & Support',
+                        titleBn: 'হেল্প ডেস্ক ও সহায়তা'
+                      });
+                      setIsMoreOpen(false);
+                    }}
+                    className={`flex items-center justify-between p-3.5 rounded-2xl border-2 text-xs font-black transition text-left cursor-pointer shadow-md ${
+                      activeTab === 'help_desk'
+                        ? 'bg-gradient-to-r from-emerald-500/25 to-teal-600/20 border-emerald-400 text-white shadow-emerald-500/10'
+                        : 'bg-gradient-to-r from-emerald-950/40 via-[#0B1528] to-[#070D1B] border-emerald-500/40 hover:border-emerald-400 text-white'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                        <Headphones className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs sm:text-sm font-black text-emerald-300">
+                            {language === 'bn' ? 'হেল্প ডেস্ক ও সাপোর্ট' : 'Help Desk & Support'}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded bg-emerald-500/30 text-emerald-300 text-[9px] font-bold border border-emerald-500/40">
+                            WhatsApp
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-300 font-normal mt-0.5">
+                          {language === 'bn' ? 'হটলাইন ও ২৪/৭ প্রতিনিধি' : 'Hotline & Representatives'}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-emerald-400 opacity-80 shrink-0" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -542,14 +670,14 @@ export const Sidebar: React.FC = () => {
                 )}
 
                 {/* Language Switcher */}
-                <div className="p-3 bg-[#0B1528] border border-[#D4AF37]/30 rounded-2xl flex items-center justify-between gap-2">
+                <div className={`p-3 ${currentTheme.mode === 'light' ? 'bg-amber-50/70 border-amber-500/30' : 'bg-[#0B1528] border-[#D4AF37]/30'} border rounded-2xl flex items-center justify-between gap-2`}>
                   <div className="flex items-center gap-2.5">
-                    <Globe className="w-4 h-4 text-amber-400" />
+                    <Globe className="w-4 h-4 text-amber-500" />
                     <div>
-                      <div className="text-xs font-bold text-white">
+                      <div className={`text-xs font-bold ${currentTheme.mode === 'light' ? 'text-slate-900' : 'text-white'}`}>
                         {language === 'bn' ? 'ভাষা নির্বাচন (Language)' : 'System Language'}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className={`text-[10px] ${currentTheme.mode === 'light' ? 'text-slate-500' : 'text-slate-400'}`}>
                         {language === 'bn' ? 'বর্তমান: বাংলা' : 'Current: English'}
                       </div>
                     </div>
@@ -557,43 +685,49 @@ export const Sidebar: React.FC = () => {
 
                   <button
                     onClick={() => setLanguage(language === 'en' ? 'bn' : 'en')}
-                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-extrabold rounded-xl border border-amber-500/40 cursor-pointer transition active:scale-95 flex items-center gap-1"
+                    className={`px-3 py-1.5 ${currentTheme.mode === 'light' ? 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 border-amber-500/40' : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'} text-xs font-extrabold rounded-xl border cursor-pointer transition active:scale-95 flex items-center gap-1`}
                   >
                     <span>{language === 'en' ? 'বাংলা রূপান্তর' : 'Switch to English'}</span>
                   </button>
                 </div>
 
                 {/* Theme Switcher */}
-                <div className="p-3 bg-[#0B1528] border border-[#D4AF37]/30 rounded-2xl flex items-center justify-between gap-2">
+                <div className={`p-3 ${currentTheme.mode === 'light' ? 'bg-amber-50/90 border-amber-500/40 shadow-xs' : 'bg-[#0B1528] border-[#D4AF37]/30'} border rounded-2xl flex items-center justify-between gap-2`}>
                   <div className="flex items-center gap-2.5">
-                    {theme === 'light' ? <Moon className="w-4 h-4 text-amber-300" /> : <Sun className="w-4 h-4 text-amber-400" />}
+                    {currentTheme.mode === 'light' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-amber-400" />}
                     <div>
-                      <div className="text-xs font-bold text-white">
+                      <div className={`text-xs font-bold ${currentTheme.mode === 'light' ? 'text-slate-900' : 'text-white'}`}>
                         {language === 'bn' ? 'কালার থিম (Theme)' : 'Display Theme'}
                       </div>
-                      <div className="text-[10px] text-slate-400">
-                        {theme === 'light' ? 'Light Mode Active' : 'Dark Mode Active'}
+                      <div className={`text-[10px] ${currentTheme.mode === 'light' ? 'text-amber-800 font-semibold' : 'text-slate-400'}`}>
+                        {currentTheme.mode === 'light' 
+                          ? (language === 'bn' ? 'হোয়াইট ও গোল্ড সক্রিয়' : 'White & Gold Active') 
+                          : (language === 'bn' ? 'রয়েল ডার্ক সক্রিয়' : 'Royal Dark Active')}
                       </div>
                     </div>
                   </div>
 
                   <button
-                    onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-extrabold rounded-xl border border-amber-500/30 cursor-pointer transition active:scale-95"
+                    onClick={() => {
+                      if (currentTheme.mode === 'light') {
+                        setAppTheme('pbc-royal-gold');
+                      } else {
+                        setAppTheme('pearl-white-gold');
+                      }
+                    }}
+                    className={`px-3 py-1.5 ${
+                      currentTheme.mode === 'light'
+                        ? 'bg-slate-900 hover:bg-slate-800 text-amber-300 border-slate-700 shadow-xs'
+                        : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black shadow-md border-amber-400'
+                    } text-xs font-extrabold rounded-xl border cursor-pointer transition active:scale-95`}
                   >
-                    {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+                    {currentTheme.mode === 'light' 
+                      ? (language === 'bn' ? 'ডার্ক মোড' : 'Royal Dark') 
+                      : (language === 'bn' ? 'হোয়াইট ও গোল্ড' : 'White & Gold')}
                   </button>
                 </div>
 
               </div>
-            </div>
-
-            {/* Section 3: App Version & Updates */}
-            <div>
-              <p className="text-[11px] font-extrabold text-amber-400/80 uppercase tracking-wider mb-2">
-                {language === 'bn' ? 'অ্যাপ ভার্সন ও আপডেট সেটিংস' : 'App Version & Update'}
-              </p>
-              <AppUpdateSettingCard />
             </div>
 
             {/* Section 4: Sign Out Action */}

@@ -50,26 +50,26 @@ export const APP_THEMES: AppTheme[] = [
   },
   {
     id: 'pearl-white-gold',
-    name: 'Pearl White & Royal Gold',
-    nameBn: 'পার্ল হোয়াইট ও রয়েল গোল্ড (লাইট থিম - সাদা ব্যাকগ্রাউন্ড)',
-    description: 'Bright, ultra-clean light mode with warm ivory-white canvas, sharp dark text and golden royal highlights.',
+    name: 'PBC Ivory White & Royal Gold',
+    nameBn: 'আইভরি হোয়াইট ও রয়েল গোল্ড (হোয়াইট-গোল্ডেন লাক্সারি থিম)',
+    description: 'Official luxury light mode with crisp snow-white cards, golden framed borders, dark navy typography, and emerald/blue/gold indicators.',
     isDefault: false,
     mode: 'light',
     previewColors: {
-      bg: '#F3F4F6',
+      bg: '#F8FAFC',
       card: '#FFFFFF',
-      accent: '#B45309',
-      border: 'rgba(180, 83, 9, 0.35)'
+      accent: '#D97706',
+      border: 'rgba(217, 119, 6, 0.5)'
     },
     cssVariables: {
-      '--theme-bg-main': '#F3F4F6',
+      '--theme-bg-main': '#F8FAFC',
       '--theme-card-bg': '#FFFFFF',
-      '--theme-accent-gold': '#B45309',
-      '--theme-accent-hover': '#D97706',
-      '--theme-accent-glow': 'rgba(180, 83, 9, 0.2)',
-      '--theme-surface-dark': '#E5E7EB',
+      '--theme-accent-gold': '#D97706',
+      '--theme-accent-hover': '#B45309',
+      '--theme-accent-glow': 'rgba(217, 119, 6, 0.2)',
+      '--theme-surface-dark': '#F1F5F9',
       '--theme-nav-active': '#FEF3C7',
-      '--theme-border': 'rgba(180, 83, 9, 0.3)'
+      '--theme-border': 'rgba(217, 119, 6, 0.45)'
     }
   },
   {

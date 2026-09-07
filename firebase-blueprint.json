@@ -41,6 +41,7 @@
         "depositDate": { "type": "string" },
         "paymentMethod": { "type": "string" },
         "referenceNumber": { "type": "string" },
+        "targetMonth": { "type": "string" },
         "status": { "type": "string" }
       },
       "required": ["memberId", "amount", "currency", "depositDate"]
@@ -89,7 +90,9 @@
         "clubName": { "type": "string" },
         "currencySymbol": { "type": "string" },
         "minDepositAmount": { "type": "number" },
-        "allowNewRegistrations": { "type": "boolean" }
+        "allowNewRegistrations": { "type": "boolean" },
+        "allowMemberSelfEdit": { "type": "boolean" },
+        "allowMemberPhotoUpload": { "type": "boolean" }
       },
       "required": ["clubName"]
     },
@@ -105,6 +108,88 @@
         "displayOrder": { "type": "number" }
       },
       "required": ["quote", "author"]
+    },
+    "board_directors": {
+      "title": "Board of Directors",
+      "description": "Official club board of directors and committee members",
+      "properties": {
+        "name": { "type": "string" },
+        "nameBn": { "type": "string" },
+        "designation": { "type": "string" },
+        "designationBn": { "type": "string" },
+        "bio": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "email": { "type": "string" },
+        "order": { "type": "number" }
+      },
+      "required": ["name", "designation"]
+    },
+    "trashed_items": {
+      "title": "Recycle Bin",
+      "description": "Deleted items retained for audit and recovery",
+      "properties": {
+        "originalCollection": { "type": "string" },
+        "originalId": { "type": "string" },
+        "itemData": { "type": "object" },
+        "deletedAt": { "type": "string" }
+      },
+      "required": ["originalCollection", "originalId", "deletedAt"]
+    },
+    "active_sessions": {
+      "title": "Active Sessions",
+      "description": "Active logged in sessions for real-time monitoring",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "lastSeen": { "type": "string" }
+      },
+      "required": ["userId", "userEmail"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User accounts and permissions"
+    },
+    "/members/{memberId}": {
+      "schema": "members",
+      "description": "Club member profiles and status"
+    },
+    "/deposits/{depositId}": {
+      "schema": "deposits",
+      "description": "Member deposits and transaction receipts"
+    },
+    "/projects/{projectId}": {
+      "schema": "projects",
+      "description": "Club investment projects"
+    },
+    "/reports/{reportId}": {
+      "schema": "reports",
+      "description": "Club financial reports"
+    },
+    "/activity_logs/{logId}": {
+      "schema": "activity_logs",
+      "description": "Audit trail of user and system activities"
+    },
+    "/system_settings/{settingId}": {
+      "schema": "system_settings",
+      "description": "System configuration and settings"
+    },
+    "/quotes/{quoteId}": {
+      "schema": "quotes",
+      "description": "Inspirational quotes"
+    },
+    "/board_directors/{directorId}": {
+      "schema": "board_directors",
+      "description": "Board of directors information"
+    },
+    "/trashed_items/{trashId}": {
+      "schema": "trashed_items",
+      "description": "Recycle bin items"
+    },
+    "/active_sessions/{sessionId}": {
+      "schema": "active_sessions",
+      "description": "Active user sessions"
     }
   }
 }

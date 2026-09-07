@@ -27,6 +27,48 @@ export interface SystemSettings {
   maintenanceMode?: boolean;
   maintenanceMessage?: string;
   activeThemeId?: string;
+  adminWhatsApp?: string;
+  allowMemberSelfEdit?: boolean;
+  allowMemberPhotoUpload?: boolean;
+  allowMemberCardDownload?: boolean;
+  // Support & Help Desk Settings
+  supportWhatsAppGroupLink?: string;
+  supportOfficialWhatsApp?: string;
+  supportRep1Name?: string;
+  supportRep1Title?: string;
+  supportRep1Phone?: string;
+  supportRep1WhatsApp?: string;
+  supportRep2Name?: string;
+  supportRep2Title?: string;
+  supportRep2Phone?: string;
+  supportRep2WhatsApp?: string;
+  supportWorkingHours?: string;
+  // Deposit Account Details (bKash, Nagad, Bank)
+  bkashNumber?: string;
+  bkashName?: string; // Account holder / receiver name
+  bkashType?: string; // 'Personal' | 'Merchant' | 'Agent'
+  nagadNumber?: string;
+  nagadName?: string; // Account holder / receiver name
+  nagadType?: string; // 'Personal' | 'Merchant'
+  rocketNumber?: string;
+  rocketName?: string; // Account holder / receiver name
+  rocketType?: string;
+  bankName?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankBranchName?: string;
+  bankRoutingNumber?: string;
+  cachedGlobalStats?: {
+    totalMembers: number;
+    totalDeposits: number;
+    totalFundRaisingDeposits?: number;
+    totalRealEstateDeposits?: number;
+    totalFund?: number;
+  };
+  depositInstructions?: string;
+  // Club Constitution & Rules Settings
+  clubRules?: any[]; // ClubRuleCategory[]
+  clubRulesLastUpdated?: string;
 }
 
 export interface TrashedItem {
@@ -197,6 +239,7 @@ export interface Deposit {
   paymentMethod: 'Bank' | 'bKash' | 'Nagad' | 'Bank Wire' | 'bKash/Nagad' | 'Wise' | 'Stripe/Card' | 'Cheque' | 'Cash';
   referenceNumber: string;
   notes?: string;
+  targetMonth?: string;
   status: 'Approved' | 'Pending' | 'Rejected';
   receiptUrl?: string;
   approvedByAdminName?: string;
@@ -284,7 +327,7 @@ export interface BoardDirector {
   updatedAt?: string;
 }
 
-export type AppTab = 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now';
+export type AppTab = 'dashboard' | 'members' | 'deposits' | 'real_estate' | 'reports' | 'my_profile' | 'admin_panel' | 'directors' | 'active_now' | 'help_desk' | 'deposit_accounts' | 'club_rules';
 
 export interface QuoteItem {
   id: string; // e.g. QUOTE-101

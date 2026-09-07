@@ -180,8 +180,13 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
           <div className="flex-1 text-center md:text-left space-y-2">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
-                  {member.fullName}
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-wide flex flex-wrap items-center justify-center md:justify-start gap-2">
+                  <span>{member.fullName}</span>
+                  {member.batchNumber && (
+                    <span className="px-2.5 py-0.5 text-xs font-bold font-mono bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full tracking-wider">
+                      BATCH: {member.batchNumber}
+                    </span>
+                  )}
                 </h1>
                 <p className="text-sm text-amber-300/90 font-medium flex items-center justify-center md:justify-start gap-1.5 mt-1">
                   <MapPin className="w-4 h-4 text-amber-400" />

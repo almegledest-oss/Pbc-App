@@ -16,17 +16,25 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const { systemSettings, updateSystemSettings, role } = useApp();
   const [isChangingTheme, setIsChangingTheme] = useState(false);
 
-  // Active theme ID resolution: Firestore systemSettings > Local cached > Default
-  const activeThemeId = useMemo(() => {
-    return systemSettings?.activeThemeId || safeStorage.getItem('pbc_selected_theme_id') || DEFAULT_THEME_ID;
+  // 1. Manage current selected theme ID with React state so any change triggers immediate render
+  const [selectedThemeId, setSelectedThemeId] = useState<string>(() => {
+    return safeStorage.getItem('pbc_selected_theme_id') || systemSettings?.activeThemeId || DEFAULT_THEME_ID;
+  });
+
+  // Sync with Firestore settings if updated remotely or on initial fetch
+  useEffect(() => {
+    if (systemSettings?.activeThemeId && systemSettings.activeThemeId !== selectedThemeId) {
+      setSelectedThemeId(systemSettings.activeThemeId);
+      safeStorage.setItem('pbc_selected_theme_id', systemSettings.activeThemeId);
+    }
   }, [systemSettings?.activeThemeId]);
 
   const currentTheme = useMemo(() => {
-    const found = APP_THEMES.find(t => t.id === activeThemeId);
+    const found = APP_THEMES.find(t => t.id === selectedThemeId);
     return found || APP_THEMES[0]; // Always fallback to PBC Royal Navy & Gold
-  }, [activeThemeId]);
+  }, [selectedThemeId]);
 
-  // Inject CSS Variables and Mode Class to Root DOM
+  // Inject CSS Variables and Mode Class to Root DOM & Body
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
@@ -39,13 +47,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (currentTheme.mode === 'light') {
       root.classList.add('light-theme');
       body.classList.add('light-theme');
-      root.classList.remove('dark-theme');
-      body.classList.remove('dark-theme');
+      root.classList.remove('dark-theme', 'dark');
+      body.classList.remove('dark-theme', 'dark');
     } else {
       root.classList.remove('light-theme');
       body.classList.remove('light-theme');
-      root.classList.add('dark-theme');
-      body.classList.add('dark-theme');
+      root.classList.add('dark-theme', 'dark');
+      body.classList.add('dark-theme', 'dark');
     }
 
     safeStorage.setItem('pbc_selected_theme_id', currentTheme.id);
@@ -56,10 +64,27 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!target) return;
 
     setIsChangingTheme(true);
+    // Instant UI update via React state
+    setSelectedThemeId(themeId);
     safeStorage.setItem('pbc_selected_theme_id', themeId);
 
-    // If Super Admin, persist across all devices in Firestore System Settings
-    if (role === 'super_admin') {
+    // Apply immediate classes so visual transition is instantaneous
+    const root = document.documentElement;
+    const body = document.body;
+    if (target.mode === 'light') {
+      root.classList.add('light-theme');
+      body.classList.add('light-theme');
+      root.classList.remove('dark-theme', 'dark');
+      body.classList.remove('dark-theme', 'dark');
+    } else {
+      root.classList.remove('light-theme');
+      body.classList.remove('light-theme');
+      root.classList.add('dark-theme', 'dark');
+      body.classList.add('dark-theme', 'dark');
+    }
+
+    // If Super Admin or Admin, persist across all devices in Firestore System Settings
+    if (role === 'super_admin' || role === 'admin') {
       try {
         await updateSystemSettings({ activeThemeId: themeId });
       } catch (err) {
@@ -69,7 +94,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     setTimeout(() => {
       setIsChangingTheme(false);
-    }, 300);
+    }, 150);
   };
 
   return (

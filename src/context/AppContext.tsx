@@ -22,6 +22,7 @@ import { INITIAL_MEMBERS, INITIAL_DEPOSITS, INITIAL_PROJECTS, INITIAL_NOTIFICATI
 import { INITIAL_DIRECTORS } from '../data/seedDirectors';
 import { INITIAL_QUOTES } from '../data/seedQuotes';
 import { DEFAULT_CARD_TEMPLATE } from '../data/defaultCardTemplate';
+import { DEFAULT_CLUB_RULES } from '../data/defaultClubRules';
 import { safeStorage } from '../utils/safeStorage';
 import {
   seedFirestoreIfEmpty,
@@ -247,6 +248,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       allowNewRegistrations: true,
       registrationOpen: true,
       requireAdminApproval: true,
+      allowMemberSelfEdit: true,
+      allowMemberPhotoUpload: true,
+      allowMemberCardDownload: true,
+      // Support & Help Desk Defaults
+      supportWhatsAppGroupLink: 'https://chat.whatsapp.com/PBC-Official-Club',
+      supportOfficialWhatsApp: '+8801700000000',
+      supportRep1Name: 'সাপোর্ট প্রতিনিধি ১',
+      supportRep1Title: 'অফিসিয়াল মেম্বার হেল্পলাইন',
+      supportRep1Phone: '+8801700000000',
+      supportRep1WhatsApp: '+8801700000000',
+      supportRep2Name: 'অর্থ বিষয়ক প্রতিনিধি',
+      supportRep2Title: 'ডিপোজিট ও ভাউচার সাপোর্ট',
+      supportRep2Phone: '+8801800000000',
+      supportRep2WhatsApp: '+8801800000000',
+      supportWorkingHours: 'সকাল ৯:০০ টা - রাত ৯:০০ টা (প্রতিদিন)',
+      // Deposit Accounts Defaults
+      bkashNumber: '01700000000',
+      bkashName: 'Probashi Business Club',
+      bkashType: 'Personal',
+      nagadNumber: '01800000000',
+      nagadName: 'Probashi Business Club',
+      nagadType: 'Personal',
+      rocketNumber: '01900000000',
+      rocketName: 'Probashi Business Club',
+      rocketType: 'Personal',
+      bankName: 'Islami Bank Bangladesh PLC',
+      bankAccountName: 'Probashi Business Club',
+      bankAccountNumber: '2050XXXXXXXXXXXXX',
+      bankBranchName: 'Principal Branch, Dhaka',
+      bankRoutingNumber: '125270000',
+      depositInstructions: 'টাকা পাঠানোর পর প্রাপ্ত ট্রানজেকশন আইডি (TrxID) সংরক্ষণ করুন এবং অ্যাপের ডিপোজিট রিকোয়েস্টে সঠিক তথ্য দিন।',
+      clubRules: DEFAULT_CLUB_RULES,
+      clubRulesLastUpdated: '২০২৬-০৯-০৪',
       noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.',
       maintenanceMode: false,
       maintenanceMessage: `সম্মানিত মেম্বারবৃন্দ,\nঅ্যাপটির নতুন নিরাপত্তা আপডেট ও পারফরম্যান্স উন্নয়নের কাজ চলমান রয়েছে। সাময়িকভাবে সাধারণ মেম্বারদের জন্য লগইন ও অ্যাপ ব্যবহারের সেবা স্থগিত রাখা হয়েছে।\n\nকাজ শেষ হওয়া মাত্রই অ্যাপটি পুনরায় সচল করা হবে। আপনার ধৈর্য ও সহযোগিতার জন্য ধন্যবাদ।`
@@ -366,6 +400,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { title: 'Live Online Members', titleBn: 'লাইভ অ্যাক্টিভ মেম্বারস' };
       case 'my_profile':
         return { title: 'My Expat Profile', titleBn: 'আমার প্রোফাইল ও স্টেটমেন্ট' };
+      case 'help_desk':
+        return { title: 'Help Desk & Deposit Accounts', titleBn: 'হেল্প ডেস্ক ও ডিপোজিট অ্যাকাউন্টস' };
       default:
         return { title: 'PBC Portal', titleBn: 'পিবিসি পোর্টাল' };
     }
@@ -507,70 +543,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [navigationHistory]);
 
-  // Clean up any stale logo cache from local storage on startup
+  // Clean up any stale logo cache & stale quota flag from local storage on startup
   useEffect(() => {
     safeStorage.removeItem('pbc_cached_custom_logo');
+    safeStorage.removeItem('pbc_firestore_quota_exceeded_timestamp');
   }, []);
 
-  // Initialize Firebase Seeding & Real-time Listeners
+  // 1. Initialize System Settings & Firebase Auth (Lightweight: only 1 settings doc + auth state)
   useEffect(() => {
     let unsubscribeAuth: (() => void) | undefined;
-    let unsubMembers: (() => void) | undefined;
-    let unsubDeposits: (() => void) | undefined;
-    let unsubProjects: (() => void) | undefined;
-    let unsubReports: (() => void) | undefined;
-    let unsubUsers: (() => void) | undefined;
-    let unsubLogs: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
-    let unsubTemplate: (() => void) | undefined;
-    let unsubDirectors: (() => void) | undefined;
-    let unsubQuotes: (() => void) | undefined;
-    let unsubTrash: (() => void) | undefined;
-    let unsubActive: (() => void) | undefined;
 
-    const initFirebase = async () => {
-      await seedFirestoreIfEmpty();
-
-      unsubMembers = subscribeMembers((data) => {
-        setMembers(data || []);
-      });
-
-      unsubDeposits = subscribeDeposits((data) => {
-        setDeposits(data || []);
-      });
-
-      unsubProjects = subscribeProjects((data) => {
-        setProjects(data || []);
-      });
-
-      unsubReports = subscribeReports((data) => {
-        setReports(data);
-      });
-
-      unsubUsers = subscribeUsers((data) => {
-        setUsers(data);
-      });
-
-      unsubLogs = subscribeActivityLogs((data) => {
-        setActivityLogs(data);
-      });
-
-      unsubDirectors = subscribeBoardDirectors((data) => {
-        setDirectors(data || []);
-      });
-
-      unsubQuotes = subscribeQuotes((data) => {
-        setQuotes(data || []);
-      });
-
-      unsubTrash = subscribeTrashedItems((data) => {
-        setTrashedItems(data || []);
-      });
-
-      unsubActive = subscribeActiveSessions((data) => {
-        setActiveSessions(data || []);
-      });
-
+    const initFirebaseCore = async () => {
       unsubSettings = subscribeSystemSettings((data) => {
         if (data) {
           setSystemSettings(data);
@@ -580,10 +564,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.warn('Could not cache system settings:', e);
           }
         }
-      });
-
-      unsubTemplate = subscribeCardTemplate((data) => {
-        if (data) setCardTemplate(data);
       });
 
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
@@ -623,7 +603,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           setIsLoggedIn(true);
           setIsAuthModalOpen(false);
-          addActivityLogDoc(user.email || 'user@pbcclub.org', 'Login', `User authenticated as ${detectedRole}`);
+
+          // Only seed super admin if the logging in user is super_admin
+          if (detectedRole === 'super_admin') {
+            seedFirestoreIfEmpty().catch(() => {});
+          }
+
+          // Only record activity log for admin/super_admin logins (avoids polluting logs and burning reads)
+          if (detectedRole === 'admin' || detectedRole === 'super_admin') {
+            addActivityLogDoc(user.email || 'admin@pbcclub.org', 'Admin Login', `Admin session started as ${detectedRole}`);
+          }
         } else {
           // No active firebase user -> force login modal
           safeStorage.removeItem('pbc_role');
@@ -634,55 +623,133 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     };
 
-    initFirebase().catch(console.error);
+    initFirebaseCore().catch(console.error);
 
     return () => {
-      if (unsubMembers) unsubMembers();
-      if (unsubDeposits) unsubDeposits();
-      if (unsubProjects) unsubProjects();
-      if (unsubReports) unsubReports();
-      if (unsubUsers) unsubUsers();
-      if (unsubLogs) unsubLogs();
       if (unsubSettings) unsubSettings();
-      if (unsubTemplate) unsubTemplate();
-      if (unsubDirectors) unsubDirectors();
-      if (unsubQuotes) unsubQuotes();
-      if (unsubTrash) unsubTrash();
-      if (unsubActive) unsubActive();
       if (unsubscribeAuth) unsubscribeAuth();
     };
   }, []);
 
-  // Active Session Heartbeat Ping
-  const activeTabRef = useRef(activeTab);
-  useEffect(() => {
-    activeTabRef.current = activeTab;
-  }, [activeTab]);
+  // Core subscription single-run lock to prevent re-querying Firestore on tab switching or component re-renders
+  const activeSubKeyRef = useRef<string>('');
 
+  // 2. Core database subscriptions: members, deposits, projects, reports, directors, quotes, cardTemplate
+  // CRITICAL QUOTA SAFEGUARDS:
+  // - Locked to a single subscription per session (does NOT re-fetch when switching browser tabs)
+  // - Regular members ONLY get their own deposits (memberId scoped) and small preview (limit: 10)
+  // - Reports are only subscribed by admins (regular members never download reports)
+  // - Blocked during maintenance mode or logged-out state
   useEffect(() => {
-    if (!isLoggedIn || isQuotaExceeded || getIsGlobalQuotaExceeded()) return;
-    const userEmail = authUser?.email || currentMember?.email;
-    if (!userEmail) return;
+    const isBlockedByMaintenance = systemSettings.maintenanceMode && role !== 'super_admin';
+    if (!isLoggedIn || isBlockedByMaintenance) {
+      activeSubKeyRef.current = '';
+      return;
+    }
 
-    const pingSession = () => {
-      if (isQuotaExceeded || getIsGlobalQuotaExceeded()) return;
-      updateActiveSessionDoc({
-        uid: authUser?.uid || currentMember?.id || 'session-uid',
-        email: userEmail,
-        memberName: currentMember?.fullName || authUser?.displayName || 'PBC Member',
-        memberId: currentMember?.id || '',
-        role: role,
-        photoUrl: currentMember?.photoUrl || '',
-        activeTab: activeTabRef.current,
-        isOnline: true
-      }).catch(err => console.warn('Active session heartbeat notice:', err));
+    // For regular members, wait until member ID is available before subscribing to deposits
+    if (role === 'member' && !currentMember?.id) {
+      return;
+    }
+
+    const subKey = `${isLoggedIn ? 'in' : 'out'}:${role}:${role === 'member' ? currentMember?.id : 'all'}`;
+    if (activeSubKeyRef.current === subKey) {
+      // Already actively subscribed for this session and role. DO NOT TEAR DOWN OR RE-QUERY!
+      return;
+    }
+    activeSubKeyRef.current = subKey;
+
+    let unsubMembers: (() => void) | undefined;
+    let unsubDeposits: (() => void) | undefined;
+    let unsubProjects: (() => void) | undefined;
+    let unsubReports: (() => void) | undefined;
+    let unsubTemplate: (() => void) | undefined;
+    let unsubDirectors: (() => void) | undefined;
+    let unsubQuotes: (() => void) | undefined;
+
+    // Regular members only query limited members (10 for preview); admins get full collection
+    unsubMembers = subscribeMembers((data) => {
+      setMembers(data || []);
+    }, role === 'member' ? { limit: 10 } : undefined);
+
+    // Regular members ONLY subscribe to their own deposits! (Saves 95%+ of deposit reads)
+    unsubDeposits = subscribeDeposits((data) => {
+      setDeposits(data || []);
+    }, role === 'member' && currentMember?.id ? { memberId: currentMember.id } : undefined);
+
+    unsubProjects = subscribeProjects((data) => {
+      setProjects(data || []);
+    });
+
+    // Only admins need reports
+    if (role !== 'member') {
+      unsubReports = subscribeReports((data) => {
+        setReports(data);
+      });
+    }
+
+    unsubDirectors = subscribeBoardDirectors((data) => {
+      setDirectors(data || []);
+    });
+
+    unsubQuotes = subscribeQuotes((data) => {
+      setQuotes(data || []);
+    });
+
+    unsubTemplate = subscribeCardTemplate((data) => {
+      if (data) setCardTemplate(data);
+    });
+
+    return () => {
+      activeSubKeyRef.current = '';
+      if (unsubMembers) unsubMembers();
+      if (unsubDeposits) unsubDeposits();
+      if (unsubProjects) unsubProjects();
+      if (unsubReports) unsubReports();
+      if (unsubTemplate) unsubTemplate();
+      if (unsubDirectors) unsubDirectors();
+      if (unsubQuotes) unsubQuotes();
     };
+  }, [isLoggedIn, systemSettings.maintenanceMode, role, currentMember?.id]);
 
-    pingSession();
-    const interval = setInterval(pingSession, 120000); // Throttled heartbeat every 2 minutes
+  // 3. On-Demand Trashed Items: ONLY listen when trash box modal is actually open!
+  useEffect(() => {
+    const isAdmin = role === 'admin' || role === 'super_admin' || (authUser?.email && (authUser.email === 'fokrulislammir9897@gmail.com' || authUser.email === 'almegledest@gmail.com'));
+    if (!isLoggedIn || !isAdmin || !isTrashBoxOpen || isQuotaExceeded || getIsGlobalQuotaExceeded()) {
+      return;
+    }
+    const unsubTrash = subscribeTrashedItems((data) => setTrashedItems(data || []));
+    return () => unsubTrash();
+  }, [isLoggedIn, role, authUser?.email, isTrashBoxOpen, isQuotaExceeded]);
 
-    return () => clearInterval(interval);
-  }, [isLoggedIn, isQuotaExceeded, authUser?.email, authUser?.uid, currentMember?.fullName, currentMember?.id, currentMember?.photoUrl, role]);
+  // 4. On-Demand Admin Panel collections (Users, Activity Logs, Active Sessions):
+  // ONLY listen when admin is actually viewing the 'admin_panel' tab!
+  useEffect(() => {
+    const isAdmin = role === 'admin' || role === 'super_admin' || (authUser?.email && (authUser.email === 'fokrulislammir9897@gmail.com' || authUser.email === 'almegledest@gmail.com'));
+    if (!isLoggedIn || !isAdmin || activeTab !== 'admin_panel' || isQuotaExceeded || getIsGlobalQuotaExceeded()) {
+      return;
+    }
+
+    let unsubUsers: (() => void) | undefined;
+    let unsubLogs: (() => void) | undefined;
+    let unsubActive: (() => void) | undefined;
+
+    try {
+      unsubUsers = subscribeUsers((data) => setUsers(data || []));
+      unsubLogs = subscribeActivityLogs((data) => setActivityLogs(data || []));
+      unsubActive = subscribeActiveSessions((data) => setActiveSessions(data || []));
+    } catch (err) {
+      console.warn('Admin listeners notice:', err);
+    }
+
+    return () => {
+      if (unsubUsers) unsubUsers();
+      if (unsubLogs) unsubLogs();
+      if (unsubActive) unsubActive();
+    };
+  }, [isLoggedIn, role, authUser?.email, activeTab, isQuotaExceeded]);
+
+  // Note: Background active session ping disabled to eliminate unnecessary Firestore writes & snapshot cascades
 
   // Update currentMember and sync role when members change
   useEffect(() => {
@@ -705,7 +772,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (effectiveRole === 'admin' && role === 'member') {
           setRoleState('admin');
           safeStorage.setItem('pbc_role', 'admin');
-        } else if (effectiveRole === 'member' && role === 'admin' && loggedInEmail !== 'fokrulislammir9897@gmail.com') {
+        } else if (effectiveRole === 'member' && role === 'admin' && loggedInEmail !== 'fokrulislammir9897@gmail.com' && loggedInEmail !== 'almegledest@gmail.com') {
           setRoleState('member');
           safeStorage.setItem('pbc_role', 'member');
         }
@@ -720,7 +787,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Compute account's true background permission level
   const loggedInEmail = (authUser?.email || currentMember?.email || '').toLowerCase().trim();
   const foundUserObj = users.find(u => u.email.toLowerCase().trim() === loggedInEmail);
-  const accountRole: UserRole = foundUserObj?.role || currentMember?.role || (loggedInEmail === 'fokrulislammir9897@gmail.com' ? 'super_admin' : 'member');
+  const accountRole: UserRole = foundUserObj?.role || currentMember?.role || (loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com' ? 'super_admin' : 'member');
 
   const switchRoleMode = (targetMode: UserRole) => {
     if (targetMode === 'member') {
@@ -767,21 +834,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeStorage.setItem('pbc_theme', t);
   };
 
-  // Calculate live stats dynamically
-  const totalMembersCount = members.length;
+  // Calculate live stats dynamically (with global aggregation fallback for members)
   const isApprovedStatus = (status?: string) => {
     if (!status) return false;
     const s = status.toLowerCase().trim();
     return s === 'approved' || s === 'active' || s === 'completed';
   };
 
-  const totalFundRaisingSum = deposits
-    .filter(d => isApprovedStatus(d.status) && (d.category === 'Fund Raising' || !d.category))
-    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-  const totalRealEstateSum = deposits
-    .filter(d => isApprovedStatus(d.status) && d.category === 'Real Estate')
-    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-  const totalDepositsSum = deposits.filter(d => isApprovedStatus(d.status)).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalMembersCount = role === 'member' && systemSettings.cachedGlobalStats?.totalMembers
+    ? systemSettings.cachedGlobalStats.totalMembers
+    : members.length;
+
+  const totalFundRaisingSum = role === 'member' && systemSettings.cachedGlobalStats?.totalFundRaisingDeposits !== undefined
+    ? systemSettings.cachedGlobalStats.totalFundRaisingDeposits
+    : deposits
+        .filter(d => isApprovedStatus(d.status) && (d.category === 'Fund Raising' || !d.category))
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  const totalRealEstateSum = role === 'member' && systemSettings.cachedGlobalStats?.totalRealEstateDeposits !== undefined
+    ? systemSettings.cachedGlobalStats.totalRealEstateDeposits
+    : deposits
+        .filter(d => isApprovedStatus(d.status) && d.category === 'Real Estate')
+        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  const totalDepositsSum = role === 'member' && systemSettings.cachedGlobalStats?.totalDeposits !== undefined
+    ? systemSettings.cachedGlobalStats.totalDeposits
+    : deposits.filter(d => isApprovedStatus(d.status)).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
   const totalInvestmentSum = projects.reduce((sum, p) => sum + (Number(p.investmentAmount) || 0), 0);
   const totalCurrentValSum = projects.reduce((sum, p) => sum + (Number(p.currentValue) || 0), 0);
   const totalProfitSum = totalCurrentValSum - totalInvestmentSum;
@@ -807,8 +886,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // System Settings update helper
   const updateSystemSettings = async (settings: Partial<SystemSettings>) => {
-    if (role !== 'super_admin') {
-      alert('Security Restriction: Only Super Admin can modify system settings.');
+    if (role !== 'super_admin' && role !== 'admin') {
+      alert('Security Restriction: Only Admins can modify system settings.');
       return;
     }
     const updated = { ...systemSettings, ...settings };
@@ -819,7 +898,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Could not cache updated system settings:', e);
     }
     await updateSystemSettingsDoc(settings);
-    await addActivityLog('System Settings Updated', 'System configurations modified by Super Admin');
+    await addActivityLog('System Settings Updated', 'System configurations modified by Admin');
   };
 
   // Admin User Creation, Role Assignment & Removal
@@ -928,7 +1007,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanEmail = (m.email || '').toLowerCase().trim();
     const finalRole: UserRole = (m.role as UserRole) || 'member';
     
-    await addMemberDoc(customId, {
+    const newMemberData = {
       fullName: m.fullName,
       fullNameBn: m.fullNameBn || '',
       phone: m.phone,
@@ -950,7 +1029,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       barcodeData: m.barcodeData || `PBC-BC-${customId}`,
       emergencyContact: m.emergencyContact || '',
       password: m.password || ''
-    });
+    };
+
+    // Optimistically update UI immediately (0ms latency, zero extra reads)
+    setMembers(prev => [{ ...newMemberData, id: customId } as Member, ...prev.filter(x => x.id !== customId)]);
+    
+    await addMemberDoc(customId, newMemberData);
 
     if (cleanEmail) {
       const uid = `usr-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
@@ -1128,6 +1212,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       approvedByAdminName: d.approvedByAdminName || (depositStatus === 'Approved' ? (currentMember?.fullName || authUser?.displayName || 'PBC Admin') : undefined),
       approvedByAdminId: d.approvedByAdminId || (depositStatus === 'Approved' ? (currentMember?.id || 'PBC-ADMIN') : undefined)
     };
+
+    const fullNewDeposit: Deposit = {
+      ...depositData,
+      id: newId
+    } as Deposit;
+
+    // Optimistically update UI immediately (0ms latency, zero extra reads)
+    setDeposits(prev => [fullNewDeposit, ...prev.filter(x => x.id !== newId)]);
 
     await addDepositDoc(newId, depositData);
 
@@ -1335,6 +1427,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextPrjNum = 300 + projects.length + 1;
     const newId = `PRJ-${nextPrjNum}`;
     
+    const newProjectObj: RealEstateProject = {
+      ...p,
+      id: newId,
+      profit: (Number(p.currentValue) || 0) - (Number(p.investmentAmount) || 0),
+      loss: Math.max(0, (Number(p.investmentAmount) || 0) - (Number(p.currentValue) || 0))
+    } as RealEstateProject;
+
+    // Optimistically update UI immediately (0ms latency, zero extra reads)
+    setProjects(prev => [newProjectObj, ...prev.filter(x => x.id !== newId)]);
+
     await addProjectDoc(newId, p);
     await addActivityLog('Project Created', `Real Estate Project ${p.projectName} created in ${p.city}`);
     addNotification('New Project Acquisition', `${p.projectName} in ${p.city}, ${p.country} added to portfolio.`, 'project');
@@ -1540,7 +1642,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const userEmailOrId = (authUser?.email || currentMember?.email || currentMember?.id || '').toLowerCase().trim();
-  const isSuperAdminUser = role === 'super_admin' || accountRole === 'super_admin' || (currentMember && currentMember.role === 'super_admin') || (authUser && authUser.email === 'fokrulislammir9897@gmail.com');
+  const isSuperAdminUser = role === 'super_admin' || accountRole === 'super_admin' || (currentMember && currentMember.role === 'super_admin') || (authUser && (authUser.email === 'fokrulislammir9897@gmail.com' || authUser.email === 'almegledest@gmail.com'));
   const canManageDirectors = isSuperAdminUser || directors.some(d => d.allowedAccessUsers && d.allowedAccessUsers.some(u => u.toLowerCase().trim() === userEmailOrId));
 
   return (
@@ -1571,14 +1673,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         canManageDirectors,
         quotes,
         addQuote: async (quote) => {
+          const tempId = `quote-${Date.now()}`;
+          setQuotes(prev => [...prev, { ...quote, id: tempId }]);
           await addQuoteDoc(quote);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Add Quote', `Added daily quote by: ${quote.author}`);
         },
         updateQuote: async (id, quote) => {
+          setQuotes(prev => prev.map(q => q.id === id ? { ...q, ...quote } : q));
           await updateQuoteDoc(id, quote);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Update Quote', `Updated quote ID: ${id}`);
         },
         deleteQuote: async (id) => {
+          setQuotes(prev => prev.filter(q => q.id !== id));
           await deleteQuoteDoc(id);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Delete Quote', `Deleted quote ID: ${id}`);
         },
@@ -1602,14 +1708,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateReport,
         deleteReport,
         addDirector: async (director) => {
+          const tempId = `dir-${Date.now()}`;
+          setDirectors(prev => [...prev, { ...director, id: tempId }]);
           await addDirectorDoc(director);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Add Board Director', `Added director: ${director.name}`);
         },
         updateDirector: async (id, director) => {
+          setDirectors(prev => prev.map(d => d.id === id ? { ...d, ...director } : d));
           await updateDirectorDoc(id, director);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Update Board Director', `Updated director ID: ${id}`);
         },
         deleteDirector: async (id) => {
+          setDirectors(prev => prev.filter(d => d.id !== id));
           await deleteDirectorDoc(id);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Delete Board Director', `Deleted director ID: ${id}`);
         },

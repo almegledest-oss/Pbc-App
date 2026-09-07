@@ -47,6 +47,7 @@ export const ProjectList: React.FC = () => {
     projects, 
     members,
     deposits,
+    currentMember,
     addProject, 
     updateProject, 
     deleteProjectWithReason,
@@ -426,6 +427,10 @@ export const ProjectList: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredProjects.map((project) => {
+            const myAllocation = currentMember 
+              ? project.memberAllocations?.find(a => a.memberId === currentMember.id)
+              : null;
+
             return (
               <div
                 key={project.id}
@@ -512,6 +517,30 @@ export const ProjectList: React.FC = () => {
                       </span>
                     </div>
                   </div>
+
+                  {/* Personalized Stake Banner for logged-in Member */}
+                  {myAllocation && (
+                    <div className="bg-gradient-to-r from-amber-500/20 via-yellow-500/10 to-emerald-500/20 border border-amber-400/50 rounded-2xl p-3 flex items-center justify-between shadow-md">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-amber-500/20 rounded-xl text-amber-300 border border-amber-400/30">
+                          <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-extrabold text-amber-300 uppercase tracking-wider block">
+                            {language === 'bn' ? '🌟 আপনার ব্যক্তিগত বিনিয়োগ শেয়ার' : '🌟 Your Allocated Stake'}
+                          </span>
+                          <span className="text-xs sm:text-sm font-black text-white">
+                            ৳{Number(myAllocation.allocatedAmount).toLocaleString()} BDT
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-extrabold text-xs rounded-xl">
+                        {Number(project.investmentAmount) > 0 
+                          ? `${((Number(myAllocation.allocatedAmount) / Number(project.investmentAmount)) * 100).toFixed(2)}% Share` 
+                          : 'Allocated'}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Member Capital Allocation Banner */}
                   <div className="bg-[#070D1B] p-3 rounded-2xl border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
