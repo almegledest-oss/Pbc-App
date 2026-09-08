@@ -116,7 +116,7 @@ interface AppContextType {
   updateDeposit: (id: string, deposit: Partial<Deposit>) => Promise<void>;
   deleteDeposit: (id: string) => Promise<void>;
   approveDeposit: (id: string, signatureDataUrl?: string) => Promise<void>;
-  rejectDeposit: (id: string) => Promise<void>;
+  rejectDeposit: (id: string, reason?: string) => Promise<void>;
   
   addProject: (project: Omit<RealEstateProject, 'id' | 'profit' | 'loss'>) => Promise<void>;
   updateProject: (id: string, project: Partial<RealEstateProject>) => Promise<void>;
@@ -245,6 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clubName: 'PROBASHI BUSINESS CLUB',
       currencySymbol: '৳',
       minDepositAmount: 5000,
+      shareUnitPrice: 5000,
       allowNewRegistrations: true,
       registrationOpen: true,
       requireAdminApproval: true,
@@ -1205,8 +1206,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Default status: if submitted by role === 'member' or explicitly 'Pending', status is 'pending'
     const depositStatus: 'Approved' | 'Pending' | 'Rejected' = (d.status?.toLowerCase() === 'pending' || role === 'member') ? 'Pending' : (d.status || 'Approved');
 
+    const effectiveShareUnitPrice = d.shareUnitPrice && d.shareUnitPrice > 0 ? d.shareUnitPrice : (systemSettings.shareUnitPrice || 5000);
+    const effectiveShareCount = d.shareCount && d.shareCount > 0 ? d.shareCount : Math.max(1, Math.round((Number(d.amount) || 0) / effectiveShareUnitPrice));
+
     const depositData = {
       ...d,
+      shareUnitPrice: effectiveShareUnitPrice,
+      shareCount: effectiveShareCount,
       category: d.category || 'Fund Raising',
       status: depositStatus,
       approvedByAdminName: d.approvedByAdminName || (depositStatus === 'Approved' ? (currentMember?.fullName || authUser?.displayName || 'PBC Admin') : undefined),
@@ -1365,13 +1371,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const rejectDeposit = async (id: string) => {
+  const rejectDeposit = async (id: string, reason?: string) => {
     if (role !== 'super_admin' && role !== 'admin') {
       alert('Security Restriction: Members cannot reject deposits.');
       return;
     }
-    await updateDepositDoc(id, { status: 'Rejected' });
-    await addActivityLog('Deposit Rejected', `Deposit ${id} rejected by admin`);
+    const targetDeposit = deposits.find(d => d.id === id);
+    if (!targetDeposit) return;
+
+    const adminName = currentMember?.fullName || authUser?.displayName || (role === 'super_admin' ? 'Super Admin' : 'PBC Admin');
+    const adminId = currentMember?.id || (role === 'super_admin' ? 'PBC-00118' : 'PBC-ADMIN');
+    const finalReason = reason?.trim() || 'প্রশাসনিক অডিট নিরীক্ষায় তথ্য অমিল বা ট্রানজ্যাকশন নিশ্চিত হওয়া যায়নি।';
+
+    const updateData: Partial<Deposit> = {
+      status: 'Rejected',
+      rejectionReason: finalReason,
+      rejectedAt: new Date().toISOString(),
+      rejectedByAdminName: adminName,
+      rejectedByAdminId: adminId
+    };
+
+    // 1. Instant optimistic UI update
+    setDeposits(prev => prev.map(d => d.id === id ? { ...d, ...updateData } : d));
+
+    // 2. If it was previously Approved (edge case), subtract from member total deposit
+    if (targetDeposit.status === 'Approved' || targetDeposit.status?.toLowerCase() === 'approved') {
+      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
+      if (targetMember) {
+        const newTotal = Math.max(0, (Number(targetMember.totalDeposit) || 0) - (Number(targetDeposit.amount) || 0));
+        setMembers(prev => prev.map(m => m.id === targetMember.id ? { ...m, totalDeposit: newTotal } : m));
+        updateMemberDoc(targetMember.id, { totalDeposit: newTotal }).catch(console.warn);
+      }
+    }
+
+    // 3. Background async database sync & push member notification
+    try {
+      await Promise.allSettled([
+        updateDepositDoc(id, updateData),
+        addActivityLog('Deposit Rejected', `Admin (${adminName} | ${adminId}) rejected deposit ${id} (৳${targetDeposit.amount}). Reason: ${finalReason}`)
+      ]);
+      addNotification(
+        'ডিপোজিট আবেদন বাতিল (Deposit Rejected)',
+        `ডিপোজিট ভাউচার ${id} (৳${Number(targetDeposit.amount || 0).toLocaleString()} BDT, সদস্য: ${targetDeposit.memberName || targetDeposit.memberId}) বাতিল করা হয়েছে। কারণ: ${finalReason}`,
+        'deposit'
+      );
+    } catch (e) {
+      console.warn('Background sync error on deposit rejection:', e);
+    }
   };
 
   // Verify Admin Password Helper

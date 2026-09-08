@@ -8,23 +8,9 @@ import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
 import { safeStorage } from '../../utils/safeStorage';
 import { db } from '../../lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
-
-const COUNTRY_CITY_MAP: Record<string, string[]> = {
-  'Saudi Arabia': ['Riyadh', 'Jeddah', 'Dammam', 'Mecca', 'Medina', 'Al Khobar', 'Jubail', 'Tabuk'],
-  'United Arab Emirates': ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Ras Al Khaimah', 'Al Ain'],
-  'Qatar': ['Doha', 'Al Rayyan', 'Al Wakrah', 'Al Khor'],
-  'Oman': ['Muscat', 'Salalah', 'Sohar', 'Nizwa'],
-  'Kuwait': ['Kuwait City', 'Hawalli', 'Salmiya', 'Farwaniya'],
-  'Bahrain': ['Manama', 'Riffa', 'Muharraq'],
-  'Malaysia': ['Kuala Lumpur', 'Penang', 'Johor Bahru', 'Shah Alam'],
-  'Singapore': ['Singapore'],
-  'United Kingdom': ['London', 'Birmingham', 'Manchester', 'Oldham', 'Leeds'],
-  'United States': ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Paterson', 'Dallas'],
-  'Italy': ['Rome', 'Milan', 'Venice', 'Bologna', 'Naples'],
-  'Canada': ['Toronto', 'Vancouver', 'Montreal', 'Calgary'],
-  'Australia': ['Sydney', 'Melbourne', 'Brisbane', 'Perth'],
-  'Bangladesh': ['Dhaka', 'Chittagong', 'Sylhet', 'Rajshahi', 'Khulna', 'Barisal', 'Rangpur', 'Mymensingh', 'Comilla', 'Noakhali'],
-};
+import { findCountryByName, validatePhoneDigits, findCountryByDialCode, COUNTRY_CITY_MAP, getCitiesForCountry } from '../../utils/countryDialCodes';
+import { PhoneInputWithCountry } from '../Common/PhoneInputWithCountry';
+import { CountryCitySelector } from '../Common/CountryCitySelector';
 import {
   auth,
   signInWithEmailAndPassword,
@@ -69,7 +55,8 @@ export const AuthModal: React.FC = () => {
   const [signupMemberId, setSignupMemberId] = useState('');
   const [signupFullName, setSignupFullName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
-  const [signupPhone, setSignupPhone] = useState('');
+  const [signupDialCode, setSignupDialCode] = useState('+966');
+  const [signupPhoneDigits, setSignupPhoneDigits] = useState('');
   const [signupCountry, setSignupCountry] = useState('Saudi Arabia');
   const [signupCity, setSignupCity] = useState('Riyadh');
   const [signupPassword, setSignupPassword] = useState('');
@@ -116,6 +103,10 @@ export const AuthModal: React.FC = () => {
         const data = await res.json();
         if (data.country_name) {
           setSignupCountry(data.country_name);
+          const matchedCountry = findCountryByName(data.country_name);
+          if (matchedCountry) {
+            setSignupDialCode(matchedCountry.dialCode);
+          }
           const cities = COUNTRY_CITY_MAP[data.country_name];
           if (data.city) {
             setSignupCity(data.city);
@@ -129,6 +120,10 @@ export const AuthModal: React.FC = () => {
           const data2 = await res2.json();
           if (data2.country) {
             setSignupCountry(data2.country);
+            const matchedCountry = findCountryByName(data2.country);
+            if (matchedCountry) {
+              setSignupDialCode(matchedCountry.dialCode);
+            }
             if (data2.city) setSignupCity(data2.city);
           }
         }
@@ -142,11 +137,30 @@ export const AuthModal: React.FC = () => {
 
   const handleCountryChange = (val: string) => {
     setSignupCountry(val);
+    const matchedDial = findCountryByName(val);
+    if (matchedDial) {
+      setSignupDialCode(matchedDial.dialCode);
+    }
     const matchedCountryKey = Object.keys(COUNTRY_CITY_MAP).find(
       c => c.toLowerCase() === val.trim().toLowerCase()
     );
     if (matchedCountryKey && COUNTRY_CITY_MAP[matchedCountryKey]?.length > 0) {
       setSignupCity(COUNTRY_CITY_MAP[matchedCountryKey][0]);
+    }
+  };
+
+  const handleDialCodeChange = (code: string) => {
+    setSignupDialCode(code);
+    const matchedCountry = findCountryByDialCode(code);
+    if (matchedCountry) {
+      // Sync country if not already matching
+      if (signupCountry.toLowerCase() !== matchedCountry.name.toLowerCase()) {
+        setSignupCountry(matchedCountry.name);
+        const cities = COUNTRY_CITY_MAP[matchedCountry.name];
+        if (cities && cities.length > 0) {
+          setSignupCity(cities[0]);
+        }
+      }
     }
   };
 
@@ -176,9 +190,15 @@ export const AuthModal: React.FC = () => {
         if (!signupFullName.trim()) {
           throw new Error('Please enter your full name (পুরো নাম লিখুন)।');
         }
-        if (!signupPhone.trim()) {
-          throw new Error('Please enter your phone number (ফোন নম্বর লিখুন)।');
+        
+        // Validate Phone with country dial code and length bounds
+        const cleanDigits = signupPhoneDigits.replace(/\D/g, '');
+        const phoneValidation = validatePhoneDigits(signupDialCode, cleanDigits);
+        if (!phoneValidation.valid) {
+          throw new Error(phoneValidation.messageBn || phoneValidation.message || 'ফোন নম্বরটি সঠিক নয়');
         }
+        const fullPhoneNumber = `${signupDialCode} ${cleanDigits}`;
+
         if (!signupPassword) {
           throw new Error('Please enter a password (পাসওয়ার্ড দিন)।');
         }
@@ -236,7 +256,7 @@ export const AuthModal: React.FC = () => {
         const newMemberData: Member = {
           id: newMemberId,
           fullName: signupFullName.trim(),
-          phone: signupPhone.trim(),
+          phone: fullPhoneNumber,
           email: cleanEmail,
           country: signupCountry.trim() || 'Saudi Arabia',
           city: signupCity.trim() || 'Riyadh',
@@ -296,7 +316,7 @@ export const AuthModal: React.FC = () => {
           id: newMemberId,
           fullName: signupFullName.trim(),
           email: cleanEmail,
-          phone: signupPhone.trim(),
+          phone: fullPhoneNumber,
           country: signupCountry.trim() || 'Saudi Arabia',
           city: signupCity.trim() || 'Riyadh'
         });
@@ -965,75 +985,33 @@ export const AuthModal: React.FC = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-slate-200 font-bold mb-1">
-                    Mobile / Phone / ফোন নম্বর *
-                  </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="tel"
-                      required
-                      value={signupPhone}
-                      onChange={e => setSignupPhone(e.target.value)}
-                      placeholder="e.g. +966 50 123 4567"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
-                  </div>
-                </div>
+                {/* Reusable Country-Code aware Phone Input */}
+                <PhoneInputWithCountry
+                  dialCode={signupDialCode}
+                  onDialCodeChange={handleDialCodeChange}
+                  phoneDigits={signupPhoneDigits}
+                  onPhoneDigitsChange={digits => {
+                    setSignupPhoneDigits(digits);
+                    if (errorMessage.includes('ফোন') || errorMessage.includes('phone') || errorMessage.includes('Phone')) {
+                      setErrorMessage('');
+                    }
+                  }}
+                  label="Mobile / Phone"
+                  labelBn="ফোন নম্বর"
+                  required
+                />
 
-                {/* Country & City Fields */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-slate-200 font-bold mb-1">
-                      Country / দেশ
-                    </label>
-                    <div className="relative">
-                      <Globe className="w-4 h-4 text-amber-400 absolute left-3 top-3.5" />
-                      <input
-                        type="text"
-                        list="pbc-country-list"
-                        value={signupCountry}
-                        onChange={e => handleCountryChange(e.target.value)}
-                        placeholder="Saudi Arabia"
-                        className="w-full pl-9 pr-2.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                      />
-                      <datalist id="pbc-country-list">
-                        {Object.keys(COUNTRY_CITY_MAP).map(country => (
-                          <option key={country} value={country} />
-                        ))}
-                      </datalist>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-slate-200 font-bold mb-1">
-                      City / শহর
-                    </label>
-                    <div className="relative">
-                      <MapPin className="w-4 h-4 text-amber-400 absolute left-3 top-3.5" />
-                      <input
-                        type="text"
-                        list="pbc-city-list"
-                        value={signupCity}
-                        onChange={e => setSignupCity(e.target.value)}
-                        placeholder="Riyadh"
-                        className="w-full pl-9 pr-2.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                      />
-                      <datalist id="pbc-city-list">
-                        {(
-                          COUNTRY_CITY_MAP[
-                            Object.keys(COUNTRY_CITY_MAP).find(
-                              c => c.toLowerCase() === signupCountry.trim().toLowerCase()
-                            ) || ''
-                          ] || Object.values(COUNTRY_CITY_MAP).flat()
-                        ).map((city, idx) => (
-                          <option key={`${city}-${idx}`} value={city} />
-                        ))}
-                      </datalist>
-                    </div>
-                  </div>
-                </div>
+                {/* Country & City Dropdown Selector */}
+                <CountryCitySelector
+                  country={signupCountry}
+                  onCountryChange={handleCountryChange}
+                  city={signupCity}
+                  onCityChange={setSignupCity}
+                  labelCountry="Country"
+                  labelCountryBn="দেশ"
+                  labelCity="City"
+                  labelCityBn="শহর"
+                />
 
                 <div>
                   <label className="block text-slate-200 font-bold mb-1">

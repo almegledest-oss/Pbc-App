@@ -1303,6 +1303,50 @@ export const AdminPanel: React.FC = () => {
                     />
                   </div>
 
+                  <div className="space-y-1.5 p-3.5 bg-[#070D1B] rounded-2xl border border-amber-500/40">
+                    <div className="flex items-center justify-between">
+                      <label className="block font-bold text-amber-300 text-xs">
+                        প্রতি শেয়ারের প্রাতিষ্ঠানিক মূল্য (Default Share Unit Price)
+                      </label>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold">
+                        BDT / Share
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 font-black">৳</span>
+                      <input
+                        type="number"
+                        min="100"
+                        step="100"
+                        value={systemSettings.shareUnitPrice ?? 5000}
+                        onChange={e => {
+                          const val = Number(e.target.value);
+                          updateSystemSettings({ shareUnitPrice: val > 0 ? val : 5000 });
+                        }}
+                        className="w-full pl-8 pr-3 py-2 bg-[#0B1528] border border-amber-500/40 rounded-xl text-amber-300 font-black text-sm focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      ডিপোজিট ফর্মে মেম্বারদের শেয়ার নির্বাচন করার সময় এই নির্ধারিত রেটে স্বয়ংক্রিয়ভাবে মোট জমার পরিমাণ হিসাব হবে।
+                    </p>
+                    <div className="flex items-center gap-1.5 pt-1">
+                      {[5000, 10000, 15000, 20000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => updateSystemSettings({ shareUnitPrice: amt })}
+                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition ${
+                            (systemSettings.shareUnitPrice ?? 5000) === amt
+                              ? 'bg-amber-500 text-slate-950 border-amber-400'
+                              : 'bg-[#0B1528] text-amber-300 border-amber-500/30 hover:border-amber-400'
+                          }`}
+                        >
+                          ৳{amt.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
                     <div>
                       <span className="font-bold text-white block">Require Admin Approval</span>

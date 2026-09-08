@@ -60,9 +60,12 @@ export const MyProfileView: React.FC = () => {
     );
   }
 
-  // Filter deposits for current member
+  // Filter deposits for current member (Approved deposits only count towards active balance)
+  const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
   const myDeposits = deposits.filter(d => d.memberId === currentMember.id);
-  const myTotalDeposited = myDeposits.reduce((sum, d) => sum + d.amount, 0);
+  const myTotalDeposited = myDeposits
+    .filter(d => isApproved(d.status))
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
   const openEditModal = () => {
     if (!canEditInfo) {

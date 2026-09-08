@@ -36,7 +36,11 @@ import {
   Headphones,
   Landmark,
   ChevronDown,
-  Info
+  Info,
+  AlertTriangle,
+  Minus,
+  Layers,
+  Sparkles
 } from 'lucide-react';
 
 const MONTH_NAMES_EN = [
@@ -81,15 +85,21 @@ export const DepositList: React.FC = () => {
     currentMember,
     authUser,
     triggerSecurityAlert,
-    navigateWithHistory
+    navigateWithHistory,
+    systemSettings
   } = useApp();
 
   const labels = t[language];
+  const isBn = language === 'bn';
+
+  const shareUnitPrice = systemSettings?.shareUnitPrice || 5000;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('All');
   const [currencyFilter, setCurrencyFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState<'All' | 'Approved' | 'Pending' | 'Rejected'>('All');
+  const [monthFilter, setMonthFilter] = useState<string>('All');
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -98,11 +108,16 @@ export const DepositList: React.FC = () => {
   const [receiptPreview, setReceiptPreview] = useState<string>('');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
+  const [rejectingDeposit, setRejectingDeposit] = useState<Deposit | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
+  const [isRejectingSubmitting, setIsRejectingSubmitting] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
     memberId: members[0]?.id || 'PBC-1001',
-    amount: 5000,
+    shareCount: 1,
+    shareUnitPrice: shareUnitPrice,
+    amount: shareUnitPrice,
     category: 'Fund Raising' as 'Fund Raising' | 'Real Estate',
     currency: 'BDT' as const,
     depositDate: new Date().toISOString().split('T')[0],
@@ -111,6 +126,15 @@ export const DepositList: React.FC = () => {
     targetMonth: 'August 2026',
     notes: language === 'bn' ? 'মাসিক মূলধন কিস্তি - আগস্ট ২০২৬' : 'Monthly Capital Contribution - August 2026'
   });
+
+  const handleShareCountChange = (count: number) => {
+    const validCount = Math.max(1, count);
+    setFormData(prev => ({
+      ...prev,
+      shareCount: validCount,
+      amount: validCount * shareUnitPrice
+    }));
+  };
 
   const handleModalMonthChange = (selected: string) => {
     setFormData(prev => {
@@ -166,6 +190,8 @@ export const DepositList: React.FC = () => {
     ? deposits.filter(d => d.memberId === currentMember?.id)
     : deposits;
 
+  const isDepositApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
+
   const filteredDeposits = userDeposits.filter(d => {
     const matchesSearch = 
       d.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -179,10 +205,34 @@ export const DepositList: React.FC = () => {
       || (categoryFilter === 'Fund Raising' && (d.category === 'Fund Raising' || !d.category))
       || (categoryFilter === 'Real Estate' && d.category === 'Real Estate');
 
-    return matchesSearch && matchesMethod && matchesCurrency && matchesCategory;
+    const matchesStatus = statusFilter === 'All' || (
+      statusFilter === 'Approved' ? isDepositApproved(d.status) :
+      statusFilter === 'Pending' ? (d.status?.toLowerCase().trim() === 'pending') :
+      statusFilter === 'Rejected' ? (d.status?.toLowerCase().trim() === 'rejected') : true
+    );
+
+    const matchesMonth = monthFilter === 'All' || (
+      // Match either targetMonth directly or depositDate starting with YYYY-MM
+      (d.targetMonth && d.targetMonth.toLowerCase().trim() === monthFilter.toLowerCase().trim()) ||
+      (d.depositDate && d.depositDate.startsWith(monthFilter))
+    );
+
+    return matchesSearch && matchesMethod && matchesCurrency && matchesCategory && matchesStatus && matchesMonth;
   });
 
-  const totalFilteredAmount = filteredDeposits.reduce((sum, d) => sum + d.amount, 0);
+  // CRITICAL RULE: "Pending" deposits must NEVER be counted in the ledger total or user balance!
+  // Only officially "Approved" deposits are included in the ledger total.
+  const totalFilteredAmount = filteredDeposits
+    .filter(d => isDepositApproved(d.status))
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  const pendingFilteredAmount = filteredDeposits
+    .filter(d => d.status?.toLowerCase().trim() === 'pending')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
+  const rejectedFilteredAmount = filteredDeposits
+    .filter(d => d.status?.toLowerCase().trim() === 'rejected')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
   const handleAddDepositClick = () => {
     if (role === 'admin' || role === 'super_admin') {
@@ -223,6 +273,8 @@ export const DepositList: React.FC = () => {
       memberId: memberObj.id,
       memberName: memberObj.fullName,
       amount: Number(formData.amount),
+      shareCount: formData.shareCount || Math.max(1, Math.round(Number(formData.amount) / shareUnitPrice)),
+      shareUnitPrice: shareUnitPrice,
       category: formData.category,
       currency: formData.currency,
       depositDate: formData.depositDate,
@@ -246,7 +298,9 @@ export const DepositList: React.FC = () => {
 
     setFormData({
       memberId: currentMember?.id || members[0]?.id || 'PBC-1001',
-      amount: 5000,
+      shareCount: 1,
+      shareUnitPrice: shareUnitPrice,
+      amount: shareUnitPrice,
       category: 'Fund Raising',
       currency: 'BDT',
       depositDate: new Date().toISOString().split('T')[0],
@@ -346,41 +400,103 @@ export const DepositList: React.FC = () => {
       </div>
 
       {/* Summary Banner Card */}
-      <div className="bg-[#0B1528] p-5 rounded-3xl border border-[#D4AF37]/40 text-white shadow-xl flex items-center justify-between">
+      <div className="bg-[#0B1528] p-5 rounded-3xl border border-[#D4AF37]/40 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-3 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30">
             <Wallet className="w-6 h-6 text-amber-400" />
           </div>
           <div>
-            <span className="text-xs text-amber-300/80 font-bold tracking-wider uppercase">FILTERED LEDGER TOTAL</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-300/80 font-bold tracking-wider uppercase">
+                {language === 'bn' ? 'অনুমোদিত লেজার টোটাল (FILTERED LEDGER TOTAL)' : 'FILTERED LEDGER TOTAL'}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                {language === 'bn' ? 'শুধুমাত্র অনুমোদিত' : 'Approved Only'}
+              </span>
+            </div>
             <h3 className="text-2xl font-black text-amber-300 mt-0.5">
               ৳{totalFilteredAmount.toLocaleString()} BDT
             </h3>
           </div>
         </div>
 
-        {(role === 'super_admin' || role === 'admin') && (
-          <span className="text-xs font-mono bg-[#070D1B] px-3 py-1.5 rounded-xl text-amber-300 border border-[#D4AF37]/30 hidden sm:inline-block font-bold">
-            {filteredDeposits.length} Records
-          </span>
-        )}
+        {/* Sub-breakdown for Pending & Records */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {pendingFilteredAmount > 0 && (
+            <span className="text-xs bg-amber-500/10 px-3 py-1.5 rounded-xl text-amber-300 border border-amber-500/30 font-medium flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-amber-400" />
+              <span>{language === 'bn' ? 'অপেক্ষমাণ জমা:' : 'Pending:'} ৳{pendingFilteredAmount.toLocaleString()}</span>
+            </span>
+          )}
+
+          {(role === 'super_admin' || role === 'admin') && (
+            <span className="text-xs font-mono bg-[#070D1B] px-3 py-1.5 rounded-xl text-amber-300 border border-[#D4AF37]/30 font-bold">
+              {filteredDeposits.length} Records
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Filter & Search Controls */}
       {(role === 'super_admin' || role === 'admin') && (
-        <div className="bg-[#0B1528] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-lg flex flex-col md:flex-row gap-3 items-center justify-between">
-          <div className="relative w-full md:w-80">
+        <div className="bg-[#0B1528] p-4 rounded-2xl border border-[#D4AF37]/30 shadow-lg flex flex-col lg:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full lg:w-72">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400" />
             <input
               type="text"
-              placeholder="Search Deposit ID, Member, Ref No..."
+              placeholder={language === 'bn' ? "ডিপোজিট আইডি, মেম্বার, রেফারেন্স..." : "Search Deposit ID, Member, Ref No..."}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-3.5 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
             />
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 touch-pan-x">
+          <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0 touch-pan-x flex-wrap sm:flex-nowrap">
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as any)}
+              className={`px-3 py-3 min-h-[48px] bg-[#070D1B] border rounded-xl text-xs font-bold shrink-0 transition ${
+                statusFilter === 'Pending' 
+                  ? 'border-amber-400 text-amber-300 bg-amber-500/10'
+                  : statusFilter === 'Approved'
+                  ? 'border-emerald-400 text-emerald-300 bg-emerald-500/10'
+                  : statusFilter === 'Rejected'
+                  ? 'border-rose-400 text-rose-300 bg-rose-500/10'
+                  : 'border-[#D4AF37]/30 text-amber-200'
+              }`}
+            >
+              <option value="All" className="bg-[#070D1B] text-white">
+                {language === 'bn' ? 'সকল স্ট্যাটাস (All Status)' : 'All Status'}
+              </option>
+              <option value="Pending" className="bg-[#070D1B] text-amber-300">
+                ⏳ {language === 'bn' ? 'অপেক্ষমাণ (Pending)' : 'Pending'}
+              </option>
+              <option value="Approved" className="bg-[#070D1B] text-emerald-400">
+                ✅ {language === 'bn' ? 'অনুমোদিত (Approved)' : 'Approved'}
+              </option>
+              <option value="Rejected" className="bg-[#070D1B] text-rose-400">
+                ❌ {language === 'bn' ? 'বাতিলকৃত (Rejected)' : 'Rejected'}
+              </option>
+            </select>
+
+            {/* Month & Date Filter */}
+            <select
+              value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              className="px-3 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-amber-200 font-medium shrink-0"
+            >
+              <option value="All" className="bg-[#070D1B] text-white">
+                {language === 'bn' ? 'সকল মাস ও কিস্তি (All Months)' : 'All Months & Dates'}
+              </option>
+              {GENERATED_MONTH_OPTIONS.map(m => (
+                <option key={m.value} value={m.value} className="bg-[#070D1B] text-white">
+                  📅 {language === 'bn' ? m.labelBn : m.labelEn}
+                </option>
+              ))}
+            </select>
+
+            {/* Category Filter */}
             <select
               value={categoryFilter}
               onChange={e => setCategoryFilter(e.target.value)}
@@ -391,6 +507,7 @@ export const DepositList: React.FC = () => {
               <option value="Real Estate" className="bg-[#070D1B] text-white">🏢 Real Estate</option>
             </select>
 
+            {/* Payment Method Filter */}
             <select
               value={methodFilter}
               onChange={e => setMethodFilter(e.target.value)}
@@ -404,6 +521,7 @@ export const DepositList: React.FC = () => {
               <option value="Cheque" className="bg-[#070D1B] text-white">Cheque</option>
             </select>
 
+            {/* Currency Filter */}
             <select
               value={currencyFilter}
               onChange={e => setCurrencyFilter(e.target.value)}
@@ -447,6 +565,11 @@ export const DepositList: React.FC = () => {
                   <div className="font-black text-emerald-400 text-sm sm:text-base tracking-tight">
                     ৳{d.amount.toLocaleString()} <span className="text-[10px] font-bold text-emerald-400/80">BDT</span>
                   </div>
+                  {d.shareCount && d.shareCount > 0 ? (
+                    <div className="text-[10px] font-bold text-amber-300">
+                      {d.shareCount} {language === 'bn' ? 'টি শেয়ার' : (d.shareCount === 1 ? 'Share' : 'Shares')}
+                    </div>
+                  ) : null}
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase mt-1 border ${
                     d.status?.toLowerCase() === 'approved' || d.status?.toLowerCase() === 'completed' || d.status?.toLowerCase() === 'active'
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
@@ -577,17 +700,16 @@ export const DepositList: React.FC = () => {
                     </button>
 
                     <button
-                      onClick={async () => {
-                        if (window.confirm(language === 'bn' ? 'আপনি কি এই ডিপোজিটটি বাতিল করতে নিশ্চিত?' : 'Are you sure you want to reject this deposit?')) {
-                          await rejectDeposit(d.id);
-                        }
+                      onClick={() => {
+                        setRejectingDeposit(d);
+                        setRejectReason('');
                       }}
                       className={`p-2 rounded-xl transition flex items-center justify-center active:scale-95 cursor-pointer ${
                         d.status?.toLowerCase() === 'rejected'
                           ? 'bg-rose-600 text-white shadow-md'
                           : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white border border-rose-500/30'
                       }`}
-                      title="Reject Deposit"
+                      title={language === 'bn' ? "ডিপোজিট বাতিল / রিজেক্ট করুন" : "Reject Deposit"}
                     >
                       <XCircle className="w-3.5 h-3.5" />
                     </button>
@@ -643,9 +765,14 @@ export const DepositList: React.FC = () => {
                     <span className="text-[10px] text-slate-400 font-mono">{d.memberId}</span>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <span className="font-extrabold text-amber-300">
+                    <span className="font-extrabold text-amber-300 block">
                       ৳{d.amount.toLocaleString()} BDT
                     </span>
+                    {d.shareCount && d.shareCount > 0 ? (
+                      <span className="text-[10px] font-bold text-amber-400/90 block">
+                        {d.shareCount} {language === 'bn' ? 'টি শেয়ার' : (d.shareCount === 1 ? 'Share' : 'Shares')}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     <span className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border ${
@@ -714,17 +841,16 @@ export const DepositList: React.FC = () => {
                             <Check className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={async () => {
-                              if (window.confirm(language === 'bn' ? 'আপনি কি এই ডিপোজিটটি বাতিল করতে নিশ্চিত?' : 'Are you sure you want to reject this deposit?')) {
-                                await rejectDeposit(d.id);
-                              }
+                            onClick={() => {
+                              setRejectingDeposit(d);
+                              setRejectReason('');
                             }}
                             className={`min-w-[40px] min-h-[40px] p-2 rounded-xl transition flex items-center justify-center active:scale-95 cursor-pointer ${
                               d.status?.toLowerCase() === 'rejected'
                                 ? 'bg-rose-600 text-white shadow-md'
                                 : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white'
                             }`}
-                            title="Reject Deposit (বাতিল করুন)"
+                            title={language === 'bn' ? "ডিপোজিট বাতিল / রিজেক্ট করুন" : "Reject Deposit (বাতিল করুন)"}
                           >
                             <XCircle className="w-4 h-4" />
                           </button>
@@ -893,6 +1019,105 @@ export const DepositList: React.FC = () => {
                 </div>
               </div>
 
+              {/* Share Selection & Unit Calculator */}
+              <div className="p-3.5 bg-[#070D1B] border border-amber-500/40 rounded-2xl space-y-3 shadow-inner">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                      <Layers className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-white block">
+                        {language === 'bn' ? 'শেয়ার সংখ্যা নির্বাচন করুন (Share Selection)' : 'Select Share Count'}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {language === 'bn' ? 'প্রতি শেয়ারের নির্ধারিত মূল্য অনুযায়ী স্বয়ংক্রিয় হিসাব' : 'Auto-calculated based on share unit price'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-500/15 border border-amber-500/40 rounded-full self-start sm:self-auto">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    <span className="text-[11px] font-bold text-amber-300">
+                      {language === 'bn' ? `রেট: ৳${shareUnitPrice.toLocaleString('en-BD')} / শেয়ার` : `Rate: ৳${shareUnitPrice.toLocaleString('en-BD')} / Share`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Counter Control */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleShareCountChange((formData.shareCount || 1) - 1)}
+                      disabled={(formData.shareCount || 1) <= 1}
+                      className="w-9 h-9 rounded-xl bg-[#0B1528] hover:bg-[#112244] disabled:opacity-30 disabled:cursor-not-allowed border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
+                      title={language === 'bn' ? 'কমিয়ে দিন' : 'Decrease'}
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.shareCount || 1}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10);
+                          handleShareCountChange(isNaN(val) || val < 1 ? 1 : val);
+                        }}
+                        className="w-16 text-center py-1.5 bg-[#0B1528] border-2 border-amber-500/50 rounded-xl text-amber-300 font-mono font-black text-base focus:outline-none focus:border-amber-400 shadow-inner"
+                      />
+                      <span className="ml-2 text-xs font-bold text-slate-300">
+                        {language === 'bn' ? 'টি শেয়ার' : ((formData.shareCount || 1) === 1 ? 'Share' : 'Shares')}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleShareCountChange((formData.shareCount || 1) + 1)}
+                      className="w-9 h-9 rounded-xl bg-[#0B1528] hover:bg-[#112244] border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
+                      title={language === 'bn' ? 'বাড়িয়ে দিন' : 'Increase'}
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="px-3 py-1.5 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center gap-2">
+                    <span className="text-[11px] text-emerald-300/80 font-mono">
+                      {(formData.shareCount || 1)} × ৳{shareUnitPrice.toLocaleString('en-BD')} =
+                    </span>
+                    <span className="text-sm font-mono font-black text-emerald-300">
+                      ৳{((formData.shareCount || 1) * shareUnitPrice).toLocaleString('en-BD')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Share Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase tracking-wider">
+                    {language === 'bn' ? 'কুইক সিলেক্ট:' : 'Quick Select:'}
+                  </span>
+                  {[1, 2, 3, 4, 5, 10].map((count) => {
+                    const isSelected = (formData.shareCount || 1) === count;
+                    return (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => handleShareCountChange(count)}
+                        className={`px-2.5 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer active:scale-95 border ${
+                          isSelected
+                            ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md font-black'
+                            : 'bg-[#0B1528] text-amber-300 border-amber-500/30 hover:border-amber-400 hover:bg-[#112244]'
+                        }`}
+                      >
+                        {count} {language === 'bn' ? 'টি' : (count === 1 ? 'Share' : 'Shares')}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-amber-300 font-bold mb-1">
@@ -906,7 +1131,12 @@ export const DepositList: React.FC = () => {
                     onFocus={e => e.target.select()}
                     onChange={e => {
                       const val = e.target.value;
-                      setFormData({ ...formData, amount: val === '' ? 0 : Number(val) });
+                      const numVal = val === '' ? 0 : Number(val);
+                      setFormData(prev => ({
+                        ...prev,
+                        amount: numVal,
+                        shareCount: numVal > 0 ? Math.max(1, Math.round(numVal / shareUnitPrice)) : 1
+                      }));
                     }}
                     placeholder="e.g. 5000"
                     className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-[#D4AF37]/40 rounded-xl text-amber-300 font-black text-base focus:outline-none focus:border-amber-400"
@@ -917,7 +1147,13 @@ export const DepositList: React.FC = () => {
                       <button
                         key={amt}
                         type="button"
-                        onClick={() => setFormData({ ...formData, amount: amt })}
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            amount: amt,
+                            shareCount: Math.max(1, Math.round(amt / shareUnitPrice))
+                          }));
+                        }}
                         className={`px-2 py-1 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
                           formData.amount === amt
                             ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
@@ -1208,6 +1444,102 @@ export const DepositList: React.FC = () => {
             setDepositToDelete(null);
           }}
         />
+      )}
+
+      {/* Reject Deposit Modal with Reason */}
+      {rejectingDeposit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#0B1528] border border-rose-500/40 rounded-3xl p-6 max-w-lg w-full text-white shadow-2xl shadow-rose-950/40 relative">
+            <div className="flex items-center justify-between pb-4 border-b border-rose-500/20">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                  <XCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    {language === 'bn' ? 'ডিপোজিট বাতিল / রিজেক্ট নিশ্চিতকরণ' : 'Confirm Deposit Rejection'}
+                  </h3>
+                  <p className="text-xs text-rose-300/80">
+                    {rejectingDeposit.id} • ৳{(rejectingDeposit.amount || 0).toLocaleString()} BDT
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRejectingDeposit(null);
+                  setRejectReason('');
+                }}
+                className="p-2 text-slate-400 hover:text-white rounded-xl bg-[#070D1B] border border-slate-700"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="p-3.5 bg-[#070D1B] rounded-2xl border border-rose-500/30 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">{language === 'bn' ? 'মেম্বার নাম:' : 'Member:'}</span>
+                  <span className="text-white font-bold">{rejectingDeposit.memberName} ({rejectingDeposit.memberId})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">{language === 'bn' ? 'পরিমাণ:' : 'Amount:'}</span>
+                  <span className="text-amber-300 font-bold">৳{(rejectingDeposit.amount || 0).toLocaleString()} BDT</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">{language === 'bn' ? 'বর্তমান অবস্থা:' : 'Current Status:'}</span>
+                  <span className="text-rose-400 font-semibold">{rejectingDeposit.status || 'Pending'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{language === 'bn' ? 'বাতিলের সুনির্দিষ্ট কারণ লিখুন (মেম্বার নোটিফিকেশন পাবেন):' : 'Reason for rejection (Member will be notified):'}</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder={language === 'bn' ? "উদা: ভাউচার/ট্রানজ্যাকশন আইডি মেলেনি, ভুল একাউন্টে টাকা পাঠানো ইত্যাদি..." : "e.g., Transaction ID did not match bank statement..."}
+                  rows={3}
+                  className="w-full p-3 bg-[#070D1B] border border-rose-500/30 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                />
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  disabled={isRejectingSubmitting}
+                  onClick={() => {
+                    setRejectingDeposit(null);
+                    setRejectReason('');
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-[#070D1B] text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition"
+                >
+                  {language === 'bn' ? 'না, বাতিল নয়' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  disabled={isRejectingSubmitting}
+                  onClick={async () => {
+                    if (!rejectingDeposit) return;
+                    setIsRejectingSubmitting(true);
+                    try {
+                      await rejectDeposit(rejectingDeposit.id, rejectReason.trim() || undefined);
+                      setRejectingDeposit(null);
+                      setRejectReason('');
+                    } finally {
+                      setIsRejectingSubmitting(false);
+                    }
+                  }}
+                  className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-lg shadow-rose-950/50 transition flex items-center justify-center gap-2"
+                >
+                  <XCircle className="w-4 h-4" />
+                  <span>{isRejectingSubmitting ? (language === 'bn' ? 'বাতিল হচ্ছে...' : 'Rejecting...') : (language === 'bn' ? 'বাতিল নিশ্চিত করুন' : 'Confirm Rejection')}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

@@ -340,7 +340,7 @@ export const Sidebar: React.FC = () => {
                     {currentMember?.fullName || authUser?.displayName || 'PBC Club Member'}
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-amber-300">
-                    <span className="font-bold">{currentMember?.id || 'PBC-1001'}</span>
+                    <span className="font-bold">{currentMember?.id || 'PBC-00118'}</span>
                     <span>•</span>
                     <span className="capitalize px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded-md font-semibold text-[10px] border border-amber-500/30">
                       {role === 'super_admin' ? (language === 'bn' ? 'সিস্টেম অ্যাডমিন' : 'System Admin') : (role === 'admin' ? 'Admin' : 'Member')}

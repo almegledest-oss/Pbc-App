@@ -16,6 +16,7 @@ export interface SystemSettings {
   clubName: string;
   currencySymbol: string;
   minDepositAmount: number;
+  shareUnitPrice?: number; // Default institutional share unit price (e.g. 5000 BDT)
   allowNewRegistrations: boolean;
   registrationOpen?: boolean;
   requireAdminApproval?: boolean;
@@ -232,6 +233,8 @@ export interface Deposit {
   memberId: string;
   memberName: string;
   amount: number; // in BDT (৳)
+  shareCount?: number; // Number of shares (e.g. 1, 2, 3...)
+  shareUnitPrice?: number; // Share unit price at the time of deposit (e.g. 5000 BDT)
   category?: 'Fund Raising' | 'Real Estate';
   currency: 'BDT';
   localAmount?: number;
@@ -245,6 +248,10 @@ export interface Deposit {
   approvedByAdminName?: string;
   approvedByAdminId?: string;
   approvedByAdminSignature?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+  rejectedByAdminName?: string;
+  rejectedByAdminId?: string;
 }
 
 export interface ProjectMemberAllocation {

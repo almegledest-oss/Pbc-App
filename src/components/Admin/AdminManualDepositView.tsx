@@ -28,6 +28,8 @@ import {
   Share2, 
   X, 
   Plus, 
+  Minus,
+  Layers,
   Sparkles,
   ChevronDown,
   Info,
@@ -92,10 +94,13 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     currentMember, 
     authUser,
     navigateWithHistory,
-    goBack
+    goBack,
+    systemSettings
   } = useApp();
 
   const isBn = language === 'bn';
+
+  const shareUnitPrice = systemSettings?.shareUnitPrice || 5000;
 
   // Member Selection State
   const [memberSearch, setMemberSearch] = useState('');
@@ -105,7 +110,14 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
   // Deposit Form State
   const [category, setCategory] = useState<'Fund Raising' | 'Real Estate'>('Fund Raising');
   const [paymentMethod, setPaymentMethod] = useState<Deposit['paymentMethod']>('Cash');
+  const [shareCount, setShareCount] = useState<number>(1);
   const [amountBDT, setAmountBDT] = useState<number | ''>(5000);
+
+  const handleShareCountChange = (newCount: number) => {
+    const validCount = Math.max(1, newCount);
+    setShareCount(validCount);
+    setAmountBDT(validCount * shareUnitPrice);
+  };
   const [depositDate, setDepositDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [referenceNumber, setReferenceNumber] = useState<string>(
     `ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`
@@ -174,7 +186,9 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
   const handleQuickAmount = (val: number) => {
     setAmountBDT(prev => {
       const current = typeof prev === 'number' ? prev : 0;
-      return current + val;
+      const next = current + val;
+      setShareCount(Math.max(1, Math.round(next / shareUnitPrice)));
+      return next;
     });
   };
 
@@ -258,6 +272,8 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
         memberId: selectedMember.id,
         memberName: selectedMember.fullName,
         amount: numAmount,
+        shareCount: shareCount,
+        shareUnitPrice: shareUnitPrice,
         category: category,
         currency: 'BDT',
         depositDate: depositDate || new Date().toISOString().split('T')[0],
@@ -301,7 +317,8 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     setCreatedDeposit(null);
     setSelectedMember(null);
     setMemberSearch('');
-    setAmountBDT(5000);
+    setShareCount(1);
+    setAmountBDT(shareUnitPrice);
     setTargetMonth('August 2026');
     setNotes(isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬' : 'Monthly Contribution - August 2026');
   };
@@ -675,10 +692,114 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
             </div>
           </div>
 
+          {/* Share Selection & Unit Calculator */}
+          <div className="p-4 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl space-y-3.5 shadow-inner">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-500/20">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    {isBn ? 'শেয়ার সংখ্যা নির্বাচন করুন (Share Selection)' : 'Select Share Count'}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {isBn ? 'প্রতি শেয়ারের নির্ধারিত মূল্য অনুযায়ী স্বয়ংক্রিয় হিসাব' : 'Auto-calculated based on institutional share unit price'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Current Unit Price Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 border border-amber-500/40 rounded-full self-start sm:self-auto">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                <span className="text-[11px] font-bold text-amber-300">
+                  {isBn ? `রেট: ৳${shareUnitPrice.toLocaleString('en-BD')} / শেয়ার` : `Rate: ৳${shareUnitPrice.toLocaleString('en-BD')} / Share`}
+                </span>
+              </div>
+            </div>
+
+            {/* Counter Control */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {/* Decrement button */}
+                <button
+                  type="button"
+                  onClick={() => handleShareCountChange(shareCount - 1)}
+                  disabled={shareCount <= 1}
+                  className="w-10 h-10 rounded-xl bg-[#0B1528] hover:bg-[#112244] disabled:opacity-30 disabled:cursor-not-allowed border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
+                  title={isBn ? 'কমিয়ে দিন' : 'Decrease'}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+
+                {/* Share count input */}
+                <div className="relative flex items-center">
+                  <input
+                    type="number"
+                    min="1"
+                    value={shareCount}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      handleShareCountChange(isNaN(val) || val < 1 ? 1 : val);
+                    }}
+                    className="w-20 text-center py-2 bg-[#0B1528] border-2 border-amber-500/50 rounded-xl text-amber-300 font-mono font-black text-lg focus:outline-none focus:border-amber-400 shadow-inner"
+                  />
+                  <span className="ml-2 text-xs font-bold text-slate-300">
+                    {isBn ? 'টি শেয়ার' : (shareCount === 1 ? 'Share' : 'Shares')}
+                  </span>
+                </div>
+
+                {/* Increment button */}
+                <button
+                  type="button"
+                  onClick={() => handleShareCountChange(shareCount + 1)}
+                  className="w-10 h-10 rounded-xl bg-[#0B1528] hover:bg-[#112244] border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
+                  title={isBn ? 'বাড়িয়ে দিন' : 'Increase'}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Live formula summary pill */}
+              <div className="px-3.5 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center gap-2">
+                <span className="text-[11px] text-emerald-300/80 font-mono">
+                  {shareCount} × ৳{shareUnitPrice.toLocaleString('en-BD')} =
+                </span>
+                <span className="text-sm font-mono font-black text-emerald-300">
+                  ৳{(shareCount * shareUnitPrice).toLocaleString('en-BD')}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Share Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase tracking-wider">
+                {isBn ? 'কুইক সিলেক্ট:' : 'Quick Select:'}
+              </span>
+              {[1, 2, 3, 4, 5, 10].map((count) => {
+                const isSelected = shareCount === count;
+                return (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => handleShareCountChange(count)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 border ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md font-black'
+                        : 'bg-[#0B1528] text-amber-300 border-amber-500/30 hover:border-amber-400 hover:bg-[#112244]'
+                    }`}
+                  >
+                    {count} {isBn ? 'টি শেয়ার' : count === 1 ? 'Share' : 'Shares'}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Amount in BDT */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>{isBn ? 'জমার পরিমাণ (টাকা - BDT) *' : 'Deposit Amount in BDT (৳) *'}</span>
+              <span>{isBn ? 'জমার মোট পরিমাণ (টাকা - BDT) *' : 'Total Deposit Amount in BDT (৳) *'}</span>
               <span className="text-xs font-black text-amber-300 font-mono">
                 ৳{typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : '0'}
               </span>
@@ -692,7 +813,13 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
                 min="100"
                 placeholder="5000"
                 value={amountBDT}
-                onChange={(e) => setAmountBDT(e.target.value === '' ? '' : Number(e.target.value))}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : Number(e.target.value);
+                  setAmountBDT(val);
+                  if (typeof val === 'number' && val > 0) {
+                    setShareCount(Math.max(1, Math.round(val / shareUnitPrice)));
+                  }
+                }}
                 className="w-full pl-10 pr-4 py-3.5 bg-[#070D1B] border-2 border-[#D4AF37]/40 focus:border-amber-400 rounded-2xl text-white font-mono font-black text-xl placeholder-slate-600 focus:outline-none transition shadow-inner"
               />
             </div>
@@ -712,7 +839,10 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
               ))}
               <button
                 type="button"
-                onClick={() => setAmountBDT('')}
+                onClick={() => {
+                  setAmountBDT('');
+                  setShareCount(1);
+                }}
                 className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 {isBn ? 'মুছুন' : 'Clear'}

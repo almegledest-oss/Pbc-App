@@ -37,6 +37,8 @@
         "memberId": { "type": "string" },
         "memberName": { "type": "string" },
         "amount": { "type": "number" },
+        "shareCount": { "type": "number" },
+        "shareUnitPrice": { "type": "number" },
         "currency": { "type": "string" },
         "depositDate": { "type": "string" },
         "paymentMethod": { "type": "string" },
@@ -90,6 +92,7 @@
         "clubName": { "type": "string" },
         "currencySymbol": { "type": "string" },
         "minDepositAmount": { "type": "number" },
+        "shareUnitPrice": { "type": "number" },
         "allowNewRegistrations": { "type": "boolean" },
         "allowMemberSelfEdit": { "type": "boolean" },
         "allowMemberPhotoUpload": { "type": "boolean" }

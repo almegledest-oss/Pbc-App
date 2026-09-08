@@ -324,6 +324,22 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
                   </span>
                 </div>
 
+                {/* Share Units (if present) */}
+                {deposit.shareCount && deposit.shareCount > 0 && (
+                  <div className="flex flex-col justify-center">
+                    <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
+                      Share Count / শেয়ার:
+                    </span>
+                    <span 
+                      className="font-black text-xs sm:text-sm mt-0.5" 
+                      style={{ color: '#FCD34D' }}
+                    >
+                      {deposit.shareCount} {deposit.shareCount === 1 ? 'Share' : 'Shares'}
+                      {deposit.shareUnitPrice ? ` (@ ৳${deposit.shareUnitPrice.toLocaleString('en-BD')})` : ''}
+                    </span>
+                  </div>
+                )}
+
                 {/* Target Month (if present) */}
                 {deposit.targetMonth && (
                   <div className="flex flex-col justify-center">

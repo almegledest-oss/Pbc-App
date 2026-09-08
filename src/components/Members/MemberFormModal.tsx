@@ -17,6 +17,9 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
+import { PhoneInputWithCountry } from '../Common/PhoneInputWithCountry';
+import { findCountryByName, findCountryByDialCode, validatePhoneDigits, COUNTRY_DIAL_CODES, getCitiesForCountry } from '../../utils/countryDialCodes';
+import { CountryCitySelector } from '../Common/CountryCitySelector';
 
 interface MemberFormModalProps {
   isOpen: boolean;
@@ -63,15 +66,45 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     familyInfoAddress: ''
   });
 
-  const [errors, setErrors] = useState<{ email?: string; phone?: string; fullName?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; phone?: string; fullName?: string; id?: string }>({});
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [isUploadingIdFront, setIsUploadingIdFront] = useState(false);
   const [isUploadingIdBack, setIsUploadingIdBack] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Phone dial code and digits states
+  const [phoneDialCode, setPhoneDialCode] = useState('+971');
+  const [phoneDigits, setPhoneDigits] = useState('');
+
+  // Helper to parse phone into dialCode and digits
+  const parsePhoneToDialAndDigits = (phoneStr: string, countryName?: string) => {
+    let dial = '+971';
+    let digits = '';
+    const clean = (phoneStr || '').trim();
+    
+    // Check if phone starts with a known dial code
+    const matchedByDial = COUNTRY_DIAL_CODES.find(c => clean.startsWith(c.dialCode));
+    if (matchedByDial) {
+      dial = matchedByDial.dialCode;
+      digits = clean.slice(matchedByDial.dialCode.length).replace(/\D/g, '');
+    } else {
+      // Fallback by country
+      const matchedByCountry = countryName ? findCountryByName(countryName) : undefined;
+      if (matchedByCountry) {
+        dial = matchedByCountry.dialCode;
+      }
+      digits = clean.replace(/\D/g, '');
+    }
+    return { dial, digits };
+  };
+
   useEffect(() => {
     if (memberToEdit) {
+      const parsed = parsePhoneToDialAndDigits(memberToEdit.phone || '', memberToEdit.country);
+      setPhoneDialCode(parsed.dial);
+      setPhoneDigits(parsed.digits);
+
       setFormData({
         id: memberToEdit.id || '',
         fullName: memberToEdit.fullName || '',
@@ -105,14 +138,16 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     } else {
       const nextId = `PBC-${10000 + members.length + 1}`;
       const autoPass = `PBC-${Math.floor(100000 + Math.random() * 900000)}`;
+      setPhoneDialCode('+966');
+      setPhoneDigits('');
       setFormData({
         id: nextId,
         fullName: '',
         fullNameBn: '',
         phone: '',
         email: '',
-        country: 'United Arab Emirates',
-        city: 'Dubai',
+        country: 'Saudi Arabia',
+        city: 'Riyadh',
         dateOfBirth: '1988-01-15',
         bloodGroup: 'B+',
         passportNumber: '',
@@ -141,6 +176,29 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleCountryChange = (val: string) => {
+    const matchedDial = findCountryByName(val);
+    if (matchedDial) {
+      setPhoneDialCode(matchedDial.dialCode);
+    }
+    const cities = getCitiesForCountry(val);
+    setFormData(prev => ({
+      ...prev,
+      country: val,
+      city: cities.length > 0 ? cities[0] : prev.city
+    }));
+  };
+
+  const handleDialCodeChange = (code: string) => {
+    setPhoneDialCode(code);
+    const matchedCountry = findCountryByDialCode(code);
+    if (matchedCountry) {
+      if (formData.country.toLowerCase() !== matchedCountry.name.toLowerCase()) {
+        setFormData(prev => ({ ...prev, country: matchedCountry.name }));
+      }
+    }
+  };
+
   const validate = () => {
     const errs: { email?: string; phone?: string; fullName?: string; id?: string } = {};
 
@@ -158,9 +216,10 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       errs.email = 'Please enter a valid email address';
     }
 
-    const digitsOnly = formData.phone.replace(/\D/g, '');
-    if (!formData.phone.trim() || digitsOnly.length < 7) {
-      errs.phone = 'Please enter a valid phone number with at least 7 digits';
+    const digitsOnly = phoneDigits.replace(/\D/g, '');
+    const phoneVal = validatePhoneDigits(phoneDialCode, digitsOnly);
+    if (!phoneVal.valid) {
+      errs.phone = phoneVal.messageBn || phoneVal.message || 'Please enter a valid phone number';
     }
 
     setErrors(errs);
@@ -235,12 +294,13 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
       const finalMemberId = `PBC-${cleanDigits}`;
       const finalQr = formData.qrCodeData.trim() || `PBC-MEMBER:${finalMemberId}:${formData.fullName}:${formData.status}`;
       const finalBarcode = formData.barcodeData.trim() || `PBC-BC-${finalMemberId}`;
+      const fullPhone = `${phoneDialCode} ${phoneDigits.replace(/\D/g, '')}`;
 
       const payload = {
         id: finalMemberId,
         fullName: formData.fullName.trim(),
         fullNameBn: formData.fullNameBn.trim(),
-        phone: formData.phone.trim(),
+        phone: fullPhone,
         email: formData.email.trim(),
         country: formData.country.trim(),
         city: formData.city.trim(),
@@ -414,20 +474,19 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                 {errors.email && <p className="text-[10px] text-rose-400 mt-1 font-medium">{errors.email}</p>}
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Phone Number *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="+971 50 123 4567"
-                  value={formData.phone}
-                  onChange={e => {
-                    setFormData({ ...formData, phone: e.target.value });
+              {/* Phone with Country Dial Code & Validation */}
+              <div className="sm:col-span-1">
+                <PhoneInputWithCountry
+                  dialCode={phoneDialCode}
+                  onDialCodeChange={handleDialCodeChange}
+                  phoneDigits={phoneDigits}
+                  onPhoneDigitsChange={digits => {
+                    setPhoneDigits(digits);
                     if (errors.phone) setErrors({ ...errors, phone: undefined });
                   }}
-                  className={`w-full px-3 py-2.5 bg-[#070D1B] border ${errors.phone ? 'border-rose-500' : 'border-[#D4AF37]/30'} rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400`}
+                  label="Phone Number"
+                  labelBn="ফোন নম্বর"
+                  required
                 />
                 {errors.phone && <p className="text-[10px] text-rose-400 mt-1 font-medium">{errors.phone}</p>}
               </div>
@@ -480,33 +539,26 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Country</label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={e => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
+              <div className="sm:col-span-2">
+                <CountryCitySelector
+                  country={formData.country}
+                  onCountryChange={handleCountryChange}
+                  city={formData.city}
+                  onCityChange={c => setFormData(prev => ({ ...prev, city: c }))}
+                  labelCountry="Country"
+                  labelCountryBn="দেশ"
+                  labelCity="City"
+                  labelCityBn="শহর"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">City</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">Join Date</label>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm">Join Date</label>
                 <input
                   type="date"
                   value={formData.joinDate}
                   onChange={e => setFormData({ ...formData, joinDate: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400"
+                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400 text-sm"
                 />
               </div>
             </div>
