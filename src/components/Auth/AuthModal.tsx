@@ -372,6 +372,27 @@ export const AuthModal: React.FC = () => {
               console.warn('Firestore user query notice:', e);
             }
           }
+
+          if (!targetMember && targetUser?.memberId) {
+            targetMember = members.find(m => m.id.toUpperCase() === targetUser.memberId.toUpperCase());
+            if (!targetMember) {
+              try {
+                const mDocSnap = await getDoc(doc(db, 'members', targetUser.memberId));
+                if (mDocSnap.exists()) {
+                  targetMember = { id: mDocSnap.id, ...mDocSnap.data() } as Member;
+                }
+              } catch (e) {}
+            }
+          }
+
+          if (!targetMember && cleanEmail === 'almegledest@gmail.com') {
+            try {
+              const mDocSnap = await getDoc(doc(db, 'members', 'PBC-00000'));
+              if (mDocSnap.exists()) {
+                targetMember = { id: mDocSnap.id, ...mDocSnap.data() } as Member;
+              }
+            } catch (e) {}
+          }
         } else {
           // Input is Member ID (e.g. PBC-1001, PBC-1002, or 1002)
           const formattedId = rawInput.toUpperCase().startsWith('PBC-')
@@ -478,9 +499,69 @@ export const AuthModal: React.FC = () => {
             }
 
             setRole(finalRole);
-            if (member || targetMember) {
-              setCurrentMember(member || targetMember!);
+            
+            let activeMember: Member;
+            if (member) {
+              activeMember = member;
+            } else if (targetMember) {
+              activeMember = targetMember;
+            } else if (cleanEmail === 'fokrulislammir9897@gmail.com') {
+              const fokrulMem = members.find(m => m.id === 'PBC-1001' || (m.email && m.email.toLowerCase().trim() === cleanEmail));
+              activeMember = fokrulMem || {
+                id: 'PBC-1001',
+                fullName: 'Fokrul Islam Mir',
+                fullNameBn: 'ফকরুল ইসলাম মীর',
+                email: cleanEmail,
+                phone: '+880 1711-000000',
+                country: 'Saudi Arabia',
+                city: 'Riyadh',
+                joinDate: '2022-01-15',
+                status: 'active',
+                photoUrl: '',
+                totalDeposit: 0,
+                qrCodeData: 'PBC-1001-QR',
+                role: 'super_admin'
+              };
+            } else if (cleanEmail === 'almegledest@gmail.com') {
+              const foundMem = members.find(m => m.id === 'PBC-00000' || (m.email && m.email.toLowerCase().trim() === cleanEmail));
+              activeMember = foundMem || {
+                id: 'PBC-00000',
+                fullName: targetUser?.displayName || user.displayName || 'System Super Admin (almegledest)',
+                fullNameBn: 'সিস্টেম সুপার অ্যাডমিন',
+                email: cleanEmail,
+                phone: targetUser?.phone || '',
+                country: 'Saudi Arabia',
+                city: 'Riyadh',
+                joinDate: '2023-01-01',
+                status: 'active',
+                photoUrl: targetUser?.photoUrl || user.photoURL || '',
+                totalDeposit: 0,
+                qrCodeData: 'PBC-00000-SUPERADMIN',
+                role: 'super_admin'
+              };
+            } else {
+              // Isolated Admin profile for THIS authenticated user
+              const isolatedId = targetUser?.memberId || `PBC-ADM-${user.uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`;
+              activeMember = {
+                id: isolatedId,
+                fullName: targetUser?.displayName || user.displayName || cleanEmail.split('@')[0],
+                email: cleanEmail,
+                phone: targetUser?.phone || '',
+                country: 'Saudi Arabia',
+                city: 'Riyadh',
+                joinDate: new Date().toISOString().split('T')[0],
+                status: 'active',
+                photoUrl: targetUser?.photoUrl || user.photoURL || '',
+                totalDeposit: 0,
+                qrCodeData: `${isolatedId}-QR`,
+                role: finalRole
+              };
             }
+
+            setCurrentMember(activeMember);
+            safeStorage.setItem('pbc_current_member', JSON.stringify(activeMember));
+            safeStorage.setItem('pbc_member_id', activeMember.id);
+            safeStorage.setItem('pbc_user_email', cleanEmail);
 
             setActiveTab('dashboard');
             safeStorage.setItem('pbc_role', finalRole);
@@ -545,6 +626,9 @@ export const AuthModal: React.FC = () => {
 
           setRole(effectiveRole);
           setCurrentMember(targetMember);
+          safeStorage.setItem('pbc_current_member', JSON.stringify(targetMember));
+          safeStorage.setItem('pbc_member_id', targetMember.id);
+          safeStorage.setItem('pbc_user_email', targetMember.email || cleanEmail);
           setActiveTab('dashboard');
           safeStorage.setItem('pbc_role', effectiveRole);
           safeStorage.setItem('pbc_logged_in', 'true');
@@ -555,9 +639,58 @@ export const AuthModal: React.FC = () => {
         }
 
         // 3. Super Admin Direct Fallback
-        if (isSuperAdminEmail) {
+        if (cleanEmail === 'fokrulislammir9897@gmail.com') {
           if (password === 'Pbc@12345' || password === 'admin123') {
             setRole('super_admin');
+            const fokrulMem = members.find(m => m.id === 'PBC-1001' || (m.email && m.email.toLowerCase().trim() === cleanEmail)) || {
+              id: 'PBC-1001',
+              fullName: 'Fokrul Islam Mir',
+              fullNameBn: 'ফকরুল ইসলাম মীর',
+              email: cleanEmail,
+              phone: '+880 1711-000000',
+              country: 'Saudi Arabia',
+              city: 'Riyadh',
+              joinDate: '2022-01-15',
+              status: 'active',
+              photoUrl: '',
+              totalDeposit: 0,
+              qrCodeData: 'PBC-1001-QR',
+              role: 'super_admin'
+            };
+            setCurrentMember(fokrulMem);
+            safeStorage.setItem('pbc_current_member', JSON.stringify(fokrulMem));
+            safeStorage.setItem('pbc_member_id', 'PBC-1001');
+            safeStorage.setItem('pbc_user_email', cleanEmail);
+            setActiveTab('dashboard');
+            safeStorage.setItem('pbc_role', 'super_admin');
+            safeStorage.setItem('pbc_logged_in', 'true');
+            setIsLoggedIn(true);
+            setIsAuthModalOpen(false);
+            setShowAdminLoginForm(false);
+            return;
+          }
+        } else if (cleanEmail === 'almegledest@gmail.com') {
+          if (password === 'Pbc@12345' || password === 'admin123') {
+            setRole('super_admin');
+            const adminMem = members.find(m => m.id === 'PBC-00000' || (m.email && m.email.toLowerCase().trim() === cleanEmail)) || {
+              id: 'PBC-00000',
+              fullName: 'System Super Admin (almegledest)',
+              fullNameBn: 'সিস্টেম সুপার অ্যাডমিন',
+              email: cleanEmail,
+              phone: '',
+              country: 'Saudi Arabia',
+              city: 'Riyadh',
+              joinDate: '2023-01-01',
+              status: 'active',
+              photoUrl: '',
+              totalDeposit: 0,
+              qrCodeData: 'PBC-00000-SUPERADMIN',
+              role: 'super_admin'
+            };
+            setCurrentMember(adminMem);
+            safeStorage.setItem('pbc_current_member', JSON.stringify(adminMem));
+            safeStorage.setItem('pbc_member_id', 'PBC-00000');
+            safeStorage.setItem('pbc_user_email', cleanEmail);
             setActiveTab('dashboard');
             safeStorage.setItem('pbc_role', 'super_admin');
             safeStorage.setItem('pbc_logged_in', 'true');

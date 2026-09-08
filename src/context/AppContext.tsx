@@ -292,22 +292,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [quotes, setQuotes] = useState<QuoteItem[]>(INITIAL_QUOTES);
   const [isQuotesManagerOpen, setIsQuotesManagerOpen] = useState<boolean>(false);
 
+  const BLANK_MEMBER: Member = {
+    id: '',
+    fullName: '',
+    fullNameBn: '',
+    email: '',
+    phone: '',
+    country: 'Saudi Arabia',
+    city: 'Riyadh',
+    joinDate: '',
+    status: 'active',
+    photoUrl: '',
+    totalDeposit: 0,
+    qrCodeData: '',
+    role: 'member'
+  };
+
   const [currentMember, setCurrentMember] = useState<Member>(() => {
-    return members[0] || INITIAL_MEMBERS[0] || {
-      id: 'PBC-1001',
-      fullName: 'Fokrul Islam Mir',
-      fullNameBn: 'ফকরুল ইসলাম মীর',
-      email: 'fokrulislammir9897@gmail.com',
-      phone: '+880 1711-000000',
-      country: 'Saudi Arabia',
-      city: 'Riyadh',
-      joinDate: '2022-01-15',
-      status: 'active',
-      photoUrl: '',
-      totalDeposit: 0,
-      qrCodeData: 'PBC-1001-QR',
-      role: 'super_admin'
-    };
+    try {
+      const savedLoggedIn = safeStorage.getItem('pbc_logged_in');
+      const saved = safeStorage.getItem('pbc_current_member');
+      if (savedLoggedIn === 'true' && saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.id !== 'PBC-1001') return parsed;
+      }
+    } catch (e) {
+      console.warn('Could not parse cached current member:', e);
+    }
+    return BLANK_MEMBER;
   });
 
   const [language, setLanguageState] = useState<Language>(() => {
@@ -321,8 +333,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile_frame'>('desktop');
   
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return safeStorage.getItem('pbc_logged_in') === 'true';
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(() => {
+    return safeStorage.getItem('pbc_logged_in') !== 'true';
+  });
   const [authUser, setAuthUser] = useState<any>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const openMoreMenu = () => setIsMoreMenuOpen(true);
@@ -341,7 +357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const closeSecurityAlert = () => setSecurityAlertMessage(null);
 
   const logout = async () => {
-    const loggedInEmail = authUser?.email || currentMember?.email;
+    const loggedInEmail = authUser?.email || currentMember?.email || safeStorage.getItem('pbc_user_email');
     if (loggedInEmail) {
       clearActiveSessionDoc(loggedInEmail).catch(console.warn);
     }
@@ -352,6 +368,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     safeStorage.removeItem('pbc_logged_in');
     safeStorage.removeItem('pbc_role');
+    safeStorage.removeItem('pbc_current_member');
+    safeStorage.removeItem('pbc_member_id');
+    safeStorage.removeItem('pbc_user_email');
+    setAuthUser(null);
+    setRoleState('member');
+    setCurrentMember(BLANK_MEMBER);
     setIsLoggedIn(false);
     setIsAuthModalOpen(true);
   };
@@ -402,7 +424,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       case 'my_profile':
         return { title: 'My Expat Profile', titleBn: 'আমার প্রোফাইল ও স্টেটমেন্ট' };
       case 'help_desk':
-        return { title: 'Help Desk & Deposit Accounts', titleBn: 'হেল্প ডেস্ক ও ডিপোজিট অ্যাকাউন্টস' };
+        return { title: 'Help Desk & Support', titleBn: 'হেল্প ডেস্ক ও সাপোর্ট' };
+      case 'deposit_accounts':
+        return { title: 'Official Deposit Accounts', titleBn: 'অফিসিয়াল ডিপোজিট অ্যাকাউন্টসমূহ' };
+      case 'club_rules':
+        return { title: 'Club Rules & By-Laws', titleBn: 'ক্লাবের নীতিমালা ও গঠনতন্ত্র' };
       default:
         return { title: 'PBC Portal', titleBn: 'পিবিসি পোর্টাল' };
     }
@@ -570,13 +596,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
         setAuthUser(user);
         if (user) {
-          const { role: detectedRole, status, member, notFound } = await getUserRoleAndStatus(user.uid, user.email || '');
+          const { role: detectedRole, status, member, userProfile, notFound } = await getUserRoleAndStatus(user.uid, user.email || '');
 
           if (notFound) {
             console.warn(`Access denied: No user document found in Firestore for ${user.email}`);
             await signOut(auth);
             safeStorage.removeItem('pbc_role');
             safeStorage.removeItem('pbc_logged_in');
+            safeStorage.removeItem('pbc_current_member');
+            safeStorage.removeItem('pbc_member_id');
+            safeStorage.removeItem('pbc_user_email');
+            setCurrentMember(BLANK_MEMBER);
             setIsLoggedIn(false);
             setIsAuthModalOpen(true);
             return;
@@ -587,6 +617,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             await signOut(auth);
             safeStorage.removeItem('pbc_role');
             safeStorage.removeItem('pbc_logged_in');
+            safeStorage.removeItem('pbc_current_member');
+            safeStorage.removeItem('pbc_member_id');
+            safeStorage.removeItem('pbc_user_email');
+            setCurrentMember(BLANK_MEMBER);
             setIsLoggedIn(false);
             setIsAuthModalOpen(true);
             return;
@@ -596,9 +630,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           safeStorage.setItem('pbc_role', detectedRole);
           safeStorage.setItem('pbc_logged_in', 'true');
 
+          const userCleanEmail = (user.email || '').toLowerCase().trim();
+          const isFokrulSuperAdmin = userCleanEmail === 'fokrulislammir9897@gmail.com';
+          const isAlmegledest = userCleanEmail === 'almegledest@gmail.com';
+
+          let resolvedMember: Member;
+
           if (member) {
-            setCurrentMember(member);
+            resolvedMember = member;
+          } else if (isFokrulSuperAdmin) {
+            const foundFokrul = members.find(m => m.id === 'PBC-1001' || (m.email && m.email.toLowerCase().trim() === userCleanEmail));
+            resolvedMember = foundFokrul || {
+              id: 'PBC-1001',
+              fullName: 'Fokrul Islam Mir',
+              fullNameBn: 'ফকরুল ইসলাম মীর',
+              email: userCleanEmail,
+              phone: '+880 1711-000000',
+              country: 'Saudi Arabia',
+              city: 'Riyadh',
+              joinDate: '2022-01-15',
+              status: 'active',
+              photoUrl: '',
+              totalDeposit: 0,
+              qrCodeData: 'PBC-1001-QR',
+              role: 'super_admin'
+            };
+          } else if (isAlmegledest) {
+            // almegledest is an authorized system admin with permanent record in Firestore
+            const foundMem = members.find(m => m.id === 'PBC-00000' || (m.email && m.email.toLowerCase().trim() === userCleanEmail));
+            resolvedMember = foundMem || {
+              id: 'PBC-00000',
+              fullName: userProfile?.displayName || user.displayName || 'System Super Admin (almegledest)',
+              fullNameBn: 'সিস্টেম সুপার অ্যাডমিন',
+              email: userCleanEmail,
+              phone: '',
+              country: 'Saudi Arabia',
+              city: 'Riyadh',
+              joinDate: '2023-01-01',
+              status: 'active',
+              photoUrl: user.photoURL || '',
+              totalDeposit: 0,
+              qrCodeData: 'PBC-00000-SUPERADMIN',
+              role: 'super_admin'
+            };
+          } else {
+            // Strictly isolated profile for this user - match by email or memberId
+            const foundMem = members.find(m => (m.email && m.email.toLowerCase().trim() === userCleanEmail) || (userProfile?.memberId && m.id.toUpperCase() === userProfile.memberId.toUpperCase()));
+            if (foundMem) {
+              resolvedMember = foundMem;
+            } else {
+              const isolatedId = userProfile?.memberId || `PBC-USR-${user.uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5).toUpperCase()}`;
+              resolvedMember = {
+                id: isolatedId,
+                fullName: userProfile?.displayName || user.displayName || userCleanEmail.split('@')[0],
+                email: userCleanEmail,
+                phone: '',
+                country: 'Saudi Arabia',
+                city: 'Riyadh',
+                joinDate: new Date().toISOString().split('T')[0],
+                status: 'active',
+                photoUrl: user.photoURL || '',
+                totalDeposit: 0,
+                qrCodeData: `${isolatedId}-QR`,
+                role: detectedRole
+              };
+            }
           }
+
+          setCurrentMember(resolvedMember);
+          safeStorage.setItem('pbc_current_member', JSON.stringify(resolvedMember));
+          safeStorage.setItem('pbc_member_id', resolvedMember.id);
+          safeStorage.setItem('pbc_user_email', userCleanEmail);
 
           setActiveTab('dashboard');
 
@@ -615,9 +717,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             addActivityLogDoc(user.email || 'admin@pbcclub.org', 'Admin Login', `Admin session started as ${detectedRole}`);
           }
         } else {
-          // No active firebase user -> force login modal
+          // Check if user is logged in via Member ID without firebase auth
+          const savedLoggedIn = safeStorage.getItem('pbc_logged_in');
+          const savedMemberStr = safeStorage.getItem('pbc_current_member');
+          if (savedLoggedIn === 'true' && savedMemberStr) {
+            try {
+              const parsed = JSON.parse(savedMemberStr);
+              // Reject legacy hardcoded fake seed profile (PBC-1001)
+              if (parsed && parsed.id && parsed.id !== 'PBC-1001') {
+                // Keep the member ID session active and restore state
+                setIsLoggedIn(true);
+                setIsAuthModalOpen(false);
+                setCurrentMember(parsed);
+                const savedRole = safeStorage.getItem('pbc_role') as UserRole;
+                if (savedRole) setRoleState(savedRole);
+                return;
+              }
+            } catch (e) {}
+          }
+
+          // No active firebase user and no valid member session -> force login modal
           safeStorage.removeItem('pbc_role');
           safeStorage.removeItem('pbc_logged_in');
+          safeStorage.removeItem('pbc_current_member');
+          safeStorage.removeItem('pbc_member_id');
+          safeStorage.removeItem('pbc_user_email');
+          setCurrentMember(BLANK_MEMBER);
           setIsLoggedIn(false);
           setIsAuthModalOpen(true);
         }
@@ -754,48 +879,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Update currentMember and sync role when members change
   useEffect(() => {
-    if (members.length > 0) {
-      const loggedInEmail = (authUser?.email || currentMember?.email || '').toLowerCase().trim();
-      let targetMember = members.find(m => 
-        (loggedInEmail && m.email && m.email.toLowerCase().trim() === loggedInEmail) ||
-        (currentMember?.id && m.id === currentMember.id)
-      );
+    if (members.length > 0 && isLoggedIn) {
+      const loggedInEmail = (authUser?.email || safeStorage.getItem('pbc_user_email') || currentMember?.email || '').toLowerCase().trim();
+      const loggedInMemberId = (safeStorage.getItem('pbc_member_id') || currentMember?.id || '').trim();
 
-      if (!targetMember && (loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com' || accountRole === 'super_admin')) {
-        targetMember = members.find(m => m.id === 'PBC-1001' || m.email.toLowerCase().includes('fokrul')) || members[0];
+      if (!loggedInEmail && !loggedInMemberId) return;
+
+      const isSuperAdminEmail = loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com';
+
+      // Find member strictly matching the logged in user
+      let targetMember: Member | undefined = undefined;
+
+      if (loggedInEmail) {
+        targetMember = members.find(m => m.email && m.email.toLowerCase().trim() === loggedInEmail);
+      }
+      if (!targetMember && loggedInMemberId) {
+        targetMember = members.find(m => m.id && m.id.toUpperCase() === loggedInMemberId.toUpperCase());
+      }
+      if (!targetMember && loggedInEmail === 'almegledest@gmail.com') {
+        targetMember = members.find(m => m.id === 'PBC-00000');
       }
 
       if (targetMember) {
         setCurrentMember(targetMember);
+        safeStorage.setItem('pbc_current_member', JSON.stringify(targetMember));
         
         // Dynamically sync role if member's role was changed in Firestore (e.g. promoted to admin)
         const effectiveRole = targetMember.role === 'super_admin' ? 'super_admin' : (targetMember.role === 'admin' ? 'admin' : 'member');
         if (effectiveRole === 'admin' && role === 'member') {
           setRoleState('admin');
           safeStorage.setItem('pbc_role', 'admin');
-        } else if (effectiveRole === 'member' && role === 'admin' && loggedInEmail !== 'fokrulislammir9897@gmail.com' && loggedInEmail !== 'almegledest@gmail.com') {
+        } else if (effectiveRole === 'member' && role === 'admin' && !isSuperAdminEmail) {
           setRoleState('member');
           safeStorage.setItem('pbc_role', 'member');
         }
-      } else {
-        if (members[0]) {
-          setCurrentMember(members[0]);
-        }
       }
+      // CRITICAL SECURITY FIX: Never fall back to members[0]!
+      // If targetMember is not found (e.g. an Admin user without a member deposit card),
+      // keep their isolated admin profile. Never overwrite them with another person's account!
     }
-  }, [members, authUser]);
+  }, [members, authUser, isLoggedIn]);
 
-  // Compute account's true background permission level
-  const loggedInEmail = (authUser?.email || currentMember?.email || '').toLowerCase().trim();
+  // Compute account's true background permission level strictly from verified credentials
+  const loggedInEmail = (authUser?.email || safeStorage.getItem('pbc_user_email') || currentMember?.email || '').toLowerCase().trim();
+  const isSuperAdminEmail = loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com';
   const foundUserObj = users.find(u => u.email.toLowerCase().trim() === loggedInEmail);
-  const accountRole: UserRole = foundUserObj?.role || currentMember?.role || (loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com' ? 'super_admin' : 'member');
+  const accountRole: UserRole = isSuperAdminEmail 
+    ? 'super_admin' 
+    : (foundUserObj?.role === 'super_admin' 
+        ? 'super_admin' 
+        : (foundUserObj?.role || (currentMember?.role === 'admin' ? 'admin' : 'member')));
 
   const switchRoleMode = (targetMode: UserRole) => {
     if (targetMode === 'member') {
       setRoleState('member');
       safeStorage.setItem('pbc_role', 'member');
     } else {
-      const modeToSet = accountRole === 'super_admin' ? 'super_admin' : 'admin';
+      const modeToSet = (isSuperAdminEmail || accountRole === 'super_admin') ? 'super_admin' : 'admin';
       setRoleState(modeToSet);
       safeStorage.setItem('pbc_role', modeToSet);
     }
@@ -818,11 +958,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setRole = (newRole: UserRole) => {
     setRoleState(newRole);
-    if (!currentMember || !currentMember.id) {
-      if (members[0]) {
-        setCurrentMember(members[0]);
-      }
-    }
+    safeStorage.setItem('pbc_role', newRole);
   };
 
   const setLanguage = (lang: Language) => {
@@ -1380,7 +1516,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!targetDeposit) return;
 
     const adminName = currentMember?.fullName || authUser?.displayName || (role === 'super_admin' ? 'Super Admin' : 'PBC Admin');
-    const adminId = currentMember?.id || (role === 'super_admin' ? 'PBC-00118' : 'PBC-ADMIN');
+    const adminId = currentMember?.id || (role === 'super_admin' ? (authUser?.email === 'fokrulislammir9897@gmail.com' ? 'PBC-1001' : 'PBC-ADMIN') : 'PBC-ADMIN');
     const finalReason = reason?.trim() || 'প্রশাসনিক অডিট নিরীক্ষায় তথ্য অমিল বা ট্রানজ্যাকশন নিশ্চিত হওয়া যায়নি।';
 
     const updateData: Partial<Deposit> = {
@@ -1687,8 +1823,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotifications(prev => [newNotif, ...prev]);
   };
 
-  const userEmailOrId = (authUser?.email || currentMember?.email || currentMember?.id || '').toLowerCase().trim();
-  const isSuperAdminUser = role === 'super_admin' || accountRole === 'super_admin' || (currentMember && currentMember.role === 'super_admin') || (authUser && (authUser.email === 'fokrulislammir9897@gmail.com' || authUser.email === 'almegledest@gmail.com'));
+  const userEmailOrId = (authUser?.email || safeStorage.getItem('pbc_user_email') || currentMember?.email || currentMember?.id || '').toLowerCase().trim();
+  const isSuperAdminUser = (authUser && (authUser.email === 'fokrulislammir9897@gmail.com' || authUser.email === 'almegledest@gmail.com')) || 
+    (currentMember && (currentMember.email === 'fokrulislammir9897@gmail.com' || currentMember.email === 'almegledest@gmail.com')) ||
+    accountRole === 'super_admin';
   const canManageDirectors = isSuperAdminUser || directors.some(d => d.allowedAccessUsers && d.allowedAccessUsers.some(u => u.toLowerCase().trim() === userEmailOrId));
 
   return (

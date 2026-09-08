@@ -72,6 +72,7 @@ export const Sidebar: React.FC = () => {
         { id: 'my_profile', label: labels.myProfile, icon: User },
         { id: 'deposits', label: 'My Deposits', icon: Wallet },
         { id: 'real_estate', label: 'Approved Investments', icon: Building2 },
+        { id: 'club_rules', label: language === 'bn' ? 'নীতিমালা ও গঠনতন্ত্র' : 'Club Rules & By-Laws', icon: BookOpen },
         { id: 'help_desk', label: language === 'bn' ? 'হেল্প ডেস্ক ও অ্যাকাউন্টস' : 'Help Desk & Accounts', icon: Headphones }
       ]
     : [
@@ -79,6 +80,7 @@ export const Sidebar: React.FC = () => {
         { id: 'members', label: labels.members, icon: Users },
         { id: 'deposits', label: labels.deposits, icon: Wallet },
         { id: 'real_estate', label: 'Investments', icon: Building2 },
+        { id: 'club_rules', label: language === 'bn' ? 'নীতিমালা ও গঠনতন্ত্র' : 'Club Rules & By-Laws', icon: BookOpen },
         { id: 'reports', label: labels.reports, icon: PieChart },
         ...(role === 'super_admin' || role === 'admin'
           ? [
@@ -340,7 +342,7 @@ export const Sidebar: React.FC = () => {
                     {currentMember?.fullName || authUser?.displayName || 'PBC Club Member'}
                   </h4>
                   <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-amber-300">
-                    <span className="font-bold">{currentMember?.id || 'PBC-00118'}</span>
+                    <span className="font-bold">{currentMember?.id || (role === 'super_admin' ? 'PBC-ADMIN' : 'PBC-MEMBER')}</span>
                     <span>•</span>
                     <span className="capitalize px-1.5 py-0.2 bg-amber-500/20 text-amber-300 rounded-md font-semibold text-[10px] border border-amber-500/30">
                       {role === 'super_admin' ? (language === 'bn' ? 'সিস্টেম অ্যাডমিন' : 'System Admin') : (role === 'admin' ? 'Admin' : 'Member')}
@@ -409,16 +411,30 @@ export const Sidebar: React.FC = () => {
                     setIsMoreOpen(false);
                   }}
                   className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-bold transition text-left cursor-pointer ${
+                    !isAdmin ? 'col-span-2 shadow-sm' : ''
+                  } ${
                     activeTab === 'club_rules'
-                      ? 'bg-amber-500/20 border-amber-500/60 text-amber-300'
-                      : 'bg-[#0B1528] border-[#D4AF37]/20 text-slate-200 hover:bg-[#112244]'
+                      ? 'bg-amber-500/25 border-amber-500/80 text-amber-300'
+                      : 'bg-[#0B1528] border-[#D4AF37]/30 text-slate-200 hover:bg-[#112244] hover:border-amber-400/50'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <BookOpen className="w-4 h-4 text-amber-400" />
-                    <span>{language === 'bn' ? 'নীতিমালা ও নিয়মাবলী' : 'Club Rules'}</span>
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-white font-black text-xs flex items-center gap-1.5">
+                        <span>{language === 'bn' ? 'ক্লাবের নীতিমালা ও গঠনতন্ত্র' : 'Club Rules & By-Laws'}</span>
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold border border-amber-500/30">
+                          {language === 'bn' ? 'সবার জন্য' : 'All Members'}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-normal mt-0.5">
+                        {language === 'bn' ? 'সকল সদস্যের অধিকার, কিস্তি ও শরিয়াহ শর্তাবলী পড়ুন' : 'Read official member terms and by-laws'}
+                      </p>
+                    </div>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                  <ChevronRight className="w-4 h-4 opacity-70 text-amber-400" />
                 </button>
 
                 {/* Reports: ONLY for Admins & Super Admins */}

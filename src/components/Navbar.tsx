@@ -482,7 +482,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
                     {currentMember?.fullName || 'PBC Club Member'}
                   </p>
                   <p className="text-[11px] text-slate-400 flex items-center justify-between mt-0.5">
-                    <span>{currentMember?.id || 'PBC-00118'}</span>
+                    <span>{currentMember?.id || (role === 'super_admin' ? 'PBC-ADMIN' : 'PBC-MEMBER')}</span>
                     <span className="text-amber-400 font-semibold">{currentMember?.country || 'Global'}</span>
                   </p>
                 </div>

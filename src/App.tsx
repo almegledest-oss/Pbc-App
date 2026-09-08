@@ -55,9 +55,18 @@ const MainContent: React.FC = () => {
     return <MaintenanceNoticeScreen onOpenSuperAdminLogin={() => setIsAuthModalOpen(true)} />;
   }
 
-  // Member role tab restrictions - allow dashboard, my_profile, deposits, real_estate, help_desk and directors if authorized
+  // Member role tab restrictions - allow dashboard, my_profile, deposits, real_estate, help_desk, deposit_accounts, club_rules and directors if authorized
   const isMemberAuthorized = role === 'member' 
-    ? (activeTab === 'dashboard' || activeTab === 'my_profile' || activeTab === 'deposits' || activeTab === 'real_estate' || activeTab === 'help_desk' || (activeTab === 'directors' && canManageDirectors)) 
+    ? (
+        activeTab === 'dashboard' || 
+        activeTab === 'my_profile' || 
+        activeTab === 'deposits' || 
+        activeTab === 'real_estate' || 
+        activeTab === 'help_desk' || 
+        activeTab === 'deposit_accounts' || 
+        activeTab === 'club_rules' || 
+        (activeTab === 'directors' && canManageDirectors)
+      ) 
     : true;
   const currentTab = !isMemberAuthorized ? 'dashboard' : activeTab;
 

@@ -40,7 +40,9 @@ import {
   AlertTriangle,
   Minus,
   Layers,
-  Sparkles
+  Sparkles,
+  ArrowUpDown,
+  FileSpreadsheet
 } from 'lucide-react';
 
 const MONTH_NAMES_EN = [
@@ -69,6 +71,117 @@ const QUICK_MONTH_PRESETS = [
   { value: 'October 2026', labelEn: 'Oct 2026', labelBn: 'অক্টোবর ২০২৬' },
   { value: 'general', labelEn: 'Non-Monthly', labelBn: 'সাধারণ জমা' },
 ];
+
+/**
+ * Normalizes any supported date string (YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY, D-M-YYYY)
+ * into a standardized 'YYYY-MM-DD' format for exact comparison.
+ */
+function normalizeDateStr(dateStr?: string): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  // YYYY-MM-DD or YYYY/MM/DD
+  const ymdMatch = trimmed.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (ymdMatch) {
+    const [, y, m, d] = ymdMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  // DD-MM-YYYY or DD/MM/YYYY or D-M-YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return trimmed;
+}
+
+/**
+ * Checks if a deposit belongs to the selected month (e.g., 'August 2026').
+ * Supports direct targetMonth matching, depositDate (YYYY-MM) matching, and notes fallback.
+ */
+function matchesDepositMonth(d: Deposit, selectedMonth: string): boolean {
+  if (selectedMonth === 'All' || !selectedMonth) return true;
+  
+  // 1. Direct targetMonth match (case-insensitive)
+  if (d.targetMonth && d.targetMonth.toLowerCase().trim() === selectedMonth.toLowerCase().trim()) {
+    return true;
+  }
+
+  // 2. Parse "Month Year" (e.g. "August 2026") and compare with depositDate
+  const parts = selectedMonth.trim().split(' ');
+  if (parts.length === 2) {
+    const monthName = parts[0];
+    const year = parts[1];
+    const monthIdx = MONTH_NAMES_EN.findIndex(m => m.toLowerCase() === monthName.toLowerCase());
+    if (monthIdx !== -1) {
+      const yearMonth = `${year}-${String(monthIdx + 1).padStart(2, '0')}`; // e.g. "2026-08"
+      const normalizedDepDate = normalizeDateStr(d.depositDate);
+      if (normalizedDepDate && normalizedDepDate.startsWith(yearMonth)) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Fallback: check if notes mention selectedMonth
+  if (d.notes && d.notes.toLowerCase().includes(selectedMonth.toLowerCase())) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks if a deposit date falls within fromDate and toDate range.
+ * Supports flexible formats (e.g. YYYY-MM-DD or DD-MM-YYYY).
+ */
+function matchesDateRange(depositDate?: string, from?: string, to?: string): boolean {
+  if (!from && !to) return true;
+  const normDep = normalizeDateStr(depositDate);
+  if (!normDep) return false;
+
+  const normFrom = normalizeDateStr(from);
+  const normTo = normalizeDateStr(to);
+
+  if (normFrom && normTo) {
+    const min = normFrom <= normTo ? normFrom : normTo;
+    const max = normFrom <= normTo ? normTo : normFrom;
+    return normDep >= min && normDep <= max;
+  }
+  if (normFrom) return normDep >= normFrom;
+  if (normTo) return normDep <= normTo;
+  return true;
+}
+
+/**
+ * Parses a search term like "01-01-2026 to 20-02-2026" or "01-01-2026 - 20-02-2026"
+ */
+function parseSearchDateRange(searchTerm: string): { from: string; to: string } | null {
+  if (!searchTerm) return null;
+  const parts = searchTerm.trim().split(/\s+(?:to|TO|থেকে|পর্যন্ত|-|➔)\s+/);
+  if (parts.length === 2) {
+    const d1 = normalizeDateStr(parts[0]);
+    const d2 = normalizeDateStr(parts[1]);
+    if (d1 && d2) {
+      return { from: d1 <= d2 ? d1 : d2, to: d1 <= d2 ? d2 : d1 };
+    }
+  }
+  return null;
+}
+
+/**
+ * Human readable formatted date: e.g. '01 Aug 2026' or '০১ আগস্ট ২০২৬'
+ */
+function formatDisplayDate(dateStr?: string, isBn: boolean = false): string {
+  if (!dateStr) return '-';
+  const norm = normalizeDateStr(dateStr);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(norm)) {
+    const [y, m, d] = norm.split('-');
+    const day = parseInt(d, 10);
+    const monthIdx = parseInt(m, 10) - 1;
+    const monthName = isBn ? MONTH_NAMES_BN[monthIdx] || m : MONTH_NAMES_EN[monthIdx] || m;
+    return `${day} ${monthName} ${y}`;
+  }
+  return dateStr;
+}
 
 export const DepositList: React.FC = () => {
   const { 
@@ -99,7 +212,43 @@ export const DepositList: React.FC = () => {
   const [currencyFilter, setCurrencyFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState<'All' | 'Approved' | 'Pending' | 'Rejected'>('All');
-  const [monthFilter, setMonthFilter] = useState<string>('All');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+  const [quickPreset, setQuickPreset] = useState<string>('All');
+  const [dateSortOrder, setDateSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  const handleSelectQuickPreset = (preset: string) => {
+    setQuickPreset(preset);
+    if (preset === 'All') {
+      setFromDate('');
+      setToDate('');
+    } else if (preset === 'today') {
+      const today = new Date().toISOString().split('T')[0];
+      setFromDate(today);
+      setToDate(today);
+    } else if (preset === 'thisMonth') {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+      setFromDate(`${y}-${m}-01`);
+      setToDate(`${y}-${m}-${String(lastDay).padStart(2, '0')}`);
+    } else {
+      // Month Year format (e.g. "August 2026")
+      const parts = preset.trim().split(' ');
+      if (parts.length === 2) {
+        const mName = parts[0];
+        const y = parts[1];
+        const mIdx = MONTH_NAMES_EN.findIndex(m => m.toLowerCase() === mName.toLowerCase());
+        if (mIdx !== -1) {
+          const mStr = String(mIdx + 1).padStart(2, '0');
+          const lastDay = new Date(parseInt(y, 10), mIdx + 1, 0).getDate();
+          setFromDate(`${y}-${mStr}-01`);
+          setToDate(`${y}-${mStr}-${String(lastDay).padStart(2, '0')}`);
+        }
+      }
+    }
+  };
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -114,7 +263,7 @@ export const DepositList: React.FC = () => {
 
   // Form State
   const [formData, setFormData] = useState({
-    memberId: members[0]?.id || 'PBC-1001',
+    memberId: currentMember?.id || (members.length > 0 ? members[0]?.id : ''),
     shareCount: 1,
     shareUnitPrice: shareUnitPrice,
     amount: shareUnitPrice,
@@ -193,44 +342,112 @@ export const DepositList: React.FC = () => {
   const isDepositApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
 
   const filteredDeposits = userDeposits.filter(d => {
-    const matchesSearch = 
-      d.memberName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.memberId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.referenceNumber.toLowerCase().includes(searchTerm.toLowerCase());
+    // 1. Search term: matches text fields OR matches parsed date range / single date
+    const searchRange = parseSearchDateRange(searchTerm);
+    const searchSingle = normalizeDateStr(searchTerm);
+    const depNormalized = normalizeDateStr(d.depositDate);
 
-    const matchesMethod = methodFilter === 'All' || d.paymentMethod === methodFilter;
+    let isSearchDateMatch = false;
+    if (searchRange) {
+      isSearchDateMatch = Boolean(depNormalized && depNormalized >= searchRange.from && depNormalized <= searchRange.to);
+    } else if (searchSingle && depNormalized && searchSingle === depNormalized) {
+      isSearchDateMatch = true;
+    }
+
+    const matchesSearch = 
+      !searchTerm ||
+      isSearchDateMatch ||
+      (d.memberName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.memberId || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.referenceNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.depositDate || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.targetMonth || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    // 2. Date Range Filter (From Date to To Date, e.g. 01-01-2026 to 20-02-2026)
+    let inDateRange = matchesDateRange(d.depositDate, fromDate, toDate);
+    // If a specific target month preset like "August 2026" was selected, also include if targetMonth matches
+    if (quickPreset && quickPreset !== 'All' && quickPreset !== 'today' && quickPreset !== 'thisMonth' && quickPreset !== 'Custom') {
+      if (d.targetMonth && d.targetMonth.toLowerCase().trim() === quickPreset.toLowerCase().trim()) {
+        inDateRange = true;
+      }
+    }
+
+    // 3. Payment Method filter with flexible aliases
+    const matchesMethod = methodFilter === 'All' || (
+      d.paymentMethod === methodFilter ||
+      (methodFilter === 'Bank Wire' && (d.paymentMethod === 'Bank' || d.paymentMethod === 'Bank Wire')) ||
+      (methodFilter === 'Bank' && (d.paymentMethod === 'Bank' || d.paymentMethod === 'Bank Wire')) ||
+      (methodFilter === 'bKash/Nagad' && (d.paymentMethod === 'bKash' || d.paymentMethod === 'Nagad' || d.paymentMethod === 'bKash/Nagad')) ||
+      (methodFilter === 'bKash' && (d.paymentMethod === 'bKash' || d.paymentMethod === 'bKash/Nagad'))
+    );
+
+    // 4. Currency filter
     const matchesCurrency = currencyFilter === 'All' || d.currency === currencyFilter;
+
+    // 5. Fund Category filter
     const matchesCategory = categoryFilter === 'All' 
       || (categoryFilter === 'Fund Raising' && (d.category === 'Fund Raising' || !d.category))
       || (categoryFilter === 'Real Estate' && d.category === 'Real Estate');
 
+    // 6. Status filter
     const matchesStatus = statusFilter === 'All' || (
       statusFilter === 'Approved' ? isDepositApproved(d.status) :
       statusFilter === 'Pending' ? (d.status?.toLowerCase().trim() === 'pending') :
       statusFilter === 'Rejected' ? (d.status?.toLowerCase().trim() === 'rejected') : true
     );
 
-    const matchesMonth = monthFilter === 'All' || (
-      // Match either targetMonth directly or depositDate starting with YYYY-MM
-      (d.targetMonth && d.targetMonth.toLowerCase().trim() === monthFilter.toLowerCase().trim()) ||
-      (d.depositDate && d.depositDate.startsWith(monthFilter))
-    );
+    return matchesSearch && inDateRange && matchesMethod && matchesCurrency && matchesCategory && matchesStatus;
+  });
 
-    return matchesSearch && matchesMethod && matchesCurrency && matchesCategory && matchesStatus && matchesMonth;
+  // Calculate overall counts and totals for Approved and Pending switch tabs
+  const approvedTotalAmount = userDeposits
+    .filter(d => isDepositApproved(d.status))
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const approvedCount = userDeposits.filter(d => isDepositApproved(d.status)).length;
+
+  const pendingTotalAmount = userDeposits
+    .filter(d => d.status?.toLowerCase().trim() === 'pending')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const pendingCount = userDeposits.filter(d => d.status?.toLowerCase().trim() === 'pending').length;
+
+  const userAllCount = userDeposits.length;
+
+  // Strict chronological date sorting helper
+  const getDepositTimestamp = (d: Deposit): number => {
+    if (d.depositDate) {
+      const normalized = normalizeDateStr(d.depositDate);
+      const parsed = Date.parse(normalized || d.depositDate);
+      if (!isNaN(parsed)) return parsed;
+    }
+    return 0;
+  };
+
+  // Sort deposits chronologically by depositDate (serial order)
+  const sortedDeposits = [...filteredDeposits].sort((a, b) => {
+    const timeA = getDepositTimestamp(a);
+    const timeB = getDepositTimestamp(b);
+    if (timeA !== timeB) {
+      return dateSortOrder === 'desc' ? timeB - timeA : timeA - timeB;
+    }
+    // Fallback: compare ID numerically/lexicographically
+    return dateSortOrder === 'desc'
+      ? (b.id || '').localeCompare(a.id || '', undefined, { numeric: true })
+      : (a.id || '').localeCompare(b.id || '', undefined, { numeric: true });
   });
 
   // CRITICAL RULE: "Pending" deposits must NEVER be counted in the ledger total or user balance!
   // Only officially "Approved" deposits are included in the ledger total.
-  const totalFilteredAmount = filteredDeposits
+  const totalFilteredAmount = sortedDeposits
     .filter(d => isDepositApproved(d.status))
     .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-  const pendingFilteredAmount = filteredDeposits
+  const pendingFilteredAmount = sortedDeposits
     .filter(d => d.status?.toLowerCase().trim() === 'pending')
     .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-  const rejectedFilteredAmount = filteredDeposits
+  const rejectedFilteredAmount = sortedDeposits
     .filter(d => d.status?.toLowerCase().trim() === 'rejected')
     .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
@@ -297,7 +514,7 @@ export const DepositList: React.FC = () => {
     }
 
     setFormData({
-      memberId: currentMember?.id || members[0]?.id || 'PBC-1001',
+      memberId: currentMember?.id || (members.length > 0 ? members[0]?.id : ''),
       shareCount: 1,
       shareUnitPrice: shareUnitPrice,
       amount: shareUnitPrice,
@@ -312,19 +529,169 @@ export const DepositList: React.FC = () => {
     setReceiptPreview('');
   };
 
-  const exportToCsv = () => {
-    const headers = ['Deposit ID', 'Member ID', 'Member Name', 'Amount BDT', 'Currency', 'Date', 'Method', 'Ref Number', 'Status'];
-    const rows = filteredDeposits.map(d => [
-      d.id, d.memberId, `"${d.memberName}"`, d.amount, d.currency, d.depositDate, d.paymentMethod, d.referenceNumber, d.status
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+  // Export to formatted Microsoft Excel Spreadsheet (.xls)
+  const exportToExcel = () => {
+    const reportDate = new Date().toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+    const reportTime = new Date().toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    const activeFilterLabel = statusFilter === 'All' ? 'All Records (সকল রেকর্ড)' : statusFilter;
+
+    const htmlContent = `
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <!--[if gte mso 9]>
+  <xml>
+    <x:ExcelWorkbook>
+      <x:ExcelWorksheets>
+        <x:ExcelWorksheet>
+          <x:Name>Deposits Ledger</x:Name>
+          <x:WorksheetOptions>
+            <x:DisplayGridlines/>
+          </x:WorksheetOptions>
+        </x:ExcelWorksheet>
+      </x:ExcelWorksheets>
+    </x:ExcelWorkbook>
+  </xml>
+  <![endif]-->
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    table { border-collapse: collapse; width: 100%; }
+    .title { font-size: 16pt; font-weight: bold; color: #0B1528; text-align: center; }
+    .subtitle { font-size: 10.5pt; color: #475569; text-align: center; }
+    th { background-color: #0B1528; color: #D4AF37; font-size: 10pt; font-weight: bold; border: 1px solid #334155; padding: 10px 8px; text-align: center; }
+    td { border: 1px solid #CBD5E1; padding: 7px 6px; font-size: 9.5pt; color: #1E293B; vertical-align: middle; }
+    .text-center { text-align: center; }
+    .text-left { text-align: left; }
+    .text-right { text-align: right; }
+    .amount { font-weight: bold; color: #047857; text-align: right; }
+    .total-row { background-color: #F1F5F9; font-weight: bold; border-top: 2px solid #0B1528; }
+  </style>
+</head>
+<body>
+  <table>
+    <tr>
+      <td colspan="11" class="title" style="border:none; padding-top:14px; font-size:16pt; font-weight:bold; color:#0B1528; text-align:center;">
+        PROBASHI BARGUNA SOMOBAY SAMITY (প্রবাসী বরগুনা সমবায় সমিতি)
+      </td>
+    </tr>
+    <tr>
+      <td colspan="11" class="subtitle" style="border:none; padding-bottom:8px; font-size:10.5pt; color:#475569; text-align:center;">
+        Official Capital Deposits Ledger & Member Transaction Statement
+      </td>
+    </tr>
+    <tr>
+      <td colspan="11" style="border:none; padding-bottom:12px;">
+        <table style="width:100%; border:1px solid #CBD5E1; background-color:#F8FAFC;">
+          <tr>
+            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Generated Date:</strong> ${reportDate} ${reportTime}</td>
+            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Filter:</strong> ${activeFilterLabel}</td>
+            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Total Records:</strong> ${sortedDeposits.length}</td>
+            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Total Approved Ledger:</strong> ৳${totalFilteredAmount.toLocaleString()} BDT</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    <thead>
+      <tr>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; width:45px;">SL</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Deposit ID</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Member ID</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; min-width:180px;">Member Name</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Shares</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Category</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Deposit Date</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Payment Method</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Transaction Ref</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Status</th>
+        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; min-width:110px;">Amount (BDT)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${sortedDeposits.map((d, index) => {
+        const isAppr = d.status?.toLowerCase().trim() === 'approved';
+        const isPend = d.status?.toLowerCase().trim() === 'pending';
+        const statusColor = isAppr 
+          ? 'background-color:#DCFCE7; color:#15803D;' 
+          : (isPend ? 'background-color:#FEF3C7; color:#B45309;' : 'background-color:#FEE2E2; color:#B91C1C;');
+        const rowBg = index % 2 === 0 ? 'background-color:#FFFFFF;' : 'background-color:#F8FAFC;';
+
+        return `
+        <tr style="${rowBg}">
+          <td style="border:1px solid #CBD5E1; text-align:center; font-weight:bold;">${index + 1}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace; font-weight:bold; color:#0B1528;">${d.id}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace; font-weight:bold; color:#B45309;">${d.memberId}</td>
+          <td style="border:1px solid #CBD5E1; text-align:left; font-weight:bold;">${d.memberName}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center;">${d.shareCount || 1}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center;">${d.category || 'Fund Raising'}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace;">${d.depositDate || '-'}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center;">${d.paymentMethod}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace;">${d.referenceNumber || '-'}</td>
+          <td style="border:1px solid #CBD5E1; text-align:center; font-weight:bold; ${statusColor}">${d.status}</td>
+          <td style="border:1px solid #CBD5E1; text-align:right; font-weight:bold; color:#047857;">৳${d.amount.toLocaleString()}</td>
+        </tr>`;
+      }).join('')}
+      <tr style="background-color:#F1F5F9; border-top:2px solid #0B1528;">
+        <td colspan="10" style="border:1px solid #94A3B8; text-align:right; font-weight:bold; font-size:10pt; padding:10px;">
+          TOTAL APPROVED LEDGER (মোট অনুমোদিত লেজার):
+        </td>
+        <td style="border:1px solid #94A3B8; text-align:right; font-weight:bold; font-size:11pt; color:#047857; padding:10px;">
+          ৳${totalFilteredAmount.toLocaleString()} BDT
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    // Add UTF-8 BOM so Excel on Windows parses Bengali & UTF-8 perfectly
+    const blob = new Blob(['\uFEFF' + htmlContent], {
+      type: 'application/vnd.ms-excel;charset=utf-8'
+    });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `PBC_Deposits_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = url;
+    link.download = `PBC_Deposits_Report_${new Date().toISOString().split('T')[0]}.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToCsv = () => {
+    const headers = ['SL', 'Deposit ID', 'Member ID', 'Member Name', 'Shares', 'Category', 'Amount BDT', 'Currency', 'Date', 'Method', 'Ref Number', 'Status'];
+    const rows = sortedDeposits.map((d, index) => [
+      index + 1,
+      d.id,
+      d.memberId,
+      `"${d.memberName.replace(/"/g, '""')}"`,
+      d.shareCount || 1,
+      `"${d.category || 'Fund Raising'}"`,
+      d.amount,
+      d.currency,
+      d.depositDate,
+      d.paymentMethod,
+      `"${(d.referenceNumber || '').replace(/"/g, '""')}"`,
+      d.status
+    ]);
+    // Prepend UTF-8 BOM \uFEFF so Excel opens CSV with proper encoding
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `PBC_Deposits_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -376,13 +743,31 @@ export const DepositList: React.FC = () => {
           )}
 
           {(role === 'super_admin' || role === 'admin') && (
-            <button
-              onClick={exportToCsv}
-              className="flex items-center justify-center gap-1.5 px-4 py-3 min-h-[48px] bg-[#0B1528] hover:bg-[#112244] text-amber-300 text-xs font-bold rounded-xl border border-[#D4AF37]/50 transition shrink-0 active:scale-95 cursor-pointer"
-            >
-              <Download className="w-4 h-4 text-amber-400" />
-              <span>{labels.exportCsv}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Primary Formatted Excel Sheet Export */}
+              <button
+                type="button"
+                id="btn-export-excel"
+                onClick={exportToExcel}
+                className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition shrink-0 active:scale-95 cursor-pointer"
+                title={language === 'bn' ? 'মাইক্রোসফট এক্সেলে সরাসরি পরিচ্ছন্ন রঙিন শীট ওপেন করুন' : 'Export styled spreadsheet for Microsoft Excel (.xls)'}
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-200 stroke-[2.5]" />
+                <span>{language === 'bn' ? 'Excel শীট ডাউনলোড' : 'Download Excel (.xls)'}</span>
+              </button>
+
+              {/* Plain CSV Export */}
+              <button
+                type="button"
+                id="btn-export-csv"
+                onClick={exportToCsv}
+                className="flex items-center justify-center gap-1.5 px-3 py-3 min-h-[48px] bg-[#0B1528] hover:bg-[#112244] text-amber-300 text-xs font-bold rounded-xl border border-[#D4AF37]/50 transition shrink-0 active:scale-95 cursor-pointer"
+                title={language === 'bn' ? 'সাধারণ সিএসভি ফাইল ডাউনলোড' : 'Download plain CSV file'}
+              >
+                <Download className="w-4 h-4 text-amber-400" />
+                <span>CSV</span>
+              </button>
+            </div>
           )}
 
           {role === 'member' && currentMember?.status === 'active' && (
@@ -408,32 +793,191 @@ export const DepositList: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-amber-300/80 font-bold tracking-wider uppercase">
-                {language === 'bn' ? 'অনুমোদিত লেজার টোটাল (FILTERED LEDGER TOTAL)' : 'FILTERED LEDGER TOTAL'}
+                {statusFilter === 'Pending'
+                  ? (language === 'bn' ? 'অপেক্ষমাণ ভাউচার মোট (PENDING TOTAL)' : 'PENDING TOTAL')
+                  : statusFilter === 'Rejected'
+                  ? (language === 'bn' ? 'বাতিলকৃত মোট (REJECTED TOTAL)' : 'REJECTED TOTAL')
+                  : (language === 'bn' ? 'অনুমোদিত লেজার টোটাল (APPROVED TOTAL)' : 'APPROVED LEDGER TOTAL')}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                {language === 'bn' ? 'শুধুমাত্র অনুমোদিত' : 'Approved Only'}
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                statusFilter === 'Pending'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  : statusFilter === 'Rejected'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+              }`}>
+                {statusFilter === 'Pending'
+                  ? (language === 'bn' ? 'অপেক্ষমাণ' : 'Pending Only')
+                  : statusFilter === 'Rejected'
+                  ? (language === 'bn' ? 'বাতিলকৃত' : 'Rejected Only')
+                  : (language === 'bn' ? 'শুধুমাত্র অনুমোদিত' : 'Approved Only')}
               </span>
             </div>
             <h3 className="text-2xl font-black text-amber-300 mt-0.5">
-              ৳{totalFilteredAmount.toLocaleString()} BDT
+              ৳{(statusFilter === 'Pending' ? pendingFilteredAmount : totalFilteredAmount).toLocaleString()} BDT
             </h3>
           </div>
         </div>
 
-        {/* Sub-breakdown for Pending & Records */}
+        {/* Records Count Badge */}
         <div className="flex items-center gap-2 flex-wrap">
-          {pendingFilteredAmount > 0 && (
-            <span className="text-xs bg-amber-500/10 px-3 py-1.5 rounded-xl text-amber-300 border border-amber-500/30 font-medium flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-amber-400" />
-              <span>{language === 'bn' ? 'অপেক্ষমাণ জমা:' : 'Pending:'} ৳{pendingFilteredAmount.toLocaleString()}</span>
-            </span>
-          )}
+          <span className="text-xs font-mono bg-[#070D1B] px-3.5 py-2 rounded-xl text-amber-300 border border-[#D4AF37]/30 font-bold flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <span>{sortedDeposits.length} {language === 'bn' ? 'টি রেকর্ড' : 'Records'}</span>
+          </span>
+        </div>
+      </div>
 
-          {(role === 'super_admin' || role === 'admin') && (
-            <span className="text-xs font-mono bg-[#070D1B] px-3 py-1.5 rounded-xl text-amber-300 border border-[#D4AF37]/30 font-bold">
-              {filteredDeposits.length} Records
+      {/* Two Prominent Switch Tabs: Approved vs Pending (Directly as requested by user) */}
+      <div className="space-y-2.5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* Approved Switch Tab */}
+          <button
+            type="button"
+            id="tab-approved-deposits"
+            onClick={() => setStatusFilter(statusFilter === 'Approved' ? 'All' : 'Approved')}
+            className={`relative p-3.5 sm:p-4 rounded-2xl border transition-all text-left flex flex-col justify-between overflow-hidden cursor-pointer group active:scale-[0.98] ${
+              statusFilter === 'Approved'
+                ? 'bg-gradient-to-br from-emerald-950/90 via-[#071F18] to-[#0A1628] border-emerald-400/90 shadow-xl shadow-emerald-950/60 ring-2 ring-emerald-400/40'
+                : 'bg-[#0B1528] border-emerald-500/30 hover:border-emerald-400/60 hover:bg-[#0E1E34]'
+            }`}
+          >
+            {statusFilter === 'Approved' && (
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-emerald-300 to-emerald-500" />
+            )}
+
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-xl transition ${
+                  statusFilter === 'Approved' 
+                    ? 'bg-emerald-500 text-slate-950' 
+                    : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                }`}>
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <span className="text-xs sm:text-sm font-black tracking-wide text-white uppercase block">
+                    {language === 'bn' ? 'অনুমোদিত' : 'Approved'}
+                  </span>
+                  <span className="text-[10px] text-emerald-400/90 font-bold block">
+                    {approvedCount} {language === 'bn' ? 'টি ডিপোজিট' : 'Deposits'}
+                  </span>
+                </div>
+              </div>
+
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
+                statusFilter === 'Approved'
+                  ? 'bg-emerald-400 text-slate-950 border-emerald-300'
+                  : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+              }`}>
+                {statusFilter === 'Approved' ? (language === 'bn' ? 'ফিল্টারড' : 'Active') : (language === 'bn' ? 'দেখুন' : 'Filter')}
+              </span>
+            </div>
+
+            <div className="mt-1">
+              <div className="text-base sm:text-xl font-black text-emerald-400 tracking-tight">
+                ৳{approvedTotalAmount.toLocaleString()} <span className="text-[10px] font-bold text-emerald-400/70">BDT</span>
+              </div>
+            </div>
+          </button>
+
+          {/* Pending Switch Tab */}
+          <button
+            type="button"
+            id="tab-pending-deposits"
+            onClick={() => setStatusFilter(statusFilter === 'Pending' ? 'All' : 'Pending')}
+            className={`relative p-3.5 sm:p-4 rounded-2xl border transition-all text-left flex flex-col justify-between overflow-hidden cursor-pointer group active:scale-[0.98] ${
+              statusFilter === 'Pending'
+                ? 'bg-gradient-to-br from-amber-950/90 via-[#281A05] to-[#0A1628] border-amber-400/90 shadow-xl shadow-amber-950/60 ring-2 ring-amber-400/40'
+                : 'bg-[#0B1528] border-amber-500/30 hover:border-amber-400/60 hover:bg-[#0E1E34]'
+            }`}
+          >
+            {statusFilter === 'Pending' && (
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500" />
+            )}
+
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-xl transition ${
+                  statusFilter === 'Pending' 
+                    ? 'bg-amber-400 text-slate-950' 
+                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                }`}>
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <span className="text-xs sm:text-sm font-black tracking-wide text-white uppercase block">
+                    {language === 'bn' ? 'অপেক্ষমাণ' : 'Pending'}
+                  </span>
+                  <span className="text-[10px] text-amber-400/90 font-bold block">
+                    {pendingCount} {language === 'bn' ? 'টি ভাউচার' : 'Vouchers'}
+                  </span>
+                </div>
+              </div>
+
+              {pendingCount > 0 ? (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1 ${
+                  statusFilter === 'Pending'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                  {pendingCount}
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 px-2 py-0.5 rounded-full bg-slate-800">
+                  0
+                </span>
+              )}
+            </div>
+
+            <div className="mt-1">
+              <div className="text-base sm:text-xl font-black text-amber-300 tracking-tight">
+                ৳{pendingTotalAmount.toLocaleString()} <span className="text-[10px] font-bold text-amber-300/70">BDT</span>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        {/* Quick status filter info & Date Chronological Sorting indicator */}
+        <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            {statusFilter !== 'All' ? (
+              <button
+                type="button"
+                id="btn-show-all-status"
+                onClick={() => setStatusFilter('All')}
+                className="px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-amber-300 border border-[#D4AF37]/30 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+              >
+                <X className="w-3 h-3 text-amber-400" />
+                <span>{language === 'bn' ? 'সবগুলো দেখুন (Show All)' : 'Show All'} ({userAllCount})</span>
+              </button>
+            ) : (
+              <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+                <span>{language === 'bn' ? 'সকল ডিপোজিট প্রদর্শিত হচ্ছে' : 'Showing all deposits'} ({userAllCount})</span>
+              </span>
+            )}
+          </div>
+
+          {/* Date Sort Toggle */}
+          <button
+            type="button"
+            id="btn-toggle-date-sort"
+            onClick={() => setDateSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+            className="px-3 py-1.5 rounded-xl bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/40 text-amber-300 text-[11px] font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm ml-auto active:scale-95"
+            title={language === 'bn' ? 'ডিপোজিট তারিখ অনুযায়ী সিরিয়াল পরিবর্তন করুন' : 'Toggle date chronological sort order'}
+          >
+            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+            <span>
+              {language === 'bn'
+                ? (dateSortOrder === 'desc' ? 'তারিখ সিরিয়াল: নতুন আগে' : 'তারিখ সিরিয়াল: পুরোনো আগে')
+                : (dateSortOrder === 'desc' ? 'Date Order: Newest First' : 'Date Order: Oldest First')}
             </span>
-          )}
+            <span className="font-mono text-[10px] bg-amber-500/20 px-1.5 py-0.2 rounded text-amber-400 font-black">
+              {dateSortOrder === 'desc' ? '↓' : '↑'}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -444,7 +988,7 @@ export const DepositList: React.FC = () => {
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-400" />
             <input
               type="text"
-              placeholder={language === 'bn' ? "ডিপোজিট আইডি, মেম্বার, রেফারেন্স..." : "Search Deposit ID, Member, Ref No..."}
+              placeholder={language === 'bn' ? "মেম্বার, আইডি, বা তারিখ (যেমন 01-01-2026 to 20-02-2026)..." : "Search Member, ID, Ref, or Date (e.g. 01-01-2026 to 20-02-2026)..."}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-3.5 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
@@ -480,20 +1024,94 @@ export const DepositList: React.FC = () => {
               </option>
             </select>
 
-            {/* Month & Date Filter */}
+            {/* Unified Date Range: From [Date] To [Date] */}
+            <div 
+              className={`flex items-center gap-2 px-3 py-1.5 min-h-[48px] bg-[#070D1B] border rounded-xl shrink-0 transition ${
+                (fromDate || toDate)
+                  ? 'border-amber-400 bg-amber-500/15 shadow-[0_0_12px_rgba(245,158,11,0.25)]' 
+                  : 'border-[#D4AF37]/30 hover:border-[#D4AF37]/60'
+              }`}
+            >
+              <Calendar className={`w-4 h-4 shrink-0 ${(fromDate || toDate) ? 'text-amber-400' : 'text-slate-400'}`} />
+              
+              {/* From Date */}
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 leading-none">
+                  {language === 'bn' ? 'শুরু (From):' : 'From:'}
+                </span>
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={e => {
+                    setFromDate(e.target.value);
+                    setQuickPreset('Custom');
+                  }}
+                  className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] pt-0.5"
+                  title={language === 'bn' ? 'শুরুর তারিখ (যেমন: 01-01-2026)' : 'From date (e.g. 01-01-2026)'}
+                />
+              </div>
+
+              <span className="text-slate-500 font-bold px-0.5 text-xs">➔</span>
+
+              {/* To Date */}
+              <div className="flex flex-col">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 leading-none">
+                  {language === 'bn' ? 'শেষ (To):' : 'To:'}
+                </span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={e => {
+                    setToDate(e.target.value);
+                    setQuickPreset('Custom');
+                  }}
+                  className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer [color-scheme:dark] pt-0.5"
+                  title={language === 'bn' ? 'শেষের তারিখ (যেমন: 20-02-2026)' : 'To date (e.g. 20-02-2026)'}
+                />
+              </div>
+
+              {(fromDate || toDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFromDate('');
+                    setToDate('');
+                    setQuickPreset('All');
+                  }}
+                  className="p-1 text-slate-400 hover:text-rose-400 rounded-md hover:bg-slate-800 transition shrink-0 ml-1 cursor-pointer"
+                  title={language === 'bn' ? 'তারিখ ফিল্টার মুছুন' : 'Clear date range'}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Quick Month / Range Preset Selector */}
             <select
-              value={monthFilter}
-              onChange={e => setMonthFilter(e.target.value)}
+              value={quickPreset}
+              onChange={e => handleSelectQuickPreset(e.target.value)}
               className="px-3 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-amber-200 font-medium shrink-0"
+              title={language === 'bn' ? 'দ্রুত মাস বা সময় নির্বাচন' : 'Quick date preset'}
             >
               <option value="All" className="bg-[#070D1B] text-white">
-                {language === 'bn' ? 'সকল মাস ও কিস্তি (All Months)' : 'All Months & Dates'}
+                {language === 'bn' ? 'সকল সময় (All Time)' : 'All Time / Any Date'}
+              </option>
+              <option value="today" className="bg-[#070D1B] text-white">
+                ⚡ {language === 'bn' ? 'আজকের জমা (Today)' : 'Today'}
+              </option>
+              <option value="thisMonth" className="bg-[#070D1B] text-white">
+                📅 {language === 'bn' ? 'চলতি মাস (This Month)' : 'This Month'}
               </option>
               {GENERATED_MONTH_OPTIONS.map(m => (
                 <option key={m.value} value={m.value} className="bg-[#070D1B] text-white">
                   📅 {language === 'bn' ? m.labelBn : m.labelEn}
                 </option>
               ))}
+              {quickPreset === 'Custom' && (
+                <option value="Custom" className="bg-[#070D1B] text-amber-300">
+                  ✏️ {language === 'bn' ? 'কাস্টম রেঞ্জ (Custom)' : 'Custom Range'}
+                </option>
+              )}
             </select>
 
             {/* Category Filter */}
@@ -513,12 +1131,13 @@ export const DepositList: React.FC = () => {
               onChange={e => setMethodFilter(e.target.value)}
               className="px-3 py-3 min-h-[48px] bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-xs text-amber-200 font-medium shrink-0"
             >
-              <option value="All" className="bg-[#070D1B] text-white">All Payment Methods</option>
-              <option value="Bank Wire" className="bg-[#070D1B] text-white">Bank Wire</option>
-              <option value="bKash/Nagad" className="bg-[#070D1B] text-white">bKash/Nagad</option>
-              <option value="Wise" className="bg-[#070D1B] text-white">Wise</option>
+              <option value="All" className="bg-[#070D1B] text-white">{language === 'bn' ? 'সকল পেমেন্ট মেথড' : 'All Payment Methods'}</option>
+              <option value="Bank Wire" className="bg-[#070D1B] text-white">Bank Wire / ব্যাংক</option>
+              <option value="bKash/Nagad" className="bg-[#070D1B] text-white">bKash / Nagad</option>
+              <option value="Wise" className="bg-[#070D1B] text-white">Wise (রেমিট্যান্স)</option>
               <option value="Stripe/Card" className="bg-[#070D1B] text-white">Stripe/Card</option>
-              <option value="Cheque" className="bg-[#070D1B] text-white">Cheque</option>
+              <option value="Cheque" className="bg-[#070D1B] text-white">Cheque (চেক)</option>
+              <option value="Cash" className="bg-[#070D1B] text-white">Cash (নগদ)</option>
             </select>
 
             {/* Currency Filter */}
@@ -534,10 +1153,110 @@ export const DepositList: React.FC = () => {
         </div>
       )}
 
+      {/* Active Filter Indicators & Quick Reset */}
+      {(fromDate || toDate || (quickPreset !== 'All' && quickPreset !== 'Custom') || searchTerm || statusFilter !== 'All' || methodFilter !== 'All' || categoryFilter !== 'All' || currencyFilter !== 'All') && (
+        <div className="flex flex-wrap items-center gap-2 bg-[#0B1528] px-4 py-2.5 rounded-2xl border border-[#D4AF37]/30 text-xs shadow-md">
+          <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+            <Filter className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="font-bold text-slate-300">{language === 'bn' ? 'সক্রিয় ফিল্টার:' : 'Active Filters:'}</span>
+          </span>
+
+          {(fromDate || toDate) && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold rounded-lg shadow-sm">
+              <Calendar className="w-3.5 h-3.5 text-amber-400" />
+              <span>
+                {fromDate && toDate && fromDate === toDate
+                  ? `${language === 'bn' ? 'তারিখ: ' : 'Date: '}${formatDisplayDate(fromDate, isBn)}`
+                  : fromDate && toDate
+                  ? `${formatDisplayDate(fromDate, isBn)} ➔ ${formatDisplayDate(toDate, isBn)}`
+                  : fromDate
+                  ? `${language === 'bn' ? 'শুরু: ' : 'From: '}${formatDisplayDate(fromDate, isBn)}`
+                  : `${language === 'bn' ? 'পর্যন্ত: ' : 'To: '}${formatDisplayDate(toDate, isBn)}`
+                }
+              </span>
+              <button 
+                type="button"
+                onClick={() => { setFromDate(''); setToDate(''); setQuickPreset('All'); }} 
+                className="hover:text-rose-400 hover:bg-amber-500/30 p-0.5 rounded transition cursor-pointer"
+                title="Remove date filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+
+          {!fromDate && !toDate && quickPreset !== 'All' && quickPreset !== 'Custom' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold rounded-lg shadow-sm">
+              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{quickPreset}</span>
+              <button 
+                type="button"
+                onClick={() => setQuickPreset('All')} 
+                className="hover:text-rose-400 hover:bg-emerald-500/30 p-0.5 rounded transition cursor-pointer"
+                title="Remove preset"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+
+          {searchTerm && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-sky-500/20 border border-sky-500/40 text-sky-300 font-bold rounded-lg shadow-sm">
+              <Search className="w-3.5 h-3.5 text-sky-400" />
+              <span>"{searchTerm}"</span>
+              <button 
+                type="button"
+                onClick={() => setSearchTerm('')} 
+                className="hover:text-rose-400 hover:bg-sky-500/30 p-0.5 rounded transition cursor-pointer"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+
+          {statusFilter !== 'All' && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/20 border border-purple-500/40 text-purple-300 font-bold rounded-lg shadow-sm">
+              <span>{statusFilter}</span>
+              <button 
+                type="button"
+                onClick={() => setStatusFilter('All')} 
+                className="hover:text-rose-400 hover:bg-purple-500/30 p-0.5 rounded transition cursor-pointer"
+                title="Clear status filter"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </span>
+          )}
+
+          <div className="ml-auto flex items-center gap-2.5">
+            <span className="text-amber-200 font-bold">
+              {filteredDeposits.length} {language === 'bn' ? 'টি রেকর্ড পাওয়া গেছে' : 'records found'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setFromDate('');
+                setToDate('');
+                setQuickPreset('All');
+                setSearchTerm('');
+                setStatusFilter('All');
+                setMethodFilter('All');
+                setCategoryFilter('All');
+                setCurrencyFilter('All');
+              }}
+              className="text-xs text-amber-400 hover:text-amber-300 underline font-bold cursor-pointer"
+            >
+              {language === 'bn' ? 'ফিল্টার রিসেট করুন' : 'Reset all'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Transaction Cards Feed (< md screens) */}
       <div className="block md:hidden space-y-3">
-        {filteredDeposits.length > 0 ? (
-          filteredDeposits.map((d) => (
+        {sortedDeposits.length > 0 ? (
+          sortedDeposits.map((d) => (
             <div 
               key={d.id} 
               className="bg-[#0B1528] rounded-2xl border border-[#D4AF37]/35 p-4 shadow-lg shadow-black/40 text-white relative transition active:scale-[0.99]"
@@ -743,7 +1462,18 @@ export const DepositList: React.FC = () => {
                 <th className="py-4 px-4">{labels.memberName}</th>
                 <th className="py-4 px-4">{labels.amount}</th>
                 <th className="py-4 px-4">{language === 'bn' ? 'ফান্ডের ধরণ' : 'Fund Type'}</th>
-                <th className="py-4 px-4">{labels.depositDate}</th>
+                <th 
+                  className="py-4 px-4 cursor-pointer select-none hover:text-amber-200 transition"
+                  onClick={() => setDateSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  title={language === 'bn' ? 'তারিখ অনুযায়ী সিরিয়াল পরিবর্তন করুন' : 'Click to toggle date sort order'}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>{labels.depositDate}</span>
+                    <span className="text-[11px] text-amber-400 font-mono bg-amber-500/20 px-1 py-0.5 rounded">
+                      {dateSortOrder === 'desc' ? '↓' : '↑'}
+                    </span>
+                  </div>
+                </th>
                 {(role === 'super_admin' || role === 'admin') && <th className="py-4 px-4">{labels.paymentMethod}</th>}
                 {(role === 'super_admin' || role === 'admin') && <th className="py-4 px-4">{labels.referenceNumber}</th>}
                 <th className="py-4 px-4">{labels.status}</th>
@@ -751,7 +1481,7 @@ export const DepositList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#D4AF37]/10">
-              {filteredDeposits.map((d) => (
+              {sortedDeposits.map((d) => (
                 <tr key={d.id} className="hover:bg-[#112244] transition">
                   {(role === 'super_admin' || role === 'admin') && (
                     <td className="py-4 px-4 font-mono font-bold text-amber-300 whitespace-nowrap">

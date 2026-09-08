@@ -890,7 +890,7 @@ export function subscribeMembers(
   options?: { limit?: number }
 ) {
   // 1. Deliver local cache immediately so UI appears in 0ms without waiting or consuming server reads
-  const cached = getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS);
+  const cached = getCachedItem<Member[]>('pbc_cached_members', []);
   if (cached && cached.length > 0) {
     if (options?.limit && options.limit > 0) {
       callback(cached.slice(0, options.limit));
@@ -946,7 +946,7 @@ export function subscribeMembers(
   }, (err) => {
     notifyQuotaExceeded(err);
     console.warn('Firestore subscribeMembers notice (Quota/Offline):', err?.message || err);
-    callback(getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS));
+    callback(getCachedItem<Member[]>('pbc_cached_members', []));
   });
 }
 
@@ -1103,6 +1103,8 @@ export function subscribeDeposits(
         memberId: data.memberId || '',
         memberName: data.memberName || '',
         amount: data.amount || 0,
+        shareCount: data.shareCount,
+        shareUnitPrice: data.shareUnitPrice,
         category: data.category === 'Real Estate' ? 'Real Estate' : 'Fund Raising',
         currency: data.currency || 'BDT',
         localAmount: data.localAmount,
@@ -1110,11 +1112,16 @@ export function subscribeDeposits(
         paymentMethod: data.paymentMethod || 'Bank Wire',
         referenceNumber: data.referenceNumber || '',
         notes: data.notes || '',
+        targetMonth: data.targetMonth || undefined,
         receiptUrl: data.receiptUrl || '',
         status: data.status || 'Approved',
         approvedByAdminName: data.approvedByAdminName || '',
         approvedByAdminId: data.approvedByAdminId || '',
-        approvedByAdminSignature: data.approvedByAdminSignature || ''
+        approvedByAdminSignature: data.approvedByAdminSignature || '',
+        rejectionReason: data.rejectionReason,
+        rejectedAt: data.rejectedAt,
+        rejectedByAdminName: data.rejectedByAdminName,
+        rejectedByAdminId: data.rejectedByAdminId
       } as Deposit;
     });
 
@@ -1755,8 +1762,8 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
 
       // Check member status in cached members or Firestore
       let member: Member | undefined = undefined;
-      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS);
-      member = cachedMembers.find(m => m.email.toLowerCase() === cleanEmail);
+      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', []);
+      member = cachedMembers.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
 
       try {
         const qMembers = query(collection(db, 'members'), where('email', '==', cleanEmail));
@@ -1774,6 +1781,48 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
         status: 'active',
         member,
         userProfile: superAdminProfile,
+        notFound: false
+      };
+    }
+
+    // 1b. Check if user is almegledest@gmail.com (Super Admin access, but separate profile - NEVER Fokrul!)
+    if (cleanEmail === 'almegledest@gmail.com') {
+      const adminProfile: UserProfile = {
+        uid,
+        email: 'almegledest@gmail.com',
+        displayName: 'System Super Admin (almegledest)',
+        role: 'super_admin',
+        memberId: 'PBC-00000'
+      };
+
+      let member: Member | undefined = undefined;
+      try {
+        const mDocSnap = await getDoc(doc(db, 'members', 'PBC-00000'));
+        if (mDocSnap.exists()) {
+          member = { id: mDocSnap.id, ...mDocSnap.data() } as Member;
+        }
+      } catch (e) {
+        notifyQuotaExceeded(e);
+      }
+
+      if (!member) {
+        try {
+          const qMembers = query(collection(db, 'members'), where('email', '==', cleanEmail));
+          const membersSnap = await getDocs(qMembers);
+          if (!membersSnap.empty) {
+            const mDoc = membersSnap.docs[0];
+            member = { id: mDoc.id, ...mDoc.data() } as Member;
+          }
+        } catch (e) {
+          notifyQuotaExceeded(e);
+        }
+      }
+
+      return {
+        role: 'super_admin',
+        status: 'active',
+        member,
+        userProfile: adminProfile,
         notFound: false
       };
     }
@@ -1807,10 +1856,24 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
       }
     }
 
-    // Fallback check in cached members list if still null
+    // Fallback check in cached members list or Firestore members collection if still null
     if (!userDocData && cleanEmail) {
-      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS);
-      const foundMem = cachedMembers.find(m => m.email.toLowerCase() === cleanEmail);
+      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', []);
+      let foundMem = cachedMembers.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
+
+      if (!foundMem && !isGlobalQuotaExceeded) {
+        try {
+          const qMembers = query(collection(db, 'members'), where('email', '==', cleanEmail));
+          const membersSnap = await getDocs(qMembers);
+          if (!membersSnap.empty) {
+            const mDoc = membersSnap.docs[0];
+            foundMem = { id: mDoc.id, ...mDoc.data() } as Member;
+          }
+        } catch (e) {
+          notifyQuotaExceeded(e);
+        }
+      }
+
       if (foundMem) {
         userDocData = {
           role: foundMem.role || 'member',
@@ -1838,12 +1901,12 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
       };
     }
 
-    // Read role ONLY from Firestore/Profile. Do not allow another super_admin.
+    // Read role ONLY from Firestore/Profile. Do not allow another super_admin unless authorized.
     let role: 'super_admin' | 'admin' | 'member' = userDocData.role;
-    if (role === 'super_admin') {
-      role = 'admin'; // Only fokrulislammir9897@gmail.com can have super_admin
+    if (role === 'super_admin' && cleanEmail !== 'fokrulislammir9897@gmail.com' && cleanEmail !== 'almegledest@gmail.com') {
+      role = 'admin';
     }
-    if (role !== 'admin' && role !== 'member') {
+    if (role !== 'admin' && role !== 'member' && role !== 'super_admin') {
       role = 'member';
     }
 
@@ -1852,8 +1915,8 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
     // Fetch linked member object if exists
     let member: Member | undefined = undefined;
     if (cleanEmail) {
-      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', INITIAL_MEMBERS);
-      member = cachedMembers.find(m => m.email.toLowerCase() === cleanEmail);
+      const cachedMembers = getCachedItem<Member[]>('pbc_cached_members', []);
+      member = cachedMembers.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
 
       try {
         const qMembers = query(collection(db, 'members'), where('email', '==', cleanEmail));
@@ -1866,6 +1929,22 @@ export async function getUserRoleAndStatus(uid: string, email: string): Promise<
           }
           if (member.role === 'admin' && role === 'member') {
             role = 'admin';
+          }
+        }
+      } catch (e) {
+        notifyQuotaExceeded(e);
+      }
+    }
+
+    // Secondary lookup: check if user has a memberId linked on userProfile
+    if (!member && (userProfile?.memberId || userDocData?.memberId)) {
+      const memId = userProfile?.memberId || userDocData?.memberId;
+      try {
+        const mDocSnap = await getDoc(doc(db, 'members', memId));
+        if (mDocSnap.exists()) {
+          member = { id: mDocSnap.id, ...mDocSnap.data() } as Member;
+          if (member.status) {
+            status = member.status as any;
           }
         }
       } catch (e) {

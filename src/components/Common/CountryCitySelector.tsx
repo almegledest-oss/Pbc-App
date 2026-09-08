@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Globe, MapPin, ChevronDown, Check } from 'lucide-react';
-import { COUNTRY_DIAL_CODES, COUNTRY_CITY_MAP, getCitiesForCountry } from '../../utils/countryDialCodes';
+import { Globe, MapPin, ChevronDown, Check, Search, X } from 'lucide-react';
+import {
+  COUNTRY_DIAL_CODES,
+  getCitiesForCountry,
+  filterCountries
+} from '../../utils/countryDialCodes';
 
 interface CountryCitySelectorProps {
   country: string;
@@ -29,10 +33,12 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
 }) => {
   const [isCountryOpen, setIsCountryOpen] = useState(false);
   const [isCityOpen, setIsCityOpen] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
   const [customCityMode, setCustomCityMode] = useState(false);
 
   const countryRef = useRef<HTMLDivElement>(null);
   const cityRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -48,6 +54,17 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Focus search input when country dropdown opens
+  useEffect(() => {
+    if (isCountryOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setCountrySearch('');
+    }
+  }, [isCountryOpen]);
+
   // Find currently selected country info
   const selectedCountryInfo = COUNTRY_DIAL_CODES.find(
     c => c.name.toLowerCase() === country.trim().toLowerCase() || c.nameBn.toLowerCase() === country.trim().toLowerCase()
@@ -55,11 +72,13 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
 
   // Available cities for selected country
   const availableCities = getCitiesForCountry(country);
+  const filteredCountries = filterCountries(countrySearch);
 
   const handleSelectCountry = (countryName: string) => {
     onCountryChange(countryName);
     setIsCountryOpen(false);
-    // Auto-select first city of this country
+    setCountrySearch('');
+    // Auto-select first city of this country if available
     const cities = getCitiesForCountry(countryName);
     if (cities.length > 0) {
       onCityChange(cities[0]);
@@ -112,34 +131,73 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform shrink-0 ${isCountryOpen ? 'rotate-180 text-amber-400' : ''}`} />
         </button>
 
-        {/* Country Dropdown Menu */}
+        {/* Country Dropdown Menu with Search */}
         {isCountryOpen && (
-          <div className="absolute left-0 top-full mt-1.5 w-64 max-h-64 overflow-y-auto bg-[#0A1224] border border-amber-500/40 rounded-xl shadow-2xl z-50 py-1 divide-y divide-slate-800/60 backdrop-blur-md">
-            <div className="px-3 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider bg-[#070D1B]">
-              Select Country / দেশ নির্বাচন করুন
+          <div className="absolute left-0 top-full mt-1.5 w-72 sm:w-80 max-h-80 bg-[#0A1224] border border-amber-500/40 rounded-xl shadow-2xl z-50 flex flex-col backdrop-blur-md overflow-hidden">
+            {/* Search Box */}
+            <div className="p-2 border-b border-slate-800 bg-[#070D1B]">
+              <div className="relative flex items-center">
+                <Search className="w-3.5 h-3.5 text-amber-400 absolute left-2.5 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={countrySearch}
+                  onChange={e => setCountrySearch(e.target.value)}
+                  placeholder="Search country / দেশ খুঁজুন..."
+                  className="w-full pl-8 pr-7 py-1.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none"
+                />
+                {countrySearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCountrySearch('')}
+                    className="absolute right-2 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400 mt-1 flex justify-between px-1">
+                <span>২০০+ দেশ রয়েছে</span>
+                <span>{filteredCountries.length} countries found</span>
+              </div>
             </div>
-            {COUNTRY_DIAL_CODES.map(c => {
-              const isSelected = selectedCountryInfo?.name === c.name || country.toLowerCase() === c.name.toLowerCase();
-              return (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => handleSelectCountry(c.name)}
-                  className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-amber-500/10 transition ${
-                    isSelected ? 'bg-amber-500/15 text-amber-300 font-semibold' : 'text-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <span className="text-xl leading-none">{c.flag}</span>
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{c.name}</div>
-                      <div className="text-[11px] text-slate-400 truncate">{c.nameBn}</div>
-                    </div>
-                  </div>
-                  {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0 ml-2" />}
-                </button>
-              );
-            })}
+
+            {/* Country List */}
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-800/50">
+              {filteredCountries.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400">
+                  কোনো দেশ পাওয়া যায়নি (&quot;{countrySearch}&quot;)
+                </div>
+              ) : (
+                filteredCountries.map(c => {
+                  const isSelected = selectedCountryInfo?.name === c.name || country.toLowerCase() === c.name.toLowerCase();
+                  return (
+                    <button
+                      key={c.code + c.dialCode}
+                      type="button"
+                      onClick={() => handleSelectCountry(c.name)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-amber-500/10 transition ${
+                        isSelected ? 'bg-amber-500/15 text-amber-300 font-semibold' : 'text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                        <span className="text-xl leading-none shrink-0">{c.flag}</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate text-white">{c.name}</div>
+                          <div className="text-[11px] text-slate-400 truncate">{c.nameBn}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-1 shrink-0">
+                        <span className="text-[11px] font-mono text-amber-400/90 bg-[#070D1B] px-1.5 py-0.5 rounded border border-amber-500/20">
+                          {c.code}
+                        </span>
+                        {isSelected && <Check className="w-4 h-4 text-amber-400 shrink-0 ml-1" />}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -150,15 +208,15 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
           {labelCity} {labelCityBn && <span className="text-slate-400 font-normal">/ {labelCityBn}</span>}
         </label>
 
-        {customCityMode ? (
+        {customCityMode || availableCities.length === 0 ? (
           <div className="relative">
             <MapPin className="w-4 h-4 text-amber-400 absolute left-3 top-3.5" />
             <input
               type="text"
               value={city}
               onChange={e => onCityChange(e.target.value)}
-              placeholder="Enter city name..."
-              className="w-full pl-9 pr-8 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 text-sm transition"
+              placeholder="Enter city / শহরের নাম লিখুন..."
+              className="w-full pl-9 pr-12 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 text-sm transition"
             />
             {availableCities.length > 0 && (
               <button
@@ -195,7 +253,7 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
 
             {/* City Dropdown Menu */}
             {isCityOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-56 max-h-64 overflow-y-auto bg-[#0A1224] border border-amber-500/40 rounded-xl shadow-2xl z-50 py-1 divide-y divide-slate-800/60 backdrop-blur-md">
+              <div className="absolute right-0 top-full mt-1.5 w-60 max-h-64 overflow-y-auto bg-[#0A1224] border border-amber-500/40 rounded-xl shadow-2xl z-50 py-1 divide-y divide-slate-800/60 backdrop-blur-md">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-amber-400 uppercase tracking-wider bg-[#070D1B]">
                   {selectedCountryInfo?.name || country} Cities
                 </div>
@@ -220,7 +278,7 @@ export const CountryCitySelector: React.FC<CountryCitySelectorProps> = ({
                   onClick={() => handleSelectCity('__OTHER__')}
                   className="w-full flex items-center space-x-2 px-3 py-2 text-left hover:bg-amber-500/10 text-amber-400/90 text-xs font-medium italic transition"
                 >
-                  <span>✏️ Other / অন্য শহর লিখুন...</span>
+                  <span>✏️ Other / নিজের শহর টাইপ করুন...</span>
                 </button>
               </div>
             )}

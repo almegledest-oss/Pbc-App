@@ -22,7 +22,9 @@ import {
   Globe,
   Droplet,
   Home,
-  Users
+  Users,
+  BookOpen,
+  ChevronRight
 } from 'lucide-react';
 
 export const MyProfileView: React.FC = () => {
@@ -271,6 +273,26 @@ export const MyProfileView: React.FC = () => {
           </div>
 
           <DigitalCard member={currentMember} />
+
+          {/* Quick link to Club Rules & By-Laws */}
+          <button
+            onClick={() => setActiveTab('club_rules')}
+            className="w-full mt-4 p-3.5 bg-gradient-to-r from-[#070D1B] to-[#112244] hover:from-[#112244] hover:to-[#1a3366] text-amber-300 rounded-2xl border border-amber-500/30 font-bold text-xs flex items-center justify-between transition cursor-pointer shadow-md group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-400">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div className="text-left">
+                <span className="block text-white font-bold">{language === 'bn' ? 'ক্লাবের নীতিমালা ও গঠনতন্ত্র পড়ুন' : 'Read PBC Rules & By-Laws'}</span>
+                <span className="text-[10px] text-slate-400 font-normal">{language === 'bn' ? 'সকল সদস্যদের জন্য অফিসিয়াল নিয়মাবলী' : 'Official club constitution for members'}</span>
+              </div>
+            </div>
+            <span className="text-xs text-amber-400 flex items-center gap-1 group-hover:translate-x-0.5 transition">
+              <span>{language === 'bn' ? 'দেখুন' : 'Open'}</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </span>
+          </button>
         </div>
 
         {/* Personal Deposit History */}
