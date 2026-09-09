@@ -32,6 +32,19 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function() {
+        try {
+          var h = window.location.hostname.toLowerCase();
+          var isOfficial = (h === 'probashibusinessclub.com' || h === 'www.probashibusinessclub.com');
+          var isDev = (h === 'localhost' || h === '127.0.0.1' || h.indexOf('ais-dev') !== -1 || h.endsWith('.cloudshell.dev'));
+          if (!isOfficial && !isDev) {
+            // Immediately stop React or cache from showing the app
+            window.__IS_LEGACY_LOCKED = true;
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
