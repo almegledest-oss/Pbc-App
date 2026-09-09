@@ -26,6 +26,7 @@ import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
 import { HelpDeskView } from './components/HelpDesk/HelpDeskView';
 import { DepositAccountsView } from './components/HelpDesk/DepositAccountsView';
 import { ClubRulesView } from './components/ClubRules/ClubRulesView';
+import { LegacyDomainRedirectModal, checkIsLegacyDomain } from './components/Common/LegacyDomainRedirectModal';
 
 const MainContent: React.FC = () => {
   const {
@@ -184,7 +185,14 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
+  const [isLegacy] = useState(() => checkIsLegacyDomain());
   const [isSplashComplete, setIsSplashComplete] = useState(false);
+
+  // Security Lock: If accessed via an old/legacy URL, do not connect to database or show any data.
+  // Instead, isolate and safely forward the user to the official domain.
+  if (isLegacy) {
+    return <LegacyDomainRedirectModal />;
+  }
 
   return (
     <VersionProvider>
