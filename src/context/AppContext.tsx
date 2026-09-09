@@ -224,6 +224,8 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [role, setRoleState] = useState<UserRole>(() => {
+    const isPreviewingAsMember = safeStorage.getItem('pbc_role_mode_override') === 'member';
+    if (isPreviewingAsMember) return 'member';
     return (safeStorage.getItem('pbc_role') as UserRole) || 'member';
   });
 
@@ -368,6 +370,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     safeStorage.removeItem('pbc_logged_in');
     safeStorage.removeItem('pbc_role');
+    safeStorage.removeItem('pbc_role_mode_override');
     safeStorage.removeItem('pbc_current_member');
     safeStorage.removeItem('pbc_member_id');
     safeStorage.removeItem('pbc_user_email');
@@ -626,8 +629,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          setRoleState(detectedRole);
-          safeStorage.setItem('pbc_role', detectedRole);
+          const isPreviewingAsMember = safeStorage.getItem('pbc_role_mode_override') === 'member';
+          const finalRole = isPreviewingAsMember ? 'member' : detectedRole;
+          setRoleState(finalRole);
+          safeStorage.setItem('pbc_role', finalRole);
           safeStorage.setItem('pbc_logged_in', 'true');
 
           const userCleanEmail = (user.email || '').toLowerCase().trim();
@@ -793,15 +798,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let unsubDirectors: (() => void) | undefined;
     let unsubQuotes: (() => void) | undefined;
 
-    // Regular members only query limited members (10 for preview); admins get full collection
+    // Full members collection subscription so member count and additions reflect immediately for both admins and members
     unsubMembers = subscribeMembers((data) => {
       setMembers(data || []);
-    }, role === 'member' ? { limit: 10 } : undefined);
+    });
 
-    // Regular members ONLY subscribe to their own deposits! (Saves 95%+ of deposit reads)
+    // Full deposits subscription so total club fund and deposits calculate in real-time for all roles
     unsubDeposits = subscribeDeposits((data) => {
       setDeposits(data || []);
-    }, role === 'member' && currentMember?.id ? { memberId: currentMember.id } : undefined);
+    });
 
     unsubProjects = subscribeProjects((data) => {
       setProjects(data || []);
@@ -905,13 +910,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         safeStorage.setItem('pbc_current_member', JSON.stringify(targetMember));
         
         // Dynamically sync role if member's role was changed in Firestore (e.g. promoted to admin)
+        const isPreviewingAsMember = safeStorage.getItem('pbc_role_mode_override') === 'member';
         const effectiveRole = targetMember.role === 'super_admin' ? 'super_admin' : (targetMember.role === 'admin' ? 'admin' : 'member');
-        if (effectiveRole === 'admin' && role === 'member') {
+        if (effectiveRole === 'admin' && role === 'member' && !isPreviewingAsMember) {
           setRoleState('admin');
           safeStorage.setItem('pbc_role', 'admin');
-        } else if (effectiveRole === 'member' && role === 'admin' && !isSuperAdminEmail) {
+        } else if (effectiveRole === 'member' && role !== 'member' && !isSuperAdminEmail) {
           setRoleState('member');
           safeStorage.setItem('pbc_role', 'member');
+          safeStorage.removeItem('pbc_role_mode_override');
         }
       }
       // CRITICAL SECURITY FIX: Never fall back to members[0]!
@@ -934,10 +941,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetMode === 'member') {
       setRoleState('member');
       safeStorage.setItem('pbc_role', 'member');
+      safeStorage.setItem('pbc_role_mode_override', 'member');
     } else {
       const modeToSet = (isSuperAdminEmail || accountRole === 'super_admin') ? 'super_admin' : 'admin';
       setRoleState(modeToSet);
       safeStorage.setItem('pbc_role', modeToSet);
+      safeStorage.removeItem('pbc_role_mode_override');
     }
   };
 
@@ -971,32 +980,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeStorage.setItem('pbc_theme', t);
   };
 
-  // Calculate live stats dynamically (with global aggregation fallback for members)
+  // Calculate live stats dynamically based on real Firestore members and approved deposits
   const isApprovedStatus = (status?: string) => {
     if (!status) return false;
     const s = status.toLowerCase().trim();
     return s === 'approved' || s === 'active' || s === 'completed';
   };
 
-  const totalMembersCount = role === 'member' && systemSettings.cachedGlobalStats?.totalMembers
-    ? systemSettings.cachedGlobalStats.totalMembers
-    : members.length;
+  const totalMembersCount = members.filter(m => m.id !== 'PBC-00000' && m.id?.toLowerCase() !== 'pbc-00000').length;
 
-  const totalFundRaisingSum = role === 'member' && systemSettings.cachedGlobalStats?.totalFundRaisingDeposits !== undefined
-    ? systemSettings.cachedGlobalStats.totalFundRaisingDeposits
-    : deposits
-        .filter(d => isApprovedStatus(d.status) && (d.category === 'Fund Raising' || !d.category))
-        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalFundRaisingSum = deposits
+    .filter(d => isApprovedStatus(d.status) && (d.category === 'Fund Raising' || !d.category))
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-  const totalRealEstateSum = role === 'member' && systemSettings.cachedGlobalStats?.totalRealEstateDeposits !== undefined
-    ? systemSettings.cachedGlobalStats.totalRealEstateDeposits
-    : deposits
-        .filter(d => isApprovedStatus(d.status) && d.category === 'Real Estate')
-        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalRealEstateSum = deposits
+    .filter(d => isApprovedStatus(d.status) && d.category === 'Real Estate')
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
-  const totalDepositsSum = role === 'member' && systemSettings.cachedGlobalStats?.totalDeposits !== undefined
-    ? systemSettings.cachedGlobalStats.totalDeposits
-    : deposits.filter(d => isApprovedStatus(d.status)).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalDepositsSum = deposits.filter(d => isApprovedStatus(d.status)).reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
 
   const totalInvestmentSum = projects.reduce((sum, p) => sum + (Number(p.investmentAmount) || 0), 0);
   const totalCurrentValSum = projects.reduce((sum, p) => sum + (Number(p.currentValue) || 0), 0);

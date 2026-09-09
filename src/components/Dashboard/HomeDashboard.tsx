@@ -35,6 +35,34 @@ export const HomeDashboard: React.FC = () => {
   const { stats, deposits, projects, members, language, setActiveTab, setSelectedMemberId, role } = useApp();
   const labels = t[language];
 
+  // Exclude system super admin PBC-00000 from displayed leaders and count
+  const registeredMembers = React.useMemo(() => {
+    return members.filter(m => m.id !== 'PBC-00000' && m.id?.toLowerCase() !== 'pbc-00000');
+  }, [members]);
+
+  // Real-time Recent Deposits: sorted by latest deposit date descending (newest first)
+  const recentDeposits = React.useMemo(() => {
+    const isApproved = (s?: string) => {
+      if (!s) return false;
+      const lower = s.toLowerCase().trim();
+      return lower === 'approved' || lower === 'active' || lower === 'completed';
+    };
+
+    const approvedList = deposits.filter(d => isApproved(d.status));
+    const targetList = approvedList.length > 0 ? approvedList : deposits;
+
+    return [...targetList]
+      .sort((a, b) => {
+        const timeA = a.depositDate ? new Date(a.depositDate).getTime() : 0;
+        const timeB = b.depositDate ? new Date(b.depositDate).getTime() : 0;
+        if (timeB !== timeA) {
+          return timeB - timeA;
+        }
+        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      })
+      .slice(0, 5);
+  }, [deposits]);
+
   const [isInvestmentsModalOpen, setIsInvestmentsModalOpen] = React.useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = React.useState<{ [key: string]: number }>({});
   const [activePreviewProject, setActivePreviewProject] = React.useState<any | null>(null);
@@ -456,30 +484,38 @@ export const HomeDashboard: React.FC = () => {
           </div>
 
           <div className="divide-y divide-amber-500/10">
-            {deposits.slice(0, 5).map((d) => (
-              <div key={d.id} className="py-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0">
-                    <Wallet className="w-4 h-4" />
+            {recentDeposits.length === 0 ? (
+              <p className="py-6 text-center text-xs text-slate-400">No deposits recorded yet</p>
+            ) : (
+              recentDeposits.map((d) => (
+                <div 
+                  key={d.id} 
+                  onClick={() => setActiveTab('deposits')}
+                  className="py-3 px-2 -mx-2 rounded-xl flex items-center justify-between gap-3 hover:bg-amber-500/5 transition cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs shrink-0 group-hover:scale-105 transition-transform">
+                      <Wallet className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white truncate max-w-[160px] group-hover:text-amber-300 transition-colors">
+                        {d.memberName}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {d.id} • {d.paymentMethod}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-white truncate max-w-[160px]">
-                      {d.memberName}
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      {d.id} • {d.paymentMethod}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="text-right">
-                  <span className="text-xs font-extrabold text-amber-300">
-                    +৳{d.amount.toLocaleString()} BDT
-                  </span>
-                  <p className="text-[10px] text-slate-400">{d.depositDate}</p>
+                  <div className="text-right">
+                    <span className="text-xs font-extrabold text-amber-300">
+                      +৳{d.amount.toLocaleString()} BDT
+                    </span>
+                    <p className="text-[10px] text-slate-400">{d.depositDate}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -493,13 +529,13 @@ export const HomeDashboard: React.FC = () => {
               onClick={() => setActiveTab('members')}
               className="text-xs font-semibold text-amber-400 hover:underline flex items-center gap-1"
             >
-              <span>{labels.members} ({members.length})</span>
+              <span>{labels.members} ({stats.totalMembers || registeredMembers.length})</span>
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           <div className="divide-y divide-amber-500/10">
-            {members.slice(0, 5).map((m) => (
+            {registeredMembers.slice(0, 5).map((m) => (
               <div 
                 key={m.id} 
                 onClick={() => {

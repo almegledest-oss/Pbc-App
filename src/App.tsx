@@ -32,6 +32,9 @@ const MainContent: React.FC = () => {
     activeTab,
     setActiveTab,
     role,
+    accountRole,
+    switchRoleMode,
+    language,
     isLoggedIn,
     canManageDirectors,
     isTrashBoxOpen,
@@ -95,6 +98,29 @@ const MainContent: React.FC = () => {
                 মেইনটেন্যান্স বন্ধ করুন
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Admin Previewing as Member Banner */}
+        {(accountRole === 'super_admin' || accountRole === 'admin') && role === 'member' && (
+          <div className="bg-gradient-to-r from-amber-600 to-amber-700 text-white px-3 py-2 text-xs font-bold flex items-center justify-between shadow-md z-[9999]">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping shrink-0" />
+              <span className="text-[11px] sm:text-xs truncate">
+                {language === 'bn' 
+                  ? '👁️ আপনি মেম্বার ভিউ মোডে আছেন (Member View Mode)' 
+                  : '👁️ You are viewing in Member Mode'}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                switchRoleMode(accountRole === 'super_admin' ? 'super_admin' : 'admin');
+                setActiveTab('admin_panel');
+              }}
+              className="bg-black/30 hover:bg-black/50 text-amber-200 hover:text-white px-2.5 py-1 rounded-lg text-[11px] font-extrabold border border-amber-400/40 transition cursor-pointer shrink-0 ml-2 active:scale-95"
+            >
+              {language === 'bn' ? 'এডমিনে ফিরুন ➔' : 'Back to Admin ➔'}
+            </button>
           </div>
         )}
 

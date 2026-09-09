@@ -163,9 +163,12 @@ export const MemberList: React.FC = () => {
     }
   };
 
-  const countries = ['All', ...Array.from(new Set(members.map(m => m.country)))];
+  // Exclude system internal super admin (PBC-00000) from public member directory
+  const directoryMembers = members.filter(m => m.id !== 'PBC-00000' && m.id?.toLowerCase() !== 'pbc-00000');
 
-  const filteredMembers = members.filter(m => {
+  const countries = ['All', ...Array.from(new Set(directoryMembers.map(m => m.country).filter(Boolean)))];
+
+  const filteredMembers = directoryMembers.filter(m => {
     const matchesSearch = 
       m.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -273,7 +276,7 @@ export const MemberList: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight uppercase">
-            {labels.members} {(role === 'super_admin' || role === 'admin') && `(${members.length})`}
+            {labels.members} {(role === 'super_admin' || role === 'admin') && `(${directoryMembers.length})`}
           </h2>
           <p className="text-xs text-slate-300">
             Registered Probashi Business Club expatriate investors worldwide

@@ -677,6 +677,7 @@ export const Sidebar: React.FC = () => {
                         const nextMode = role === 'member' ? (accountRole === 'super_admin' ? 'super_admin' : 'admin') : 'member';
                         switchRoleMode(nextMode);
                         setActiveTab(nextMode === 'member' ? 'dashboard' : 'admin_panel');
+                        setIsMoreOpen(false);
                       }}
                       className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-extrabold rounded-xl border border-amber-500/40 cursor-pointer transition active:scale-95"
                     >
