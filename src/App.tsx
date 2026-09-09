@@ -26,7 +26,7 @@ import { ActiveNowScreen } from './components/Admin/ActiveNowScreen';
 import { HelpDeskView } from './components/HelpDesk/HelpDeskView';
 import { DepositAccountsView } from './components/HelpDesk/DepositAccountsView';
 import { ClubRulesView } from './components/ClubRules/ClubRulesView';
-import { LegacyDomainRedirectModal, checkIsLegacyDomain } from './components/Common/LegacyDomainRedirectModal';
+import { LegacyDomainScreen, checkIsLegacyDomain } from './components/Common/LegacyDomainRedirectModal';
 
 const MainContent: React.FC = () => {
   const {
@@ -185,13 +185,14 @@ const MainContent: React.FC = () => {
 };
 
 export default function App() {
-  const [isLegacy] = useState(() => checkIsLegacyDomain());
   const [isSplashComplete, setIsSplashComplete] = useState(false);
+  const isLegacy = checkIsLegacyDomain();
 
-  // Security Lock: If accessed via an old/legacy URL, do not connect to database or show any data.
-  // Instead, isolate and safely forward the user to the official domain.
+  // If accessed via an old/legacy domain (e.g. vercel.app, pbc-club.ai.studio),
+  // completely isolate the app: no database connection, no login forms, no data display.
+  // Show only the official notice text.
   if (isLegacy) {
-    return <LegacyDomainRedirectModal />;
+    return <LegacyDomainScreen />;
   }
 
   return (
