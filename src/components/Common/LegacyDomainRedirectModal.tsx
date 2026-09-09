@@ -10,29 +10,22 @@ export function checkIsLegacyDomain(): boolean {
     return false;
   }
 
-  // Local development and AI Studio internal preview containers - strictly allowed
+  // Internal AI Studio dev editor preview container & localhost - allow during coding
   if (
     host === 'localhost' ||
     host === '127.0.0.1' ||
-    host.endsWith('.run.app') ||
     host.endsWith('.cloudshell.dev') ||
-    host.includes('ais-dev') ||
-    host.includes('ais-pre')
+    host.includes('ais-dev')
   ) {
     return false;
   }
 
-  // Legacy member links to show the notice on
-  if (
-    host.includes('vercel.app') ||
-    host.includes('pbc-club.ai.studio') ||
-    host.includes('firebaseapp.com') ||
-    host.includes('web.app')
-  ) {
-    return true;
-  }
-
-  return false;
+  // Any other domain, including:
+  // - pbc-club.ai.studio
+  // - ais-pre-*.run.app (the shared public app URL backing pbc-club.ai.studio)
+  // - *.vercel.app
+  // - *.web.app / *.firebaseapp.com
+  return true;
 }
 
 export const LegacyDomainScreen: React.FC = () => {
