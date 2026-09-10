@@ -34,6 +34,7 @@ export interface SystemSettings {
   allowMemberCardDownload?: boolean;
   // Support & Help Desk Settings
   supportWhatsAppGroupLink?: string;
+  supportFacebookGroupLink?: string;
   supportOfficialWhatsApp?: string;
   supportRep1Name?: string;
   supportRep1Title?: string;

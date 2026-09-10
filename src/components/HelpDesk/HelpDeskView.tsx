@@ -12,7 +12,8 @@ import {
   Clock, 
   Users,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Facebook
 } from 'lucide-react';
 
 export const HelpDeskView: React.FC = () => {
@@ -32,6 +33,7 @@ export const HelpDeskView: React.FC = () => {
 
   // Safe fallback values
   const waGroupLink = systemSettings.supportWhatsAppGroupLink || 'https://chat.whatsapp.com/sample-pbc-link';
+  const fbGroupLink = systemSettings.supportFacebookGroupLink || 'https://www.facebook.com/groups/probashibusinessclub';
   const officialWhatsApp = systemSettings.supportOfficialWhatsApp || '+8801700000000';
   const workingHours = systemSettings.supportWorkingHours || 'সকাল ১০:০০ - রাত ১০:০০ (বাংলাদেশ সময়)';
 
@@ -125,46 +127,49 @@ export const HelpDeskView: React.FC = () => {
         </div>
       </div>
 
-      {/* WHATSAPP GROUP & SUPPORT REPRESENTATIVES */}
+      {/* COMMUNITY GROUPS & SUPPORT REPRESENTATIVES */}
       <div className="space-y-6">
         
-        {/* Official WhatsApp Group Join Card */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#072418] via-[#0B1528] to-[#072418] border-2 border-emerald-500/50 shadow-2xl relative overflow-hidden space-y-5">
+        {/* Official Facebook Group Join Card */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-[#0d234a] via-[#0B1528] to-[#0d234a] border-2 border-blue-500/50 shadow-2xl relative overflow-hidden space-y-5">
+          {/* Subtle glow effect */}
+          <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
             <div className="space-y-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase tracking-wider">
-                <MessageCircle className="w-4 h-4 text-emerald-400" />
-                <span>{isBn ? 'অফিসিয়াল হোয়াটসঅ্যাপ কমিউনিটি' : 'Official WhatsApp Community'}</span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-black uppercase tracking-wider">
+                <Facebook className="w-4 h-4 text-blue-400" />
+                <span>{isBn ? 'অফিসিয়াল ফেসবুক কমিউনিটি' : 'Official Facebook Community'}</span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                {isBn ? 'প্রবাসী বিজনেস ক্লাব মেম্বার্স হোয়াটসঅ্যাপ গ্রুপ' : 'PBC Official Members WhatsApp Group'}
+              <h3 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+                <span>{isBn ? 'প্রবাসী বিজনেস ক্লাব অফিসিয়াল ফেসবুক গ্রুপ' : 'PBC Official Members Facebook Group'}</span>
               </h3>
               <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
                 {isBn 
-                  ? 'ক্লাবের সকল সর্বশেষ নোটিশ, বিনিয়োগ আপডেট, বার্ষিক লভ্যাংশ তথ্য এবং সদস্য আলোচনা সবার আগে পেতে এখনই যুক্ত হোন।' 
-                  : 'Join the verified official community group to receive announcements, project dividends, and discuss with fellow members.'}
+                  ? 'ক্লাবের সকল সর্বশেষ নোটিশ, বিনিয়োগ আপডেট, প্রজেক্টের ছবি, বার্ষিক লভ্যাংশ তথ্য এবং সদস্য উন্মুক্ত আলোচনার জন্য আমাদের অফিসিয়াল ফেসবুক গ্রুপে যুক্ত হোন।' 
+                  : 'Join the verified official community Facebook group to receive announcements, project photos, dividend reports, and discuss with fellow members.'}
               </p>
             </div>
 
             <div className="shrink-0 flex flex-col sm:flex-row gap-3">
               <a
-                href={waGroupLink}
+                href={fbGroupLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-4 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-sm rounded-2xl shadow-xl shadow-emerald-950/60 border border-emerald-300 transition duration-150 active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer"
+                className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-950/60 border border-blue-400 transition duration-150 active:scale-95 flex items-center justify-center gap-2.5 cursor-pointer"
               >
-                <MessageCircle className="w-5 h-5 fill-current" />
-                <span>{isBn ? 'গ্রুপে জয়েন করুন (Join WhatsApp Group)' : 'Join WhatsApp Group'}</span>
+                <Facebook className="w-5 h-5 fill-current" />
+                <span>{isBn ? 'গ্রুপে জয়েন করুন (Join Facebook Group)' : 'Join Facebook Group'}</span>
                 <ExternalLink className="w-4 h-4" />
               </a>
 
               <button
-                onClick={() => copyToClipboard(waGroupLink, 'groupLink')}
-                className="px-4 py-4 bg-[#070D1B] hover:bg-[#112244] text-slate-200 border border-emerald-500/30 font-bold text-xs rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
+                onClick={() => copyToClipboard(fbGroupLink, 'fbGroupLink')}
+                className="px-4 py-4 bg-[#070D1B] hover:bg-[#112244] text-slate-200 border border-blue-500/30 font-bold text-xs rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
               >
-                {copiedField === 'groupLink' ? (
+                {copiedField === 'fbGroupLink' ? (
                   <>
-                    <Check className="w-4 h-4 text-emerald-400" />
+                    <Check className="w-4 h-4 text-blue-400" />
                     <span>{isBn ? 'লিংক কপি হয়েছে' : 'Link Copied'}</span>
                   </>
                 ) : (
@@ -176,21 +181,22 @@ export const HelpDeskView: React.FC = () => {
               </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-3 pt-4 border-t border-emerald-500/20 text-xs text-emerald-300">
-            <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              <strong>{isBn ? 'সাপোর্ট সময়সূচি:' : 'Support Hours:'}</strong> {workingHours}
-            </span>
-          </div>
         </div>
 
         {/* Support Representatives Contacts */}
         <div className="space-y-4">
-          <h2 className="text-base font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
-            <Users className="w-5 h-5 text-amber-400" />
-            <span>{isBn ? 'সরাসরি যোগাযোগ ও সাপোর্ট প্রতিনিধি' : 'Direct Helpline Representatives'}</span>
-          </h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <h2 className="text-base font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
+              <Users className="w-5 h-5 text-amber-400" />
+              <span>{isBn ? 'সরাসরি যোগাযোগ ও সাপোর্ট প্রতিনিধি' : 'Direct Helpline Representatives'}</span>
+            </h2>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0B1528] border border-amber-500/30 text-xs text-amber-300 w-fit">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong>{isBn ? 'সাপোর্ট সময়সূচি:' : 'Helpline Hours:'}</strong> {workingHours}
+              </span>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
@@ -293,17 +299,25 @@ export const HelpDeskView: React.FC = () => {
 
         {/* Quick Message Box to WhatsApp */}
         <div className="p-6 sm:p-7 rounded-3xl bg-[#0B1528] border-2 border-emerald-500/30 shadow-2xl space-y-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-              <MessageCircle className="w-5 h-5 fill-current" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <MessageCircle className="w-5 h-5 fill-current" />
+              </div>
+              <div>
+                <h3 className="font-black text-white text-base">
+                  {isBn ? 'দ্রুত মেসেজ পাঠান (Send Direct Inquiry)' : 'Send Direct Message to Hotline'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {isBn ? 'এখানে লিখে সরাসরি অফিশিয়াল হোয়াটসঅ্যাপে পাঠিয়ে দিন' : 'Type your issue and it will open directly in WhatsApp'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-black text-white text-base">
-                {isBn ? 'দ্রুত মেসেজ পাঠান (Send Direct Inquiry)' : 'Send Direct Message to Hotline'}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {isBn ? 'এখানে লিখে সরাসরি অফিশিয়াল হোয়াটসঅ্যাপে পাঠিয়ে দিন' : 'Type your issue and it will open directly in WhatsApp'}
-              </p>
+
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D1B] border border-emerald-500/30 text-xs text-emerald-300 w-fit">
+              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[11px] text-slate-400">{isBn ? 'হটলাইন:' : 'Hotline:'}</span>
+              <span className="font-mono font-bold text-white">{officialWhatsApp}</span>
             </div>
           </div>
 

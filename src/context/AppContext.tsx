@@ -256,6 +256,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       allowMemberCardDownload: true,
       // Support & Help Desk Defaults
       supportWhatsAppGroupLink: 'https://chat.whatsapp.com/PBC-Official-Club',
+      supportFacebookGroupLink: 'https://www.facebook.com/groups/probashibusinessclub',
       supportOfficialWhatsApp: '+8801700000000',
       supportRep1Name: 'সাপোর্ট প্রতিনিধি ১',
       supportRep1Title: 'অফিসিয়াল মেম্বার হেল্পলাইন',

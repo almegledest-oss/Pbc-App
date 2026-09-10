@@ -13,7 +13,8 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Facebook
 } from 'lucide-react';
 
 interface AdminSupportSettingsViewProps {
@@ -28,6 +29,7 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
   const [formData, setFormData] = useState({
     // Support info
     supportWhatsAppGroupLink: systemSettings.supportWhatsAppGroupLink || 'https://chat.whatsapp.com/PBC-Official-Club',
+    supportFacebookGroupLink: systemSettings.supportFacebookGroupLink || 'https://www.facebook.com/groups/probashibusinessclub',
     supportOfficialWhatsApp: systemSettings.supportOfficialWhatsApp || '+8801700000000',
     supportRep1Name: systemSettings.supportRep1Name || 'সাপোর্ট প্রতিনিধি ১',
     supportRep1Title: systemSettings.supportRep1Title || 'অফিসিয়াল মেম্বার হেল্পলাইন',
@@ -358,8 +360,9 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
           
           {/* WhatsApp Group Link */}
           <div>
-            <label className="text-xs font-bold text-emerald-300 block mb-1.5">
-              {isBn ? 'অফিসিয়াল WhatsApp গ্রুপের লিংক (WhatsApp Group Invite Link):' : 'Official WhatsApp Group Invite Link:'}
+            <label className="text-xs font-bold text-emerald-300 block mb-1.5 flex items-center gap-1.5">
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isBn ? 'অফিসিয়াল WhatsApp গ্রুপের লিংক (WhatsApp Group Invite Link):' : 'Official WhatsApp Group Invite Link:'}</span>
             </label>
             <input
               type="url"
@@ -368,6 +371,41 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
               placeholder="https://chat.whatsapp.com/..."
               className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-400"
             />
+          </div>
+
+          {/* Facebook Group Link */}
+          <div>
+            <label className="text-xs font-bold text-blue-300 block mb-1.5 flex items-center gap-1.5">
+              <Facebook className="w-3.5 h-3.5 text-blue-400" />
+              <span>{isBn ? 'অফিসিয়াল Facebook গ্রুপের লিংক (Facebook Group URL):' : 'Official Facebook Group URL:'}</span>
+            </label>
+            <input
+              type="url"
+              value={formData.supportFacebookGroupLink}
+              onChange={e => setFormData({ ...formData, supportFacebookGroupLink: e.target.value })}
+              placeholder="https://www.facebook.com/groups/..."
+              className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-blue-500/40 rounded-xl text-blue-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-blue-400"
+            />
+          </div>
+
+          {/* Official Hotline WhatsApp Number */}
+          <div>
+            <label className="text-xs font-bold text-emerald-400 block mb-1.5 flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>{isBn ? 'অফিসিয়াল হটলাইন WhatsApp নম্বর (Send Direct Message Hotline):' : 'Official Hotline WhatsApp Number (Send Direct Message):'}</span>
+            </label>
+            <input
+              type="text"
+              value={formData.supportOfficialWhatsApp}
+              onChange={e => setFormData({ ...formData, supportOfficialWhatsApp: e.target.value })}
+              placeholder="e.g. +8801700000000 or +971559257220"
+              className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-400"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isBn 
+                ? 'মেম্বাররা হেল্প ডেস্কের নিচে থাকা "Send Direct Message to Hotline" ফর্মে মেসেজ লিখে পাঠালে সরাসরি এই নম্বরের হোয়াটসঅ্যাপে মেসেজটি যাবে।' 
+                : 'When members send inquiries using the "Send Direct Message to Hotline" form, the chat will open with this WhatsApp number.'}
+            </p>
           </div>
 
           {/* Working Hours */}
