@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check } from 'lucide-react';
+import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react';
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
@@ -710,24 +710,27 @@ export const AuthModal: React.FC = () => {
     }
   };
 
+  const triggerWhatsAppPasswordRequest = () => {
+    const rawNum = systemSettings.adminWhatsApp || systemSettings.supportOfficialWhatsApp || '+8801700000000';
+    const cleanNum = rawNum.replace(/[^0-9+]/g, '');
+    const emailInfo = resetEmail ? `ইমেইল: ${resetEmail}` : 'আমার একাউন্ট ইমেইল মনে নেই/পাচ্ছি না';
+    const msg = encodeURIComponent(
+      `*PBC Club - পাসওয়ার্ড রিসেট সহায়তা*\n══════════════════════\n👤 মেম্বার ইমেইল: ${emailInfo}\n══════════════════════\nআসসালামু আলাইকুম অ্যাডমিন, আমি আমার PBC অ্যাকাউন্টের পাসওয়ার্ড ভুলে গেছি অথবা জিমেইলে লিঙ্ক পাচ্ছি না। অনুগ্রহ করে আমার অ্যাকাউন্ট পাসওয়ার্ড রিসেট করতে সহায়তা করুন।\n══════════════════════\n_Sent from PBC App_`
+    );
+    window.open(`https://wa.me/${cleanNum}?text=${msg}`, '_blank');
+  };
+
   const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     if (!resetEmail) return;
 
     try {
-      await sendPasswordResetEmail(auth, resetEmail);
+      await sendPasswordResetEmail(auth, resetEmail.trim().toLowerCase());
       setResetEmailSent(true);
-      setTimeout(() => {
-        setResetEmailSent(false);
-        setIsForgotOpen(false);
-      }, 3000);
     } catch (err: any) {
+      // Show sent state or clear message so user can check spam or click WhatsApp
       setResetEmailSent(true);
-      setTimeout(() => {
-        setResetEmailSent(false);
-        setIsForgotOpen(false);
-      }, 3000);
     }
   };
 
@@ -1194,50 +1197,129 @@ export const AuthModal: React.FC = () => {
           /* Forgot Password View */
           <form onSubmit={handleForgotSubmit} className="space-y-4 text-xs">
             <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto mb-2 border border-amber-500/30">
-                <KeyRound className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto mb-2 border border-amber-500/40 shadow-inner">
+                <KeyRound className="w-6 h-6" />
               </div>
-              <h4 className="font-bold text-white text-base">Reset Your Password / পাসওয়ার্ড রিসেট করুন</h4>
-              <p className="text-slate-400 text-[11px] mt-1">
-                Enter your registered PBC Club email address / আপনার নিবন্ধিত ইমেইল ঠিকানা দিন
+              <h4 className="font-extrabold text-white text-base">
+                {language === 'bn' ? 'পাসওয়ার্ড রিসেট ও পুনরুদ্ধার' : 'Reset & Recover Password'}
+              </h4>
+              <p className="text-slate-300 text-[11px] mt-1 leading-relaxed">
+                {language === 'bn'
+                  ? 'রেজিস্ট্রেশনের সময় দেওয়া আপনার আসল ব্যক্তিগত জিমেইল (Gmail) লিখুন'
+                  : 'Enter your registered personal Gmail used during registration'}
               </p>
             </div>
 
             {resetEmailSent ? (
-              <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-2xl text-center font-semibold flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                <span>Password reset link sent! / পাসওয়ার্ড রিসেট লিঙ্ক পাঠানো হয়েছে!</span>
+              <div className="space-y-3">
+                {/* Success Banner */}
+                <div className="p-4 bg-emerald-950/40 border-2 border-emerald-500/50 text-emerald-300 rounded-2xl text-left space-y-2 shadow-lg shadow-emerald-950/40">
+                  <div className="flex items-center gap-2 font-black text-sm text-emerald-400">
+                    <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400 animate-bounce" />
+                    <span>পাসওয়ার্ড রিসেট লিঙ্ক পাঠানো হয়েছে!</span>
+                  </div>
+                  <p className="text-[11.5px] text-emerald-200 leading-relaxed">
+                    আমরা <strong className="text-white font-mono">{resetEmail}</strong> ঠিকানায় পাসওয়ার্ড পরিবর্তনের সিকিউর লিঙ্ক পাঠিয়েছি।
+                  </p>
+                </div>
+
+                {/* Spam Folder Alert Notice (Requirement 5) */}
+                <div className="p-3.5 bg-amber-950/40 border-2 border-amber-500/50 rounded-2xl text-amber-200 text-left space-y-1 shadow-md">
+                  <div className="flex items-center gap-1.5 font-black text-xs text-amber-300">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                    <span>স্প্যাম ফোল্ডার সতর্কতা (Inbox & Spam Check)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    অনুগ্রহ করে আপনার জিমেইলের <strong>Inbox</strong> চেক করুন। ইনবক্সে সরাসরি মেসেজটি না পেলে অবশ্যই <strong>Spam / Junk</strong> ফোল্ডার চেক করুন।
+                  </p>
+                </div>
+
+                {/* WhatsApp Direct Password Button (Requirement 5) */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={triggerWhatsAppPasswordRequest}
+                    className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-emerald-950/50 border border-emerald-300 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4.5 h-4.5 fill-current" />
+                    <span>WhatsApp-এ এডমিনের কাছে পাসওয়ার্ড চান</span>
+                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                  </button>
+                  <p className="text-[10px] text-center text-slate-400 mt-1.5">
+                    ইমেইলে লিঙ্ক না পেলে সরাসরি অ্যাডমিনকে মেসেজ দিন, ২ সেকেন্ডে পাসওয়ার্ড ঠিক করে দেওয়া হবে।
+                  </p>
+                </div>
               </div>
             ) : (
-              <div>
-                <label className="block text-slate-200 font-bold mb-1.5">Registered Email / নিবন্ধিত ইমেইল</label>
-                <input
-                  type="email"
-                  required
-                  value={resetEmail}
-                  onChange={e => setResetEmail(e.target.value)}
-                  placeholder="member@pbcclub.org"
-                  className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                />
+              <div className="space-y-3">
+                {/* Bengali Warning & Guideline */}
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-[11px] flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    <strong>জরুরী নির্দেশনা:</strong> কোনো ফেক বা ডিফল্ট ইমেইল দেবেন না। রেজিস্ট্রেশনের সময় আপনার যে আসল ব্যক্তিগত <strong>Gmail</strong> দিয়েছেন, শুধুমাত্র সেটিই লিখুন।
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-slate-200 font-bold mb-1.5">
+                    {language === 'bn' ? 'নিবন্ধিত জিমেইল (Registered Gmail)' : 'Registered Email Address'}
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={resetEmail}
+                    onChange={e => setResetEmail(e.target.value)}
+                    placeholder="example@gmail.com"
+                    className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/40 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/30 transition"
+                  />
+                </div>
               </div>
             )}
 
             <div className="flex gap-2.5 pt-2">
               <button
                 type="button"
-                onClick={() => setIsForgotOpen(false)}
-                className="flex-1 py-2.5 bg-[#030816] border border-amber-500/20 text-slate-300 font-bold rounded-xl hover:text-amber-200 transition"
+                onClick={() => {
+                  setIsForgotOpen(false);
+                  setResetEmailSent(false);
+                }}
+                className="flex-1 py-2.5 bg-[#030816] border border-amber-500/20 text-slate-300 font-bold rounded-xl hover:text-amber-200 transition cursor-pointer text-center"
               >
                 Back / ফিরে যান
               </button>
-              <button
-                type="submit"
-                disabled={loading || resetEmailSent}
-                className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl hover:from-amber-400 hover:to-amber-500 transition disabled:opacity-50"
-              >
-                {loading ? 'Sending...' : 'Send Link / লিঙ্ক পাঠান'}
-              </button>
+
+              {!resetEmailSent ? (
+                <button
+                  type="submit"
+                  disabled={loading || !resetEmail}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-black rounded-xl hover:from-amber-400 hover:to-amber-500 transition disabled:opacity-50 cursor-pointer text-center shadow-md"
+                >
+                  {loading ? 'Sending...' : 'Send Link / লিঙ্ক পাঠান'}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setResetEmailSent(false)}
+                  className="flex-1 py-2.5 bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold rounded-xl hover:bg-amber-500/30 transition cursor-pointer text-center"
+                >
+                  পুনরায় লিঙ্ক পাঠান
+                </button>
+              )}
             </div>
+
+            {/* Direct WhatsApp Option when entering email */}
+            {!resetEmailSent && (
+              <div className="pt-2 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={triggerWhatsAppPasswordRequest}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                  <span>ইমেইল মনে নেই? WhatsApp-এ এডমিনের সাথে যোগাযোগ করুন</span>
+                </button>
+              </div>
+            )}
           </form>
         )}
 

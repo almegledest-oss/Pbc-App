@@ -27,6 +27,7 @@ import { HelpDeskView } from './components/HelpDesk/HelpDeskView';
 import { DepositAccountsView } from './components/HelpDesk/DepositAccountsView';
 import { ClubRulesView } from './components/ClubRules/ClubRulesView';
 import { LegacyDomainScreen, checkIsLegacyDomain } from './components/Common/LegacyDomainRedirectModal';
+import { PbcAssistantWidget } from './components/Assistant/PbcAssistantWidget';
 
 const MainContent: React.FC = () => {
   const {
@@ -51,7 +52,12 @@ const MainContent: React.FC = () => {
 
   // Requirement 1: Disable guest access completely. Redirect unauthenticated users to Login.
   if (!isLoggedIn) {
-    return <AuthModal />;
+    return (
+      <>
+        <AuthModal />
+        <PbcAssistantWidget />
+      </>
+    );
   }
 
   // Maintenance mode block for logged-in non-super-admin users
@@ -178,6 +184,9 @@ const MainContent: React.FC = () => {
 
         {/* Authentication & Role Modal */}
         <AuthModal />
+
+        {/* PBC Assistant Smart AI Floating Widget */}
+        <PbcAssistantWidget />
 
       </div>
     </MobileFrame>

@@ -162,6 +162,13 @@ interface AppContextType {
   triggerSecurityAlert: (msg?: string) => void;
   closeSecurityAlert: () => void;
 
+  // PBC Assistant AI State
+  isAssistantOpen: boolean;
+  setIsAssistantOpen: (open: boolean) => void;
+  assistantInitialPrompt: string | null;
+  openAssistantWithPrompt: (prompt?: string) => void;
+  closeAssistant: () => void;
+
   // More Menu Bottom Sheet State
   isMoreMenuOpen: boolean;
   setIsMoreMenuOpen: (open: boolean) => void;
@@ -346,6 +353,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const openMoreMenu = () => setIsMoreMenuOpen(true);
   const closeMoreMenu = () => setIsMoreMenuOpen(false);
+
+  // PBC Assistant AI State
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+  const [assistantInitialPrompt, setAssistantInitialPrompt] = useState<string | null>(null);
+
+  const openAssistantWithPrompt = (prompt?: string) => {
+    if (prompt) setAssistantInitialPrompt(prompt);
+    setIsAssistantOpen(true);
+  };
+  const closeAssistant = () => {
+    setIsAssistantOpen(false);
+    setAssistantInitialPrompt(null);
+  };
 
   // Security Alert Modal State
   const [securityAlertMessage, setSecurityAlertMessage] = useState<string | null>(null);
@@ -1962,7 +1982,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restoreTrashedItem,
         permanentlyDeleteTrashedItem,
         emptyTrashBox,
-        canAccessTrashBox
+        canAccessTrashBox,
+        // PBC Assistant
+        isAssistantOpen,
+        setIsAssistantOpen,
+        assistantInitialPrompt,
+        openAssistantWithPrompt,
+        closeAssistant
       }}
     >
       {children}

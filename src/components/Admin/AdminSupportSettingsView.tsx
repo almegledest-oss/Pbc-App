@@ -14,7 +14,8 @@ import {
   Info,
   CheckCircle2,
   ExternalLink,
-  Facebook
+  Facebook,
+  Users
 } from 'lucide-react';
 
 interface AdminSupportSettingsViewProps {
@@ -344,24 +345,30 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
         </div>
       </div>
 
-      {/* Form Section 3: WhatsApp Group & Support Representatives */}
-      <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-6">
-        <div className="border-b border-[#D4AF37]/20 pb-3">
-          <h3 className="text-base font-black text-emerald-400 flex items-center gap-2">
-            <MessageCircle className="w-5 h-5 text-emerald-400" />
-            <span>{isBn ? '৩. হোয়াটসঅ্যাপ গ্রুপ ও প্রতিনিধি সাপোর্ট' : '3. WhatsApp Group & Support Representatives'}</span>
+      {/* Form Section 3: Official WhatsApp Group Support Team */}
+      <div className="bg-[#0B1528] text-white p-6 rounded-3xl border-2 border-emerald-500/40 shadow-xl space-y-6">
+        <div className="border-b border-emerald-500/20 pb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-black uppercase tracking-wider mb-2">
+            <Users className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isBn ? 'একমাত্র অফিসিয়াল সাপোর্ট টিম চ্যানেল' : 'Sole Official Support Channel'}</span>
+          </div>
+          <h3 className="text-base sm:text-lg font-black text-emerald-400 flex items-center gap-2">
+            <MessageCircle className="w-5 h-5 text-emerald-400 fill-current" />
+            <span>{isBn ? '৩. অফিসিয়াল WhatsApp সাপোর্ট গ্রুপ' : '3. Official WhatsApp Support Group'}</span>
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            {isBn ? 'মেম্বাররা সরাসরি গ্রুপে জয়েন করতে পারবে এবং প্রতিনিধিদের ফোন/WhatsApp এ কল দিতে পারবে' : 'Direct group link and click-to-chat contacts'}
+          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+            {isBn 
+              ? 'প্রবাসী বিজনেস ক্লাবের (PBC) সকল মেম্বার সাপোর্ট, ডিপোজিট অনুমোদন সংক্রান্ত জিজ্ঞাসা ও ট্রানজেকশন অনুসন্ধান এই অফিশিয়াল WhatsApp গ্রুপের সাপোর্ট টিম পরিচালনা করবে। অন্য কোনো ব্যক্তিগত অ্যাকাউন্ট বা প্রতিনিধির দরকার নেই।' 
+              : 'All member support and deposit verification inquiries are handled solely through this official WhatsApp group support team.'}
           </p>
         </div>
 
         <div className="space-y-4">
           
           {/* WhatsApp Group Link */}
-          <div>
-            <label className="text-xs font-bold text-emerald-300 block mb-1.5 flex items-center gap-1.5">
-              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+          <div className="p-4 rounded-2xl bg-[#070D1B] border border-emerald-500/30 space-y-2">
+            <label className="text-xs font-black text-emerald-300 block flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-emerald-400 fill-current" />
               <span>{isBn ? 'অফিসিয়াল WhatsApp গ্রুপের লিংক (WhatsApp Group Invite Link):' : 'Official WhatsApp Group Invite Link:'}</span>
             </label>
             <input
@@ -369,8 +376,13 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
               value={formData.supportWhatsAppGroupLink}
               onChange={e => setFormData({ ...formData, supportWhatsAppGroupLink: e.target.value })}
               placeholder="https://chat.whatsapp.com/..."
-              className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-400"
+              className="w-full px-3.5 py-3 bg-[#030712] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-400 shadow-inner"
             />
+            <p className="text-[11px] text-slate-400">
+              {isBn 
+                ? 'মেম্বাররা হেল্প ডেস্ক বা অ্যাসিস্ট্যান্ট থেকে সরাসরি এই লিংকে ক্লিক করে অফিসিয়াল সাপোর্ট গ্রুপে যুক্ত হবে।' 
+                : 'Members will click to join and chat directly with the official support team in this WhatsApp group.'}
+            </p>
           </div>
 
           {/* Facebook Group Link */}
@@ -388,26 +400,6 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
             />
           </div>
 
-          {/* Official Hotline WhatsApp Number */}
-          <div>
-            <label className="text-xs font-bold text-emerald-400 block mb-1.5 flex items-center gap-1.5">
-              <Phone className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{isBn ? 'অফিসিয়াল হটলাইন WhatsApp নম্বর (Send Direct Message Hotline):' : 'Official Hotline WhatsApp Number (Send Direct Message):'}</span>
-            </label>
-            <input
-              type="text"
-              value={formData.supportOfficialWhatsApp}
-              onChange={e => setFormData({ ...formData, supportOfficialWhatsApp: e.target.value })}
-              placeholder="e.g. +8801700000000 or +971559257220"
-              className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-emerald-500/40 rounded-xl text-emerald-300 font-mono text-xs sm:text-sm focus:outline-none focus:border-emerald-400"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              {isBn 
-                ? 'মেম্বাররা হেল্প ডেস্কের নিচে থাকা "Send Direct Message to Hotline" ফর্মে মেসেজ লিখে পাঠালে সরাসরি এই নম্বরের হোয়াটসঅ্যাপে মেসেজটি যাবে।' 
-                : 'When members send inquiries using the "Send Direct Message to Hotline" form, the chat will open with this WhatsApp number.'}
-            </p>
-          </div>
-
           {/* Working Hours */}
           <div>
             <label className="text-xs font-bold text-slate-300 block mb-1.5">
@@ -420,96 +412,6 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
               placeholder="e.g. সকাল ৯:০০ টা - রাত ৯:০০ টা (প্রতিদিন)"
               className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-amber-400"
             />
-          </div>
-
-          {/* Representative 1 Grid */}
-          <div className="p-4 bg-[#070D1B] rounded-2xl border border-amber-500/20 space-y-3">
-            <span className="text-xs font-black text-amber-300 uppercase tracking-wider block">
-              {isBn ? 'সাপোর্ট প্রতিনিধি ১ (Representative 1 - Helpline)' : 'Support Representative 1'}
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">প্রতিনিধির নাম:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep1Name}
-                  onChange={e => setFormData({ ...formData, supportRep1Name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">পদবী / দায়িত্ব:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep1Title}
-                  onChange={e => setFormData({ ...formData, supportRep1Title: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">ফোন নম্বর:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep1Phone}
-                  onChange={e => setFormData({ ...formData, supportRep1Phone: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">WhatsApp নম্বর (International format):</label>
-                <input
-                  type="text"
-                  value={formData.supportRep1WhatsApp}
-                  onChange={e => setFormData({ ...formData, supportRep1WhatsApp: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs font-mono"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Representative 2 Grid */}
-          <div className="p-4 bg-[#070D1B] rounded-2xl border border-amber-500/20 space-y-3">
-            <span className="text-xs font-black text-amber-300 uppercase tracking-wider block">
-              {isBn ? 'সাপোর্ট প্রতিনিধি ২ (Representative 2 - Accounts & Deposit)' : 'Support Representative 2'}
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">প্রতিনিধির নাম:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep2Name}
-                  onChange={e => setFormData({ ...formData, supportRep2Name: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">পদবী / দায়িত্ব:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep2Title}
-                  onChange={e => setFormData({ ...formData, supportRep2Title: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">ফোন নম্বর:</label>
-                <input
-                  type="text"
-                  value={formData.supportRep2Phone}
-                  onChange={e => setFormData({ ...formData, supportRep2Phone: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs font-mono"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">WhatsApp নম্বর (International format):</label>
-                <input
-                  type="text"
-                  value={formData.supportRep2WhatsApp}
-                  onChange={e => setFormData({ ...formData, supportRep2WhatsApp: e.target.value })}
-                  className="w-full px-3 py-1.5 bg-[#030712] border border-slate-700 rounded-lg text-white text-xs font-mono"
-                />
-              </div>
-            </div>
           </div>
 
         </div>

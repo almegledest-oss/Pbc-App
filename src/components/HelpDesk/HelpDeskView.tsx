@@ -13,11 +13,14 @@ import {
   Users,
   Send,
   CheckCircle2,
-  Facebook
+  Facebook,
+  Bot,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 
 export const HelpDeskView: React.FC = () => {
-  const { systemSettings, language } = useApp();
+  const { systemSettings, language, setIsAssistantOpen, openAssistantWithPrompt } = useApp();
   const { currentTheme } = useTheme();
   const isBn = language === 'bn';
 
@@ -60,9 +63,11 @@ export const HelpDeskView: React.FC = () => {
     e.preventDefault();
     if (!ticketMessage.trim()) return;
 
-    const formattedText = `*PBC Help Desk Query*\n\n*Subject:* ${ticketSubject || 'General Query'}\n*Category:* ${ticketCategory}\n*Details:* ${ticketMessage}`;
-    const cleanNum = officialWhatsApp.replace(/[^0-9+]/g, '');
-    const url = `https://wa.me/${cleanNum}?text=${encodeURIComponent(formattedText)}`;
+    const formattedText = `*PBC Help Desk Query*\n*Subject:* ${ticketSubject || 'General Query'}\n*Category:* ${ticketCategory}\n*Details:* ${ticketMessage}`;
+    
+    try {
+      navigator.clipboard.writeText(formattedText);
+    } catch (_e) {}
     
     setIsTicketSent(true);
     setTimeout(() => {
@@ -71,7 +76,7 @@ export const HelpDeskView: React.FC = () => {
       setTicketMessage('');
     }, 3000);
 
-    window.open(url, '_blank');
+    window.open(waGroupLink, '_blank');
   };
 
   const getWhatsAppUrl = (phone: string, customText?: string) => {
@@ -124,6 +129,63 @@ export const HelpDeskView: React.FC = () => {
               <ExternalLink className="w-4 h-4" />
             </a>
           </div>
+        </div>
+      </div>
+
+      {/* Dedicated PBC Member Helpdesk Card in Help Desk */}
+      <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-r from-amber-950/40 via-[#0B1528] to-[#070D1B] border-2 border-amber-500/40 shadow-2xl relative overflow-hidden space-y-4">
+        <div className="absolute -top-12 -right-12 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+          <div className="flex items-start gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30 border border-amber-200">
+              <Headphones className="w-7 h-7 stroke-[2.2]" />
+            </div>
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-bold uppercase tracking-wider">
+                <Clock className="w-3 h-3 text-amber-400" />
+                <span>{isBn ? '২৪/৭ ডিজিটাল মেম্বার সাপোর্ট ও বাস্তব এআই' : '24/7 Digital Member Support & AI'}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
+                <span>{isBn ? 'PBC মেম্বার হেল্পডেস্ক (ফুলস্ক্রিন)' : 'PBC Member Helpdesk (Fullscreen)'}</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
+                {isBn
+                  ? 'ডিপোজিট পেন্ডিং ও বিলম্ব অনুসন্ধান, রিজেকশন কারণ, ব্যাংকিং তথ্য এবং ক্লাবের যেকোনো প্রশ্নের জন্য সরাসরি ফুলস্ক্রিনে বাস্তবসম্মত উত্তর পান।'
+                  : 'Get instant, realistic answers covering pending deposits, rejection inquiries, banking info, and club queries in full-scene view.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsAssistantOpen(true)}
+            className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-950/40 border border-amber-200 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2 shrink-0"
+          >
+            <Headphones className="w-4.5 h-4.5 stroke-[2.2]" />
+            <span>{isBn ? 'ফুলস্ক্রিন হেল্পডেস্ক ওপেন করুন' : 'Open Fullscreen Helpdesk'}</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Quick Shortcut Inquiry Chips */}
+        <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center gap-2 relative z-10">
+          <span className="text-[11px] font-bold text-amber-300/80 mr-1">
+            {isBn ? 'দ্রুত জিজ্ঞাসা:' : 'Quick Prompts:'}
+          </span>
+          {[
+            { label: '💳 ডিপোজিট পেন্ডিং কেন?', prompt: 'আমার ডিপোজিট পেন্ডিং কেন? অনুমোদন হচ্ছে না কেন?' },
+            { label: '❌ ডিপোজিট রিজেক্ট হলো কেন?', prompt: 'আমার ডিপোজিট রিজেক্ট হলো কেন? কারণ কী?' },
+            { label: '🏦 ডিপোজিট একাউন্ট নম্বর', prompt: 'ডিপোজিট করার বিকাশ, নগদ ও ব্যাংক একাউন্ট নম্বর দিন' },
+            { label: '📜 মানি রিসিট ডাউনলোড নিয়ম', prompt: 'মানি রিসিট ডাউনলোড করার নিয়ম কী?' }
+          ].map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => openAssistantWithPrompt(item.prompt)}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 hover:text-white border border-amber-500/30 text-xs font-semibold transition cursor-pointer active:scale-95"
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -183,121 +245,65 @@ export const HelpDeskView: React.FC = () => {
           </div>
         </div>
 
-        {/* Support Representatives Contacts */}
-        <div className="space-y-4">
+        {/* Dedicated WhatsApp Group Support Team Card - Sole Official Support Channel */}
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950/60 via-[#0B1528] to-[#070D1B] border-2 border-emerald-500/40 shadow-2xl relative overflow-hidden space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            <h2 className="text-base font-black text-amber-400 uppercase tracking-wider flex items-center gap-2">
-              <Users className="w-5 h-5 text-amber-400" />
-              <span>{isBn ? 'সরাসরি যোগাযোগ ও সাপোর্ট প্রতিনিধি' : 'Direct Helpline Representatives'}</span>
-            </h2>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0B1528] border border-amber-500/30 text-xs text-amber-300 w-fit">
-              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-black uppercase tracking-wider">
+                <Users className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isBn ? 'একমাত্র অফিসিয়াল সাপোর্ট চ্যানেল' : 'Sole Official Support Channel'}</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+                <MessageCircle className="w-6 h-6 text-emerald-400 fill-current" />
+                <span>{isBn ? 'PBC অফিসিয়াল সাপোর্ট টিম (WhatsApp)' : 'PBC Official Support Team (WhatsApp)'}</span>
+              </h2>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D1B] border border-emerald-500/30 text-xs text-emerald-300 w-fit">
+              <Clock className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>
                 <strong>{isBn ? 'সাপোর্ট সময়সূচি:' : 'Helpline Hours:'}</strong> {workingHours}
               </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Representative 1 */}
-            <div className="p-6 rounded-3xl bg-[#0B1528] border-2 border-[#D4AF37]/30 hover:border-amber-400/50 shadow-xl space-y-4 transition">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-black text-base">
-                  01
-                </div>
-                <div>
-                  <h4 className="font-black text-white text-base">{rep1.name}</h4>
-                  <p className="text-xs text-amber-300 font-bold">{rep1.title}</p>
-                </div>
-              </div>
+          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            {isBn 
+              ? 'প্রবাসী বিজনেস ক্লাবের (PBC) সকল সদস্যের ডিপোজিট ভেরিফিকেশন, প্রশাসনিক সহায়তা, TrxID অনুসন্ধান ও সকল সমস্যার সমাধানে ক্লাবের ডেডিকেটেড সাপোর্ট টিম সার্বক্ষণিক এই WhatsApp গ্রুপেই সক্রিয়। অন্য কোনো ব্যক্তিগত অ্যাকাউন্ট বা নম্বরে যোগাযোগের প্রয়োজন নেই।'
+              : 'Our dedicated customer service and administration team operates exclusively within this official WhatsApp group to assist club members with deposit clearance, account inquiries, and general assistance.'}
+          </p>
 
-              <div className="p-3.5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/20 flex items-center justify-between gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">{isBn ? 'ফোন / WhatsApp নম্বর' : 'Phone / WhatsApp'}</span>
-                  <span className="font-mono text-base font-bold text-white tracking-wider">{rep1.phone}</span>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(rep1.phone, 'rep1')}
-                  className="p-2 text-slate-400 hover:text-amber-300 cursor-pointer"
-                  title={isBn ? 'নম্বর কপি করুন' : 'Copy Number'}
-                >
-                  {copiedField === 'rep1' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
+          <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <a
+              href={waGroupLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-emerald-950/50 border border-emerald-300 transition duration-150 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <MessageCircle className="w-4.5 h-4.5 fill-current" />
+              <span>{isBn ? 'অফিসিয়াল WhatsApp গ্রুপে যোগ দিন' : 'Join Official WhatsApp Group'}</span>
+              <ExternalLink className="w-4 h-4" />
+            </a>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <a
-                  href={`tel:${rep1.phone.replace(/[^0-9+]/g, '')}`}
-                  className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer active:scale-95"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{isBn ? 'সরাসরি কল' : 'Call Now'}</span>
-                </a>
-
-                <a
-                  href={getWhatsAppUrl(rep1.whatsapp || rep1.phone)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer active:scale-95"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                  <span>WhatsApp</span>
-                </a>
-              </div>
-            </div>
-
-            {/* Representative 2 */}
-            <div className="p-6 rounded-3xl bg-[#0B1528] border-2 border-[#D4AF37]/30 hover:border-amber-400/50 shadow-xl space-y-4 transition">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 font-black text-base">
-                  02
-                </div>
-                <div>
-                  <h4 className="font-black text-white text-base">{rep2.name}</h4>
-                  <p className="text-xs text-amber-300 font-bold">{rep2.title}</p>
-                </div>
-              </div>
-
-              <div className="p-3.5 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/20 flex items-center justify-between gap-3">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase font-bold block">{isBn ? 'ফোন / WhatsApp নম্বর' : 'Phone / WhatsApp'}</span>
-                  <span className="font-mono text-base font-bold text-white tracking-wider">{rep2.phone}</span>
-                </div>
-                <button
-                  onClick={() => copyToClipboard(rep2.phone, 'rep2')}
-                  className="p-2 text-slate-400 hover:text-amber-300 cursor-pointer"
-                  title={isBn ? 'নম্বর কপি করুন' : 'Copy Number'}
-                >
-                  {copiedField === 'rep2' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <a
-                  href={`tel:${rep2.phone.replace(/[^0-9+]/g, '')}`}
-                  className="py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer active:scale-95"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{isBn ? 'সরাসরি কল' : 'Call Now'}</span>
-                </a>
-
-                <a
-                  href={getWhatsAppUrl(rep2.whatsapp || rep2.phone)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-md transition cursor-pointer active:scale-95"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                  <span>WhatsApp</span>
-                </a>
-              </div>
-            </div>
-
+            <button
+              onClick={() => copyToClipboard(waGroupLink, 'waGroupLink')}
+              className="px-4 py-3.5 bg-[#070D1B] hover:bg-[#112244] text-slate-200 border border-emerald-500/30 font-bold text-xs rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              {copiedField === 'waGroupLink' ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" />
+                  <span>{isBn ? 'গ্রুপ লিংক কপি হয়েছে' : 'Group Link Copied'}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-4 h-4 text-slate-400" />
+                  <span>{isBn ? 'গ্রুপ লিংক কপি করুন' : 'Copy Group Link'}</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Quick Message Box to WhatsApp */}
+        {/* Quick Message Box to WhatsApp Group */}
         <div className="p-6 sm:p-7 rounded-3xl bg-[#0B1528] border-2 border-emerald-500/30 shadow-2xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -306,18 +312,18 @@ export const HelpDeskView: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-black text-white text-base">
-                  {isBn ? 'দ্রুত মেসেজ পাঠান (Send Direct Inquiry)' : 'Send Direct Message to Hotline'}
+                  {isBn ? 'সাপোর্ট টিমের জন্য বার্তা ড্রাফট করুন' : 'Send Inquiry to Support Team'}
                 </h3>
                 <p className="text-xs text-slate-400">
-                  {isBn ? 'এখানে লিখে সরাসরি অফিশিয়াল হোয়াটসঅ্যাপে পাঠিয়ে দিন' : 'Type your issue and it will open directly in WhatsApp'}
+                  {isBn ? 'এখানে লিখে সরাসরি অফিশিয়াল হোয়াটসঅ্যাপ গ্রুপে শেয়ার করুন' : 'Draft your question and share directly in the official WhatsApp group'}
                 </p>
               </div>
             </div>
 
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D1B] border border-emerald-500/30 text-xs text-emerald-300 w-fit">
-              <Phone className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="text-[11px] text-slate-400">{isBn ? 'হটলাইন:' : 'Hotline:'}</span>
-              <span className="font-mono font-bold text-white">{officialWhatsApp}</span>
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400 fill-current" />
+              <span className="text-[11px] text-slate-400">{isBn ? 'সাপোর্ট:' : 'Support:'}</span>
+              <span className="font-bold text-emerald-300">Official WhatsApp Group</span>
             </div>
           </div>
 
@@ -374,12 +380,12 @@ export const HelpDeskView: React.FC = () => {
               {isTicketSent ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-white" />
-                  <span>{isBn ? 'পাঠানো হয়েছে...' : 'Opened in WhatsApp...'}</span>
+                  <span>{isBn ? 'গ্রুপে কপি ও ওপেন হয়েছে...' : 'Copied & Opening Group...'}</span>
                 </>
               ) : (
                 <>
                   <Send className="w-4 h-4" />
-                  <span>{isBn ? 'হোয়াটসঅ্যাপে পাঠান' : 'Send via WhatsApp'}</span>
+                  <span>{isBn ? 'হোয়াটসঅ্যাপ গ্রুপে পাঠান' : 'Send to WhatsApp Group'}</span>
                 </>
               )}
             </button>
