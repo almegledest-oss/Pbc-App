@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
 import { Deposit } from '../../types';
@@ -529,7 +530,7 @@ export const DepositList: React.FC = () => {
     setReceiptPreview('');
   };
 
-  // Export to formatted Microsoft Excel Spreadsheet (.xls)
+  // Export to genuine Microsoft Excel Spreadsheet (.xlsx)
   const exportToExcel = () => {
     const reportDate = new Date().toLocaleDateString('en-GB', {
       day: '2-digit',
@@ -543,126 +544,107 @@ export const DepositList: React.FC = () => {
 
     const activeFilterLabel = statusFilter === 'All' ? 'All Records (সকল রেকর্ড)' : statusFilter;
 
-    const htmlContent = `
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head>
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <!--[if gte mso 9]>
-  <xml>
-    <x:ExcelWorkbook>
-      <x:ExcelWorksheets>
-        <x:ExcelWorksheet>
-          <x:Name>Deposits Ledger</x:Name>
-          <x:WorksheetOptions>
-            <x:DisplayGridlines/>
-          </x:WorksheetOptions>
-        </x:ExcelWorksheet>
-      </x:ExcelWorksheets>
-    </x:ExcelWorkbook>
-  </xml>
-  <![endif]-->
-  <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    table { border-collapse: collapse; width: 100%; }
-    .title { font-size: 16pt; font-weight: bold; color: #0B1528; text-align: center; }
-    .subtitle { font-size: 10.5pt; color: #475569; text-align: center; }
-    th { background-color: #0B1528; color: #D4AF37; font-size: 10pt; font-weight: bold; border: 1px solid #334155; padding: 10px 8px; text-align: center; }
-    td { border: 1px solid #CBD5E1; padding: 7px 6px; font-size: 9.5pt; color: #1E293B; vertical-align: middle; }
-    .text-center { text-align: center; }
-    .text-left { text-align: left; }
-    .text-right { text-align: right; }
-    .amount { font-weight: bold; color: #047857; text-align: right; }
-    .total-row { background-color: #F1F5F9; font-weight: bold; border-top: 2px solid #0B1528; }
-  </style>
-</head>
-<body>
-  <table>
-    <tr>
-      <td colspan="11" class="title" style="border:none; padding-top:14px; font-size:16pt; font-weight:bold; color:#0B1528; text-align:center;">
-        PROBASHI BARGUNA SOMOBAY SAMITY (প্রবাসী বরগুনা সমবায় সমিতি)
-      </td>
-    </tr>
-    <tr>
-      <td colspan="11" class="subtitle" style="border:none; padding-bottom:8px; font-size:10.5pt; color:#475569; text-align:center;">
-        Official Capital Deposits Ledger & Member Transaction Statement
-      </td>
-    </tr>
-    <tr>
-      <td colspan="11" style="border:none; padding-bottom:12px;">
-        <table style="width:100%; border:1px solid #CBD5E1; background-color:#F8FAFC;">
-          <tr>
-            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Generated Date:</strong> ${reportDate} ${reportTime}</td>
-            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Filter:</strong> ${activeFilterLabel}</td>
-            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Total Records:</strong> ${sortedDeposits.length}</td>
-            <td style="border:none; padding:6px 12px; font-size:9.5pt;"><strong>Total Approved Ledger:</strong> ৳${totalFilteredAmount.toLocaleString()} BDT</td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    <thead>
-      <tr>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; width:45px;">SL</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Deposit ID</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Member ID</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; min-width:180px;">Member Name</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Shares</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Category</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Deposit Date</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Payment Method</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Transaction Ref</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155;">Status</th>
-        <th style="background-color:#0B1528; color:#D4AF37; border:1px solid #334155; min-width:110px;">Amount (BDT)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${sortedDeposits.map((d, index) => {
-        const isAppr = d.status?.toLowerCase().trim() === 'approved';
-        const isPend = d.status?.toLowerCase().trim() === 'pending';
-        const statusColor = isAppr 
-          ? 'background-color:#DCFCE7; color:#15803D;' 
-          : (isPend ? 'background-color:#FEF3C7; color:#B45309;' : 'background-color:#FEE2E2; color:#B91C1C;');
-        const rowBg = index % 2 === 0 ? 'background-color:#FFFFFF;' : 'background-color:#F8FAFC;';
+    // 1. Prepare worksheet rows (AOA: Array of Arrays)
+    const worksheetData: (string | number)[][] = [
+      ['PROBASHI BUSINESS CLUB (প্রবাসী বিজনেস ক্লাব)'],
+      ['Official Capital Deposits Ledger & Member Transaction Statement'],
+      [
+        `Generated Date: ${reportDate} ${reportTime}`,
+        '',
+        `Filter: ${activeFilterLabel}`,
+        '',
+        `Total Records: ${sortedDeposits.length}`,
+        '',
+        `Total Approved Ledger: ৳${totalFilteredAmount.toLocaleString()} BDT`
+      ],
+      [], // Spacing row
+      [
+        'SL',
+        'Deposit ID',
+        'Member ID',
+        'Member Name',
+        'Shares',
+        'Category',
+        'Deposit Date',
+        'Payment Method',
+        'Transaction Ref',
+        'Status',
+        'Amount (BDT)'
+      ]
+    ];
 
-        return `
-        <tr style="${rowBg}">
-          <td style="border:1px solid #CBD5E1; text-align:center; font-weight:bold;">${index + 1}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace; font-weight:bold; color:#0B1528;">${d.id}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace; font-weight:bold; color:#B45309;">${d.memberId}</td>
-          <td style="border:1px solid #CBD5E1; text-align:left; font-weight:bold;">${d.memberName}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center;">${d.shareCount || 1}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center;">${d.category || 'Fund Raising'}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace;">${d.depositDate || '-'}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center;">${d.paymentMethod}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center; font-family:monospace;">${d.referenceNumber || '-'}</td>
-          <td style="border:1px solid #CBD5E1; text-align:center; font-weight:bold; ${statusColor}">${d.status}</td>
-          <td style="border:1px solid #CBD5E1; text-align:right; font-weight:bold; color:#047857;">৳${d.amount.toLocaleString()}</td>
-        </tr>`;
-      }).join('')}
-      <tr style="background-color:#F1F5F9; border-top:2px solid #0B1528;">
-        <td colspan="10" style="border:1px solid #94A3B8; text-align:right; font-weight:bold; font-size:10pt; padding:10px;">
-          TOTAL APPROVED LEDGER (মোট অনুমোদিত লেজার):
-        </td>
-        <td style="border:1px solid #94A3B8; text-align:right; font-weight:bold; font-size:11pt; color:#047857; padding:10px;">
-          ৳${totalFilteredAmount.toLocaleString()} BDT
-        </td>
-      </tr>
-    </tbody>
-  </table>
-</body>
-</html>`;
+    // 2. Add deposit records
+    sortedDeposits.forEach((d, index) => {
+      worksheetData.push([
+        index + 1,
+        d.id || '',
+        d.memberId || '',
+        d.memberName || '',
+        d.shareCount || 1,
+        d.category || 'Fund Raising',
+        d.depositDate || '-',
+        d.paymentMethod || '-',
+        d.referenceNumber || '-',
+        d.status || '',
+        Number(d.amount) || 0
+      ]);
+    });
 
-    // Add UTF-8 BOM so Excel on Windows parses Bengali & UTF-8 perfectly
-    const blob = new Blob(['\uFEFF' + htmlContent], {
-      type: 'application/vnd.ms-excel;charset=utf-8'
+    // 3. Add total summary row
+    worksheetData.push([
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'TOTAL APPROVED LEDGER:',
+      totalFilteredAmount
+    ]);
+
+    // 4. Create worksheet and workbook
+    const ws = XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // Merge title and subtitle rows across all 11 columns
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 10 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 10 } }
+    ];
+
+    // Column widths for clean readability on desktop and mobile
+    ws['!cols'] = [
+      { wch: 6 },   // SL
+      { wch: 18 },  // Deposit ID
+      { wch: 14 },  // Member ID
+      { wch: 28 },  // Member Name
+      { wch: 8 },   // Shares
+      { wch: 16 },  // Category
+      { wch: 14 },  // Deposit Date
+      { wch: 18 },  // Payment Method
+      { wch: 22 },  // Transaction Ref
+      { wch: 12 },  // Status
+      { wch: 18 }   // Amount (BDT)
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Deposits Ledger');
+
+    // 5. Generate binary XLSX output and trigger download safely
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `PBC_Deposits_Report_${new Date().toISOString().split('T')[0]}.xls`;
+    link.download = `PBC_Deposits_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const exportToCsv = () => {
@@ -750,10 +732,10 @@ export const DepositList: React.FC = () => {
                 id="btn-export-excel"
                 onClick={exportToExcel}
                 className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition shrink-0 active:scale-95 cursor-pointer"
-                title={language === 'bn' ? 'মাইক্রোসফট এক্সেলে সরাসরি পরিচ্ছন্ন রঙিন শীট ওপেন করুন' : 'Export styled spreadsheet for Microsoft Excel (.xls)'}
+                title={language === 'bn' ? 'মাইক্রোসফট এক্সেলে সরাসরি পরিচ্ছন্ন শীট ওপেন করুন' : 'Export genuine spreadsheet for Microsoft Excel (.xlsx)'}
               >
                 <FileSpreadsheet className="w-4 h-4 text-emerald-200 stroke-[2.5]" />
-                <span>{language === 'bn' ? 'Excel শীট ডাউনলোড' : 'Download Excel (.xls)'}</span>
+                <span>{language === 'bn' ? 'Excel শীট ডাউনলোড' : 'Download Excel (.xlsx)'}</span>
               </button>
 
               {/* Plain CSV Export */}
