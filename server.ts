@@ -64,6 +64,33 @@ app.post('/api/assistant/chat', async (req, res) => {
         return `হ্যালো **${memberName}** ভাই, আসসালামু আলাইকুম! \n\nআলহামদুলিল্লাহ, ভালো আছি। প্রবাসী বিজনেস ক্লাবে আপনাকে স্বাগতম। আজ আপনাকে কীভাবে সহযোগিতা করতে পারি বলুন? ডিপোজিট যাচাই, ব্যাংক একাউন্ট নম্বর বা ক্লাবের যেকোনো তথ্যের জন্য নির্দ্বিধায় প্রশ্ন করতে পারেন।`;
       }
 
+      // App development / Tech team inquiries (Banglish & Bengali)
+      if (
+        q.includes('develop') ||
+        q.includes('development') ||
+        q.includes('debolap') ||
+        q.includes('debolop') ||
+        q.includes('devolop') ||
+        q.includes('devlop') ||
+        q.includes('banay') ||
+        q.includes('bania') ||
+        q.includes('korese') ||
+        q.includes('korsay') ||
+        q.includes('made') ||
+        q.includes('creator') ||
+        q.includes('who made') ||
+        q.includes('who develop') ||
+        q.includes('software') ||
+        q.includes('tech team') ||
+        q.includes('বানাইছে') ||
+        q.includes('ডেভেলপ') ||
+        q.includes('ডেভেলপার') ||
+        q.includes('তৈরি করেছে') ||
+        q.includes('কে তৈরি')
+      ) {
+        return `প্রবাসী বিজনেস ক্লাব (PBC)-এর এই ডিজিটাল অ্যাপ্লিকেশনটি ডেভেলপ করেছেন **Fokrul Islam Mir**। 😊\n\nতিনি একাধারে একজন প্রফেশনাল সফটওয়্যার ডেভেলপার এবং পাশাপাশি প্রবাসী বিজনেস ক্লাবের একজন গর্বিত সম্মানিত সদস্য (সদস্য আইডি: **00118**)।\n\nবিশ্বজুড়ে ছড়িয়ে থাকা আমাদের সম্মানিত প্রবাসী ও দেশীয় সদস্যদের সুবিধার জন্য রিয়েল-টাইম ডিপোজিট ট্র্যাকিং, ব্যাংক-গ্রেড সিকিউরিটি এবং আর্থিক স্বচ্ছতা নিশ্চিত করার লক্ষ্যেই তিনি এই আধুনিক প্ল্যাটফর্মটি ডেভেলপ করেছেন।\n\nঅ্যাপ সম্পর্কিত যেকোনো মতামত, পরামর্শ বা টেকনিক্যাল সহযোগিতার জন্য আপনি আমাদের সাপোর্ট গ্রুপে জানাতে পারেন!`;
+      }
+
       if (
         q.includes('nam ki') ||
         q.includes('naam ki') ||
@@ -98,11 +125,19 @@ app.post('/api/assistant/chat', async (req, res) => {
         return `আলহামদুলিল্লাহ **${memberName}** ভাই, আপনার অ্যাকাউন্টে কোনো বাতিলকৃত ডিপোজিট নেই। আপনার জমাকৃত সকল লেনদেন সঠিক রয়েছে।`;
       }
 
-      if (q.includes('একাউন্ট') || q.includes('নম্বর') || q.includes('account') || q.includes('বিকাশ') || q.includes('নগদ') || q.includes('bank')) {
+      if (q.includes('একাউন্ট') || q.includes('নম্বর') || q.includes('account') || q.includes('বিকাশ') || q.includes('নগদ') || q.includes('bank') || q.includes('টাকা পাঠাব')) {
         return `প্রবাসী বিজনেস ক্লাবের অফিসিয়াল ডিপোজিট একাউন্ট বিবরণ:\n\n📱 **বিকাশ:** \`${settingsContext?.bkashNumber || '01700000000'}\`\n📱 **নগদ:** \`${settingsContext?.nagadNumber || '01800000000'}\`\n🏛️ **ব্যাংক:** **${settingsContext?.bankName || 'Islami Bank Bangladesh PLC'}**\n• হিসাব নাম: ${settingsContext?.bankAccountName || 'Probashi Business Club'}\n• হিসাব নম্বর: \`${settingsContext?.bankAccountNumber || '2050XXXXXXXXXXXXX'}\`\n• শাখা: ${settingsContext?.bankBranchName || 'Principal Branch, Dhaka'}\n• রাউটিং: \`${settingsContext?.bankRoutingNumber || '125270000'}\`\n\nটাকা পাঠানোর পর প্রাপ্ত TrxID দিয়ে অ্যাপে ডিপোজিট সাবমিট করুন।`;
       }
 
-      return `ধন্যবাদ **${memberName}** ভাই। আপনার অ্যাকাউন্টে বর্তমানে মোট অনুমোদিত ফান্ড **৳${Number(totalDeposit).toLocaleString('en-IN')} BDT** (${shares} টি শেয়ার)। ডিপোজিট স্ট্যাটাস, ব্যাংক একাউন্ট নম্বর বা মানি রিসিট সংক্রান্ত যেকোনো তথ্যে আপনাকে সার্বিক সহায়তা করতে প্রস্তুত।`;
+      if (q.includes('office') || q.includes('অফিস') || q.includes('ঠিকানা') || q.includes('address') || q.includes('location')) {
+        return `প্রবাসী বিজনেস ক্লাব (PBC)-এর প্রধান কার্যালয়:\n\n🏛️ **ঠিকানা:** ${settingsContext?.clubOfficeAddress || 'লেভেল ৪, গুলশান এভিনিউ, ঢাকা, বাংলাদেশ'}\n📞 **যোগাযোগ ও সাপোর্ট:** আমাদের অফিসিয়াল WhatsApp গ্রুপে সাপোর্ট টিমের সাথে সার্বক্ষণিক যোগাযোগ করতে পারেন।`;
+      }
+
+      if (q.includes('project') || q.includes('প্রজেক্ট') || q.includes('ইনভেস্ট') || q.includes('invest') || q.includes('জমির') || q.includes('লাভ') || q.includes('share') || q.includes('শেয়ার')) {
+        return `প্রবাসী বিজনেস ক্লাব (PBC) প্রবাসী ও দেশীয় উদ্যোক্তাদের সম্মিলিত ফান্ডে রিয়েল এস্টেট, প্রাইম ল্যান্ড ডেভেলপমেন্ট ও বাণিজ্যিক প্রকল্পে বিনিয়োগ করে থাকে।\n\nপ্রতিটি শেয়ারের ইউনিট মূল্য **৳${sharePrice.toLocaleString('en-IN')} BDT**।\nআপনার অ্যাকাউন্টে বর্তমানে মোট অনুমোদিত ফান্ড: **৳${Number(totalDeposit).toLocaleString('en-IN')} BDT** (${shares} টি শেয়ার)।\n\nবিনিয়োগ ও চলমান প্রজেক্টের বিস্তারিত তথ্যের জন্য আমাদের অফিসিয়াল WhatsApp গ্রুপে বা সাপোর্ট টিমের সাথে যোগাযোগ করতে পারেন।`;
+      }
+
+      return `ধন্যবাদ **${memberName}** ভাই। আমি আপনার প্রশ্নটি বুঝতে পেরেছি।\n\nঅ্যাপ পরিচালনা, ক্লাবের কার্যক্রম বা মেম্বারশিপ সংক্রান্ত যেকোনো বিশেষ তথ্যের জন্য আপনি আমাদের **অফিসিয়াল WhatsApp সাপোর্ট গ্রুপে** সরাসরি যোগাযোগ করতে পারেন। এছাড়া আপনার ডিপোজিট স্ট্যাটাস, ব্যাংক একাউন্ট নম্বর বা ব্যালেন্স সংক্রান্ত যেকোনো তথ্যে আমি আপনাকে সার্বক্ষণিক সহায়তা করতে প্রস্তুত।`;
     };
 
     const ai = getGenAI();
@@ -120,13 +155,19 @@ PBC is an expatriate-led investment & cooperative community in Bangladesh specia
 
 YOUR CORE OBJECTIVE:
 - Respond realistically, naturally, and warmly in fluent Bengali (or English if the user asks in English).
-- Fully understand both Bengali script and "Banglish" (Bengali written with Latin/English letters, such as "tomar nam ki", "kemon achen", "deposit pending keno", "taka kivabe pathabo", etc.).
+- Fully understand both Bengali script and "Banglish" (Bengali written with Latin/English letters, such as "tomar nam ki", "kemon achen", "deposit pending keno", "taka kivabe pathabo", "amader app ta k development korsay", etc.).
+- When asked who created, developed, or built the app (e.g., "app ke development korse", "who developed the app", "developer ke", "app ke banayse", "app kar banano", "aei app to k debolap korsay"):
+  * You MUST explicitly state that the application was developed by **Fokrul Islam Mir** (ফকরুল ইসলাম মীর).
+  * State clearly that he is a professional Software Developer and simultaneously an active, proud member of Probashi Business Club with Member ID: **00118** (মেম্বার আইডি: 00118)।
+  * Explain that as a fellow member himself, he designed and developed this modern, secure digital platform to ensure real-time deposit tracking, bank-level security, and transparent financial records for expatriate members worldwide.
+  * Do NOT address the questioner by name repeatedly. Provide a polite, direct, and professional answer.
 - When the user asks about your identity or name (e.g., "tomar nam ki", "who are you", "আপনার নাম কি", "কে তুমি"):
   * Clearly and warmly introduce yourself: "আমি **PBC স্মার্ট মেম্বার অ্যাসিস্ট্যান্ট** — প্রবাসী বিজনেস ক্লাব (PBC)-এর অফিসিয়াল ভার্চুয়াল কাস্টমার সাপোর্ট অ্যাসিস্ট্যান্ট।"
   * Mention how you can assist: deposit verification, bank/bKash accounts, share units, pending inquiry, and club information.
 - Do NOT sound like a rigid robot or deliver canned monolithic text blocks.
+- Answer the user's ACTUAL question. Do NOT blindly output balance details if they asked about something else like app development, rules, or identity.
 - When the user gives a simple greeting like "Hi", "Hello", "কেমন আছেন?", or "সালাম", respond like a real, friendly human customer support manager: greet them warmly, ask how you can help them today, and mention their name (${memberName}) respectfully.
-- When they ask about deposits, refer to their ACTUAL real-time records:
+- When they ask about deposits or balance, refer to their ACTUAL real-time records:
   * Member Name: ${memberName}
   * Member ID: ${memberId}
   * Total Verified Balance: ৳${Number(totalDeposit).toLocaleString('en-IN')} BDT (${shares} Share Units)
@@ -149,37 +190,62 @@ YOUR CORE OBJECTIVE:
 - Formatting: Use markdown for readability (bullet points, bold key terms) but keep answers concise, helpful, and natural.
 `;
 
-    // Format chat history into Gemini contents
-    const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+    // Format chat history into strictly alternating Gemini contents
+    const rawHistory: Array<{ role: 'user' | 'model'; text: string }> = [];
 
     if (Array.isArray(chatHistory)) {
       for (const item of chatHistory.slice(-8)) {
-        if (item.sender === 'user' && item.text) {
-          contents.push({
-            role: 'user',
-            parts: [{ text: item.text }]
-          });
-        } else if (item.sender === 'assistant' && item.text) {
-          contents.push({
-            role: 'model',
-            parts: [{ text: item.text }]
-          });
+        if (item.sender === 'user' && item.text?.trim()) {
+          rawHistory.push({ role: 'user', text: item.text.trim() });
+        } else if (item.sender === 'assistant' && item.text?.trim()) {
+          rawHistory.push({ role: 'model', text: item.text.trim() });
         }
       }
     }
 
-    // Add current user query
-    contents.push({
-      role: 'user',
-      parts: [{ text: message }]
-    });
+    // Add current query
+    rawHistory.push({ role: 'user', text: message.trim() });
 
-    // Try candidate models with graceful failover on 503 / high demand spikes
+    // Clean history: Ensure it starts with 'user' and alternates strictly between 'user' and 'model'
+    const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
+    let expectedRole: 'user' | 'model' = 'user';
+
+    for (const entry of rawHistory) {
+      if (contents.length === 0 && entry.role !== 'user') {
+        // Skip leading 'model' greeting messages to satisfy Gemini API constraints
+        continue;
+      }
+
+      if (entry.role === expectedRole) {
+        contents.push({
+          role: entry.role,
+          parts: [{ text: entry.text }]
+        });
+        expectedRole = expectedRole === 'user' ? 'model' : 'user';
+      } else if (contents.length > 0) {
+        // If consecutive identical roles, append text to previous turn
+        contents[contents.length - 1].parts[0].text += `\n${entry.text}`;
+      }
+    }
+
+    // Fallback: If contents ended up empty or last item is not user, guarantee single user turn
+    if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+      contents.length = 0;
+      contents.push({ role: 'user', parts: [{ text: message.trim() }] });
+    }
+
+    // Highly available Gemini models in optimal fallback order
+    const candidateList = [
+      'gemini-3.1-flash-lite',
+      'gemini-3.1-flash-lite-preview',
+      'gemini-3.6-flash',
+      'gemini-3.8-flash'
+    ];
     let replyText = '';
     let selectedModel = '';
 
-    for (let i = 0; i < CANDIDATE_MODELS.length; i++) {
-      const modelName = CANDIDATE_MODELS[i];
+    for (let i = 0; i < candidateList.length; i++) {
+      const modelName = candidateList[i];
       try {
         const response = await ai.models.generateContent({
           model: modelName,
@@ -196,14 +262,14 @@ YOUR CORE OBJECTIVE:
           break;
         }
       } catch (_err: any) {
-        // Silently failover to next candidate model without noisy console warnings
-        if (i < CANDIDATE_MODELS.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+        // High-demand spikes (503/429) silently failover to next candidate model or contextual fallback
+        if (i < candidateList.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       }
     }
 
-    // If all online models are temporarily experiencing spikes in demand, use the contextual fallback
+    // If models are under temporary high demand spikes, use the contextual fallback
     if (!replyText) {
       replyText = generateLocalContextReply(message);
       selectedModel = 'pbc-local-context';

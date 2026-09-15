@@ -404,7 +404,47 @@ export const PbcAssistantWidget: React.FC = () => {
       };
     }
 
-    // 5. BALANCE & SHARES
+    // 5. APP DEVELOPMENT / TECH TEAM INQUIRY
+    const isTechTeamIntent =
+      q.includes('develop') ||
+      q.includes('development') ||
+      q.includes('debolap') ||
+      q.includes('debolop') ||
+      q.includes('devolop') ||
+      q.includes('devlop') ||
+      q.includes('banay') ||
+      q.includes('bania') ||
+      q.includes('korese') ||
+      q.includes('korsay') ||
+      q.includes('who made') ||
+      q.includes('who develop') ||
+      q.includes('বানাইছে') ||
+      q.includes('ডেভেলপ') ||
+      q.includes('ডেভেলপার') ||
+      q.includes('কে তৈরি') ||
+      q.includes('তৈরি করেছে') ||
+      q.includes('software team') ||
+      q.includes('tech team');
+
+    if (isTechTeamIntent) {
+      return {
+        id: 'bot-' + Date.now(),
+        sender: 'assistant',
+        text: `প্রবাসী বিজনেস ক্লাব (PBC)-এর এই ডিজিটাল অ্যাপ্লিকেশনটি ডেভেলপ করেছেন **Fokrul Islam Mir**। 😊\n\nতিনি একাধারে একজন সফটওয়্যার ডেভেলপার এবং পাশাপাশি প্রবাসী বিজনেস ক্লাবের একজন গর্বিত সম্মানিত সদস্য (সদস্য আইডি: **00118**)।\n\nসম্মানিত প্রবাসী মেম্বারদের শেয়ার ও ফান্ডের নিখুঁত হিসাব, রিয়েল-টাইম ডিপোজিট ট্র্যাকিং, আন্তর্জাতিক মানের ডেটা সিকিউরিটি এবং আর্থিক স্বচ্ছতা নিশ্চিত করার লক্ষ্যেই তিনি অত্যন্ত দক্ষতার সাথে এই প্ল্যাটফর্মটি ডেভেলপ করেছেন।\n\nঅ্যাপ সম্পর্কিত আপনার কোনো মূল্যবান মতামত, টেকনিক্যাল পরামর্শ বা নতুন ফিচারের প্রস্তাব থাকলে আমাদের সাপোর্ট গ্রুপে জানাতে পারেন!`,
+        timestamp: timeStr,
+        actionButtons: [
+          {
+            label: '👥 অফিসিয়াল WhatsApp গ্রুপ',
+            icon: 'whatsapp',
+            actionType: 'whatsapp',
+            whatsappText: `*PBC Club - অ্যাপ ফিডব্যাক ও সহায়তা*\nসদস্য: ${memberName} (${memberId})\nবার্তা: অ্যাপ বিষয়ক পরামর্শ ও ফিডব্যাক।`,
+            variant: 'success'
+          }
+        ]
+      };
+    }
+
+    // 6. BALANCE & SHARES
     const isBalanceIntent =
       q.includes('balance') ||
       q.includes('ব্যালেন্স') ||
@@ -439,7 +479,7 @@ export const PbcAssistantWidget: React.FC = () => {
     return {
       id: 'bot-' + Date.now(),
       sender: 'assistant',
-      text: `ধন্যবাদ **${memberName}** ভাই। আপনি ডিপোজিট যাচাই স্ট্যাটাস, টাকা জমার ব্যাংক/বিকাশ নম্বর, মানি রিসিট ডাউনলোড বা ক্লাবের যেকোনো বিষয়ে জানতে পারেন।\n\nপ্রবাসী বিজনেস ক্লাবের একমাত্র সাপোর্ট টিম হলো আমাদের **অফিসিয়াল WhatsApp গ্রুপ**। যেকোনো বিশেষ বা জরুরি প্রয়োজনে সরাসরি অফিসিয়াল গ্রুপে যোগ দিতে পারেন।`,
+      text: `ধন্যবাদ **${memberName}** ভাই। আমি আপনার প্রশ্নটি বুঝতে পেরেছি।\n\nক্লাবের কার্যক্রম, ডিপোজিট স্ট্যাটাস, টাকা জমার ব্যাংক/বিকাশ একাউন্ট নম্বর বা যেকোনো বিষয়ে আপনাকে সহায়তা করতে প্রস্তুত।\n\nপ্রবাসী বিজনেস ক্লাবের একমাত্র সাপোর্ট টিম হলো আমাদের **অফিসিয়াল WhatsApp গ্রুপ**। যেকোনো জরুরি প্রয়োজনে সরাসরি অফিসিয়াল গ্রুপে যোগ দিতে পারেন।`,
       timestamp: timeStr,
       actionButtons: [
         {
@@ -648,6 +688,45 @@ export const PbcAssistantWidget: React.FC = () => {
     }
   };
 
+  // Helper to format text with **bold** highlights and line breaks without raw markdown asterisks
+  const renderFormattedText = (text: string, isUserMessage: boolean) => {
+    const lines = text.split('\n');
+    return (
+      <div className="space-y-1.5 leading-relaxed">
+        {lines.map((line, lineIdx) => {
+          if (!line.trim()) {
+            return <div key={lineIdx} className="h-1.5" />;
+          }
+
+          // Split line by bold markdown **text**
+          const parts = line.split(/(\*\*[^*]+\*\*)/g);
+          return (
+            <p key={lineIdx} className="m-0">
+              {parts.map((part, partIdx) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  const boldText = part.slice(2, -2);
+                  return (
+                    <strong
+                      key={partIdx}
+                      className={
+                        isUserMessage
+                          ? 'font-black text-slate-950'
+                          : 'font-extrabold text-amber-300'
+                      }
+                    >
+                      {boldText}
+                    </strong>
+                  );
+                }
+                return <span key={partIdx}>{part}</span>;
+              })}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <>
       {/* 
@@ -657,35 +736,42 @@ export const PbcAssistantWidget: React.FC = () => {
       {isAssistantOpen && (
         <div
           id="pbc-assistant-fullscreen-scene"
-          className={`fixed inset-0 z-[999999] w-screen h-[100dvh] flex flex-col ${
+          className={`fixed inset-0 z-[999999] w-full h-full max-w-full flex flex-col ${
             isLight ? 'bg-[#F8FAFC] text-slate-900' : 'bg-[#030816] text-white'
-          } overflow-hidden select-none animate-fadeIn`}
+          } overflow-hidden overflow-x-hidden select-none animate-fadeIn`}
         >
-          {/* Top Full Screen Header Bar */}
-          <header className="relative w-full px-3 sm:px-6 py-3 bg-gradient-to-r from-[#07132B] via-[#0E2042] to-[#07132B] text-white flex items-center justify-between shadow-2xl shrink-0 border-b border-amber-500/25">
+          {/* Top Full Screen Header Bar - Safe Area Inset Aware */}
+          <header
+            style={{
+              paddingTop: 'max(env(safe-area-inset-top, 0px), 14px)',
+              paddingBottom: '12px'
+            }}
+            className="relative w-full px-3 sm:px-6 bg-gradient-to-r from-[#07132B] via-[#0D1F3F] to-[#07132B] text-white flex items-center justify-between shadow-2xl shrink-0 border-b border-amber-500/25 z-20"
+          >
             <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-              {/* Back button to return to previous scene */}
+              {/* Back button */}
               <button
                 onClick={() => setIsAssistantOpen(false)}
-                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center gap-1.5 text-xs font-bold transition cursor-pointer border border-white/10 shrink-0"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition cursor-pointer border border-white/10 shrink-0"
                 title="ফিরে যান"
                 aria-label="Back"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span className="hidden sm:inline">ফিরে যান</span>
+                <ArrowLeft className="w-5 h-5" />
               </button>
 
+              {/* Bot Avatar Icon */}
               <div className="relative shrink-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-200">
-                  <Headphones className="w-5 h-5 stroke-[2.2]" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-yellow-500 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/20 border border-amber-300">
+                  <Headphones className="w-5 h-5 stroke-[2.3]" />
                 </div>
                 <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-[#07132B] flex items-center justify-center">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
                 </span>
               </div>
 
+              {/* Bot & Member Title */}
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <h1 className="text-sm sm:text-base font-black tracking-tight text-white truncate">
                     PBC মেম্বার হেল্পডেস্ক
                   </h1>
@@ -694,10 +780,11 @@ export const PbcAssistantWidget: React.FC = () => {
                     <span>এআই সক্রিয়</span>
                   </span>
                 </div>
-                <p className="text-[11px] font-medium text-amber-200/90 truncate">
-                  {isLoggedIn && currentMember?.id && currentMember.id !== 'PBC-00000'
-                    ? `${currentMember.fullName} (${currentMember.id})`
-                    : 'ডিজিটাল কাস্টমার কেয়ার ও মেম্বার সার্ভিস'}
+                <p className="text-[11px] font-medium text-amber-200/90 truncate flex items-center gap-1.5 mt-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 inline-block"></span>
+                  <span className="truncate">
+                    সার্বক্ষণিক ডিজিটাল সাপোর্ট ও মেম্বার সার্ভিস
+                  </span>
                 </p>
               </div>
             </div>
@@ -707,7 +794,7 @@ export const PbcAssistantWidget: React.FC = () => {
               <button
                 onClick={() => setMessages([getGreetingMessage()])}
                 title="নতুন চ্যাট শুরু করুন"
-                className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-slate-300 hover:text-white border border-white/10 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                className="h-9 px-2.5 sm:px-3 rounded-xl bg-white/5 hover:bg-white/15 active:scale-95 text-slate-300 hover:text-white border border-white/10 transition cursor-pointer flex items-center gap-1.5 text-xs font-semibold shrink-0"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">রিসেট</span>
@@ -715,7 +802,7 @@ export const PbcAssistantWidget: React.FC = () => {
               <button
                 onClick={() => setIsAssistantOpen(false)}
                 title="বন্ধ করুন"
-                className="p-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/35 active:scale-95 text-rose-300 hover:text-rose-100 border border-rose-500/30 transition cursor-pointer"
+                className="w-9 h-9 rounded-xl bg-rose-500/20 hover:bg-rose-500/35 active:scale-95 text-rose-300 hover:text-rose-100 border border-rose-500/30 transition cursor-pointer flex items-center justify-center shrink-0"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -725,7 +812,7 @@ export const PbcAssistantWidget: React.FC = () => {
 
           {/* Quick Reply Scrollable Chips Bar */}
           <div
-            className={`px-3 sm:px-6 py-2 shrink-0 border-b overflow-x-auto no-scrollbar flex items-center gap-2 ${
+            className={`px-3 sm:px-6 py-2.5 shrink-0 border-b overflow-x-auto no-scrollbar flex items-center gap-2 ${
               isLight ? 'bg-amber-50/70 border-amber-200/80' : 'bg-[#071328] border-amber-500/20'
             }`}
           >
@@ -733,7 +820,7 @@ export const PbcAssistantWidget: React.FC = () => {
               <button
                 key={chip.id}
                 onClick={() => handleUserSubmit(chip.prompt)}
-                className={`shrink-0 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition duration-150 active:scale-95 cursor-pointer flex items-center gap-1.5 border whitespace-nowrap ${
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition duration-150 active:scale-95 cursor-pointer flex items-center gap-1.5 border whitespace-nowrap ${
                   isLight
                     ? 'bg-white hover:bg-amber-100/70 text-slate-800 border-amber-200 shadow-xs'
                     : 'bg-[#0E2042] hover:bg-amber-500/20 text-amber-200 hover:text-amber-100 border-amber-500/30 shadow-xs'
@@ -756,150 +843,163 @@ export const PbcAssistantWidget: React.FC = () => {
                   key={msg.id}
                   className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'} space-y-2`}
                 >
-                  {/* Message Bubble */}
                   <div
-                    className={`max-w-[92%] sm:max-w-[85%] rounded-2xl p-3.5 sm:p-4 text-xs sm:text-[13.5px] leading-relaxed shadow-md ${
-                      msg.sender === 'user'
-                        ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-bold rounded-tr-xs shadow-amber-950/20'
-                        : isLight
-                        ? 'bg-white text-slate-900 border border-amber-200/90 rounded-tl-xs shadow-sm'
-                        : 'bg-[#0A172F] text-slate-100 border border-amber-500/25 rounded-tl-xs shadow-xl'
+                    className={`flex items-end gap-2 max-w-[94%] sm:max-w-[85%] ${
+                      msg.sender === 'user' ? 'flex-row-reverse self-end' : 'self-start'
                     }`}
                   >
-                    <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
-
-                    {/* Custom Data Cards */}
-                    {msg.dataCard && (
-                      <div className="mt-3 pt-2.5 border-t border-amber-500/30 space-y-2 font-normal">
-                        {msg.dataCard.type === 'pending_deposit' && msg.dataCard.deposit && (
-                          <div
-                            className={`p-3 rounded-xl border ${
-                              isLight
-                                ? 'bg-amber-50/80 border-amber-300 text-slate-900'
-                                : 'bg-amber-950/30 border-amber-500/40 text-amber-100'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between font-bold text-xs pb-1.5 mb-1.5 border-b border-amber-500/20">
-                              <span className="flex items-center gap-1.5 text-amber-400">
-                                <Clock className="w-3.5 h-3.5" />
-                                <span>পেন্ডিং ট্রানজেকশন</span>
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px]">
-                                ভেরিফিকেশন চলমান
-                              </span>
-                            </div>
-                            <div className="text-[11.5px] space-y-1">
-                              <div>পরিমাণ: <strong className="text-amber-400">৳{Number(msg.dataCard.deposit.amount).toLocaleString('en-IN')} BDT</strong></div>
-                              <div>TrxID: <span className="font-mono font-bold">{msg.dataCard.deposit.referenceNumber}</span></div>
-                              <div>মাধ্যম: {msg.dataCard.deposit.paymentMethod}</div>
-                              <div>তারিখ: {msg.dataCard.deposit.depositDate}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {msg.dataCard.type === 'rejected_deposit' && msg.dataCard.deposit && (
-                          <div
-                            className={`p-3 rounded-xl border ${
-                              isLight
-                                ? 'bg-rose-50 border-rose-300 text-slate-900'
-                                : 'bg-rose-950/30 border-rose-500/40 text-rose-100'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between font-bold text-xs pb-1.5 mb-1.5 border-b border-rose-500/20">
-                              <span className="flex items-center gap-1.5 text-rose-400">
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>বাতিলকৃত ডিপোজিট</span>
-                              </span>
-                              <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px]">
-                                Rejected
-                              </span>
-                            </div>
-                            <div className="text-[11.5px] space-y-1">
-                              <div>পরিমাণ: <strong>৳{Number(msg.dataCard.deposit.amount).toLocaleString('en-IN')} BDT</strong></div>
-                              <div>TrxID: <span className="font-mono">{msg.dataCard.deposit.referenceNumber}</span></div>
-                              <div className="text-rose-400 font-semibold pt-1">
-                                কারণ: "{msg.dataCard.deposit.rejectionReason || 'ব্যাংক স্টেটমেন্ট অমিল'}"
-                              </div>
-                            </div>
-                          </div>
-                        )}
-
-                        {msg.dataCard.type === 'accounts' && msg.dataCard.accounts && (
-                          <div className="space-y-2 pt-1 text-xs">
-                            {/* bKash */}
-                            <div
-                              className={`p-2.5 rounded-xl border flex items-center justify-between ${
-                                isLight ? 'bg-pink-50 border-pink-300 text-slate-900' : 'bg-pink-950/20 border-pink-500/30 text-pink-200'
-                              }`}
-                            >
-                              <div>
-                                <div className="font-bold text-pink-500">বিকাশ (bKash)</div>
-                                <div className="font-mono font-bold text-sm">{msg.dataCard.accounts.bkash}</div>
-                              </div>
-                              <button
-                                onClick={() => copyToClipboard(msg.dataCard.accounts.bkash, 'bkash')}
-                                className="px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                              >
-                                {copiedId === 'bkash' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === 'bkash' ? 'কপি হয়েছে' : 'কপি'}</span>
-                              </button>
-                            </div>
-
-                            {/* Nagad */}
-                            <div
-                              className={`p-2.5 rounded-xl border flex items-center justify-between ${
-                                isLight ? 'bg-amber-50 border-amber-300 text-slate-900' : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
-                              }`}
-                            >
-                              <div>
-                                <div className="font-bold text-amber-500">নগদ (Nagad)</div>
-                                <div className="font-mono font-bold text-sm">{msg.dataCard.accounts.nagad}</div>
-                              </div>
-                              <button
-                                onClick={() => copyToClipboard(msg.dataCard.accounts.nagad, 'nagad')}
-                                className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                              >
-                                {copiedId === 'nagad' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === 'nagad' ? 'কপি হয়েছে' : 'কপি'}</span>
-                              </button>
-                            </div>
-
-                            {/* Bank */}
-                            <div
-                              className={`p-2.5 rounded-xl border flex items-center justify-between ${
-                                isLight ? 'bg-emerald-50 border-emerald-300 text-slate-900' : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-                              }`}
-                            >
-                              <div>
-                                <div className="font-bold text-emerald-500">{msg.dataCard.accounts.bankName}</div>
-                                <div className="font-mono font-bold text-xs">হিসাব: {msg.dataCard.accounts.bankAccNo}</div>
-                                <div className="text-[10.5px] opacity-80">{msg.dataCard.accounts.bankAccName} ({msg.dataCard.accounts.bankBranch})</div>
-                              </div>
-                              <button
-                                onClick={() => copyToClipboard(msg.dataCard.accounts.bankAccNo, 'bank')}
-                                className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
-                              >
-                                {copiedId === 'bank' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                <span>{copiedId === 'bank' ? 'কপি হয়েছে' : 'কপি'}</span>
-                              </button>
-                            </div>
-                          </div>
-                        )}
+                    {msg.sender === 'assistant' && (
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-yellow-400 text-slate-950 flex items-center justify-center shrink-0 mb-1 shadow-sm border border-amber-300">
+                        <Headphones className="w-3.5 h-3.5 stroke-[2.3]" />
                       </div>
                     )}
 
-                    <span
-                      className={`text-[10px] block mt-1.5 text-right font-mono ${
-                        msg.sender === 'user' ? 'text-slate-950/70 font-semibold' : 'text-slate-400/70'
+                    {/* Message Bubble */}
+                    <div
+                      className={`rounded-2xl p-3.5 sm:p-4 text-xs sm:text-[13.5px] leading-relaxed shadow-md ${
+                        msg.sender === 'user'
+                          ? 'bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-bold rounded-tr-xs shadow-amber-950/20'
+                          : isLight
+                          ? 'bg-white text-slate-900 border border-amber-200/90 rounded-tl-xs shadow-sm'
+                          : 'bg-[#0A172F] text-slate-100 border border-amber-500/25 rounded-tl-xs shadow-xl'
                       }`}
                     >
-                      {msg.timestamp}
-                    </span>
+                      {/* Markdown bold formatting */}
+                      {renderFormattedText(msg.text, msg.sender === 'user')}
+
+                      {/* Custom Data Cards */}
+                      {msg.dataCard && (
+                        <div className="mt-3 pt-2.5 border-t border-amber-500/30 space-y-2 font-normal">
+                          {msg.dataCard.type === 'pending_deposit' && msg.dataCard.deposit && (
+                            <div
+                              className={`p-3 rounded-xl border ${
+                                isLight
+                                  ? 'bg-amber-50/80 border-amber-300 text-slate-900'
+                                  : 'bg-amber-950/30 border-amber-500/40 text-amber-100'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between font-bold text-xs pb-1.5 mb-1.5 border-b border-amber-500/20">
+                                <span className="flex items-center gap-1.5 text-amber-400">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  <span>পেন্ডিং ট্রানজেকশন</span>
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px]">
+                                  ভেরিফিকেশন চলমান
+                                </span>
+                              </div>
+                              <div className="text-[11.5px] space-y-1">
+                                <div>পরিমাণ: <strong className="text-amber-400">৳{Number(msg.dataCard.deposit.amount).toLocaleString('en-IN')} BDT</strong></div>
+                                <div>TrxID: <span className="font-mono font-bold">{msg.dataCard.deposit.referenceNumber}</span></div>
+                                <div>মাধ্যম: {msg.dataCard.deposit.paymentMethod}</div>
+                                <div>তারিখ: {msg.dataCard.deposit.depositDate}</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {msg.dataCard.type === 'rejected_deposit' && msg.dataCard.deposit && (
+                            <div
+                              className={`p-3 rounded-xl border ${
+                                isLight
+                                  ? 'bg-rose-50 border-rose-300 text-slate-900'
+                                  : 'bg-rose-950/30 border-rose-500/40 text-rose-100'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between font-bold text-xs pb-1.5 mb-1.5 border-b border-rose-500/20">
+                                <span className="flex items-center gap-1.5 text-rose-400">
+                                  <AlertTriangle className="w-3.5 h-3.5" />
+                                  <span>বাতিলকৃত ডিপোজিট</span>
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-[10px]">
+                                  Rejected
+                                </span>
+                              </div>
+                              <div className="text-[11.5px] space-y-1">
+                                <div>পরিমাণ: <strong>৳{Number(msg.dataCard.deposit.amount).toLocaleString('en-IN')} BDT</strong></div>
+                                <div>TrxID: <span className="font-mono">{msg.dataCard.deposit.referenceNumber}</span></div>
+                                <div className="text-rose-400 font-semibold pt-1">
+                                  কারণ: "{msg.dataCard.deposit.rejectionReason || 'ব্যাংক স্টেটমেন্ট অমিল'}"
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {msg.dataCard.type === 'accounts' && msg.dataCard.accounts && (
+                            <div className="space-y-2 pt-1 text-xs">
+                              {/* bKash */}
+                              <div
+                                className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                                  isLight ? 'bg-pink-50 border-pink-300 text-slate-900' : 'bg-pink-950/20 border-pink-500/30 text-pink-200'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-pink-500">বিকাশ (bKash)</div>
+                                  <div className="font-mono font-bold text-sm">{msg.dataCard.accounts.bkash}</div>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(msg.dataCard.accounts.bkash, 'bkash')}
+                                  className="px-2.5 py-1 rounded-lg bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 border border-pink-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  {copiedId === 'bkash' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  <span>{copiedId === 'bkash' ? 'কপি হয়েছে' : 'কপি'}</span>
+                                </button>
+                              </div>
+
+                              {/* Nagad */}
+                              <div
+                                className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                                  isLight ? 'bg-amber-50 border-amber-300 text-slate-900' : 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-amber-500">নগদ (Nagad)</div>
+                                  <div className="font-mono font-bold text-sm">{msg.dataCard.accounts.nagad}</div>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(msg.dataCard.accounts.nagad, 'nagad')}
+                                  className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  {copiedId === 'nagad' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  <span>{copiedId === 'nagad' ? 'কপি হয়েছে' : 'কপি'}</span>
+                                </button>
+                              </div>
+
+                              {/* Bank */}
+                              <div
+                                className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                                  isLight ? 'bg-emerald-50 border-emerald-300 text-slate-900' : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-emerald-500">{msg.dataCard.accounts.bankName}</div>
+                                  <div className="font-mono font-bold text-xs">হিসাব: {msg.dataCard.accounts.bankAccNo}</div>
+                                  <div className="text-[10.5px] opacity-80">{msg.dataCard.accounts.bankAccName} ({msg.dataCard.accounts.bankBranch})</div>
+                                </div>
+                                <button
+                                  onClick={() => copyToClipboard(msg.dataCard.accounts.bankAccNo, 'bank')}
+                                  className="px-2.5 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 text-[11px] font-bold flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  {copiedId === 'bank' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                  <span>{copiedId === 'bank' ? 'কপি হয়েছে' : 'কপি'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <span
+                        className={`text-[10px] block mt-1.5 text-right font-mono ${
+                          msg.sender === 'user' ? 'text-slate-950/70 font-semibold' : 'text-slate-400/70'
+                        }`}
+                      >
+                        {msg.timestamp}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Interactive Action Buttons */}
                   {msg.actionButtons && msg.actionButtons.length > 0 && (
-                    <div className="flex flex-wrap gap-2 max-w-[95%] pl-1 pt-0.5">
+                    <div className="flex flex-wrap gap-2 max-w-[95%] pl-9 pt-0.5">
                       {msg.actionButtons.map((btn, idx) => (
                         <button
                           key={idx}
@@ -916,9 +1016,9 @@ export const PbcAssistantWidget: React.FC = () => {
                         >
                           {btn.icon === 'whatsapp' && <MessageCircle className="w-4 h-4 fill-current shrink-0" />}
                           {btn.icon === 'navigate' && <ChevronRight className="w-4 h-4 shrink-0" />}
-                          {btn.icon === 'query' && <HelpCircle className="w-4 h-4 shrink-0" />}
                           <span>{btn.label}</span>
                           {btn.icon === 'whatsapp' && <ExternalLink className="w-3.5 h-3.5 shrink-0 opacity-80" />}
+                          {btn.icon === 'query' && <ChevronRight className="w-3.5 h-3.5 shrink-0 opacity-60 ml-0.5" />}
                         </button>
                       ))}
                     </div>
@@ -928,7 +1028,7 @@ export const PbcAssistantWidget: React.FC = () => {
 
               {/* Typing Indicator */}
               {isTyping && (
-                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#0A172F] border border-amber-500/25 text-xs text-amber-300 w-fit shadow-md">
+                <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#0A172F] border border-amber-500/25 text-xs text-amber-300 w-fit shadow-md ml-9">
                   <Headphones className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
                   <span>মেম্বার হেল্পডেস্ক উত্তর লিখছে...</span>
                   <span className="flex gap-1 items-center ml-1">
@@ -943,10 +1043,13 @@ export const PbcAssistantWidget: React.FC = () => {
             </div>
           </div>
 
-          {/* Full Screen Bottom Input Bar */}
+          {/* Full Screen Bottom Input Bar - Safe Area Inset Aware */}
           <footer
-            className={`p-3 sm:p-4 border-t shrink-0 ${
-              isLight ? 'bg-white border-amber-200/80' : 'bg-[#071122] border-amber-500/25'
+            style={{
+              paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 14px)'
+            }}
+            className={`p-2.5 sm:p-4 border-t shrink-0 z-20 ${
+              isLight ? 'bg-white border-amber-200/80 shadow-lg' : 'bg-[#071122] border-amber-500/25 shadow-2xl'
             }`}
           >
             <form
@@ -954,15 +1057,17 @@ export const PbcAssistantWidget: React.FC = () => {
                 e.preventDefault();
                 handleUserSubmit(input);
               }}
-              className="max-w-3xl mx-auto w-full flex items-center gap-2.5"
+              className="max-w-3xl mx-auto w-full flex items-center gap-2"
             >
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                placeholder="এখানে লিখুন (যেমন: কেমন আছেন, ডিপোজিট পেন্ডিং কেন, একাউন্ট নম্বর)..."
-                className={`flex-1 px-4 py-3 sm:py-3.5 rounded-2xl text-xs sm:text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-amber-400/40 transition ${
+                placeholder="এখানে লিখুন (যেমন: ডিপোজিট পেন্ডিং কেন, একাউন্ট নম্বর)..."
+                enterKeyHint="send"
+                style={{ fontSize: '16px' }}
+                className={`flex-1 min-w-0 px-3.5 sm:px-4 py-3 sm:py-3.5 rounded-2xl text-[16px] sm:text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-amber-400/40 transition ${
                   isLight
                     ? 'bg-slate-50 border-amber-300 text-slate-900 placeholder-slate-400'
                     : 'bg-[#0D1F3F] border-amber-500/30 text-white placeholder-slate-400'
@@ -972,9 +1077,9 @@ export const PbcAssistantWidget: React.FC = () => {
               <button
                 type="submit"
                 disabled={!input.trim() || isTyping}
-                className="px-5 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-950/30 border border-amber-200 transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
+                className="h-[46px] min-w-[46px] px-3.5 sm:px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-950/30 border border-amber-200 transition duration-150 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shrink-0"
               >
-                <span>পাঠান</span>
+                <span className="hidden sm:inline">পাঠান</span>
                 <Send className="w-4 h-4" />
               </button>
             </form>

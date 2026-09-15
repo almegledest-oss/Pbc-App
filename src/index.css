@@ -499,3 +499,24 @@ html, body, #root {
     margin: 0;
   }
 }
+
+/* Mobile Safe Area Padding Utilities for Notch, Dynamic Island, and Home Indicator */
+.safe-top-padding {
+  padding-top: max(env(safe-area-inset-top, 0px), 14px);
+}
+.safe-bottom-padding {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 14px);
+}
+
+/* Prevent iOS Safari automatic viewport zoom when tapping/typing on inputs */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="password"],
+  input[type="email"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
