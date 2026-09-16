@@ -1,6 +1,6 @@
 {
   "name": "PBC CLUB",
-  "description": "Probashi Business Club - Real Estate Investment & Member Fund Management System",
+  "description": "প্রবাসী বিজনেস ক্লাব (Probashi Business Club - PBC) বিশ্বব্যাপী প্রবাসী বাংলাদেশি উদ্যোক্তাদের সমন্বয়ে নির্ভরযোগ্য ব্যবসায়িক নেটওয়ার্ক ও রিয়েল এস্টেট বিনিয়োগ পোর্টাল।",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

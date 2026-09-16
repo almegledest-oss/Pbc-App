@@ -2,6 +2,25 @@ import { BoardDirector } from '../types';
 
 export const INITIAL_DIRECTORS: BoardDirector[] = [
   {
+    id: 'DIR-100',
+    name: 'SHAKIL RANA',
+    designation: 'President',
+    photoUrl: '',
+    location: 'Dhaka Bangladesh',
+    mobile: '+8801711008874',
+    nationalId: '',
+    email: '',
+    homeAddress: 'Comilla, Homna',
+    village: 'Homna',
+    subDistrict: 'Homna',
+    district: 'Comilla',
+    postalCode: '',
+    displayOrder: 1,
+    isActive: true,
+    allowedAccessUsers: [],
+    createdAt: new Date().toISOString()
+  },
+  {
     id: 'DIR-101',
     name: 'FOKRUL ISLAM MIR',
     designation: 'Director',
@@ -15,7 +34,7 @@ export const INITIAL_DIRECTORS: BoardDirector[] = [
     subDistrict: '',
     district: 'Riyadh',
     postalCode: '',
-    displayOrder: 1,
+    displayOrder: 2,
     isActive: true,
     allowedAccessUsers: [],
     createdAt: new Date().toISOString()

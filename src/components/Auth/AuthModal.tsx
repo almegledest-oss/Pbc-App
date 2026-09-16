@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check, MessageCircle, ExternalLink } from 'lucide-react';
+import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check, MessageCircle, ExternalLink, ChevronDown } from 'lucide-react';
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
+import { PublicClubShowcase } from './PublicClubShowcase';
 import { safeStorage } from '../../utils/safeStorage';
 import { db } from '../../lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
@@ -734,32 +735,50 @@ export const AuthModal: React.FC = () => {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 bg-[#030712]/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-[#070D1B] rounded-3xl p-6 sm:p-8 max-w-md w-full border-2 border-[#D4AF37]/40 relative shadow-[0_0_60px_rgba(212,175,55,0.18)] animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-        
-        {isLoggedIn && (
-          <button
-            onClick={() => setIsAuthModalOpen(false)}
-            className="absolute top-4 right-4 p-2 text-amber-400/80 hover:text-amber-200 rounded-full bg-amber-500/10 hover:bg-amber-500/20 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+  const scrollToLogin = () => {
+    const el = document.getElementById('login-card');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
-        {/* Brand Header */}
-        <div className="text-center mb-6">
-          <PbcLogo variant="gold" className="w-20 h-20 mx-auto mb-3" />
-          <div className="flex items-center justify-center gap-2 text-[#E5A93C] text-xs font-bold tracking-[0.25em] uppercase mt-1">
-            <span className="text-[10px]">❖</span>
-            <span>TOGETHER WE RISE</span>
-            <span className="text-[10px]">❖</span>
-          </div>
+  const scrollToSection = (sectionId: string) => {
+    const el = document.getElementById(sectionId);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const renderAuthCard = (showClose: boolean = false) => (
+    <div 
+      data-nosnippet="true" 
+      className="bg-[#070D1B] rounded-3xl p-6 sm:p-8 max-w-md w-full border-2 border-[#D4AF37]/40 relative shadow-[0_0_60px_rgba(212,175,55,0.18)] animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto mx-auto"
+    >
+      {showClose && (
+        <button
+          type="button"
+          onClick={() => setIsAuthModalOpen(false)}
+          className="absolute top-4 right-4 p-2 text-amber-400/80 hover:text-amber-200 rounded-full bg-amber-500/10 hover:bg-amber-500/20 transition cursor-pointer"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Brand Header */}
+      <div className="text-center mb-6" data-nosnippet="true">
+        <PbcLogo variant="gold" className="w-20 h-20 mx-auto mb-3" />
+        <div className="flex items-center justify-center gap-2 text-[#E5A93C] text-xs font-bold tracking-[0.25em] uppercase mt-1">
+          <span className="text-[10px]">❖</span>
+          <span>TOGETHER WE RISE</span>
+          <span className="text-[10px]">❖</span>
         </div>
+      </div>
 
-        {/* Mode Switcher Tabs (Sign In vs Register Member) - Only show in login/signup modes */}
-        {!isForgotOpen && (mode === 'login' || mode === 'signup') && (
-          <div className="grid grid-cols-2 p-1.5 bg-[#030816] rounded-2xl border border-[#D4AF37]/30 mb-5">
+      {/* Mode Switcher Tabs (Sign In vs Register Member) - Only show in login/signup modes */}
+      {!isForgotOpen && (mode === 'login' || mode === 'signup') && (
+        <div data-nosnippet="true" className="grid grid-cols-2 p-1.5 bg-[#030816] rounded-2xl border border-[#D4AF37]/30 mb-5">
             <button
               type="button"
               onClick={() => { setMode('login'); setErrorMessage(''); }}
@@ -985,7 +1004,7 @@ export const AuthModal: React.FC = () => {
           <>
             {mode === 'login' ? (
               /* SIGN IN FORM */
-              <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
+              <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
                 <div>
                   <label className="block text-slate-200 font-bold mb-1.5 flex items-center justify-between">
                     <span>Email Address or Member ID / ইমেইল বা মেম্বার আইডি</span>
@@ -1060,7 +1079,7 @@ export const AuthModal: React.FC = () => {
               </form>
             ) : (
               /* MEMBER SELF-REGISTRATION FORM */
-              <form onSubmit={handleLoginSubmit} className="space-y-3.5 text-xs">
+              <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-3.5 text-xs">
                 <div>
                   <label className="block text-slate-200 font-bold mb-1 flex items-center justify-between">
                     <span>Member ID / মেম্বার আইডি *</span>
@@ -1195,7 +1214,7 @@ export const AuthModal: React.FC = () => {
           </>
         ) : (
           /* Forgot Password View */
-          <form onSubmit={handleForgotSubmit} className="space-y-4 text-xs">
+          <form data-nosnippet="true" onSubmit={handleForgotSubmit} className="space-y-4 text-xs">
             <div className="text-center">
               <div className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto mb-2 border border-amber-500/40 shadow-inner">
                 <KeyRound className="w-6 h-6" />
@@ -1324,6 +1343,106 @@ export const AuthModal: React.FC = () => {
         )}
 
       </div>
+  );
+
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-[#030712] text-white flex flex-col font-sans w-full overflow-x-hidden relative selection:bg-amber-500/30 selection:text-amber-200">
+        {/* TOP BRAND NAV BAR (Sticky, with Sitelink Anchors) */}
+        <header className="sticky top-0 z-40 bg-[#070D1B]/95 backdrop-blur-md border-b border-[#D4AF37]/25 px-4 sm:px-6 py-3 transition shadow-md">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 cursor-pointer" onClick={scrollToLogin}>
+              <PbcLogo variant="gold" className="w-9 h-9 sm:w-10 sm:h-10" />
+              <div>
+                <h1 className="text-sm sm:text-base font-black text-white tracking-wide leading-tight">
+                  প্রবাসী বিজনেস ক্লাব
+                </h1>
+                <p className="text-[10px] sm:text-[11px] text-amber-400 font-bold tracking-widest uppercase">
+                  Probashi Business Club
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Sitelink Anchors */}
+            <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-300">
+              <button 
+                type="button" 
+                onClick={() => scrollToSection('about')} 
+                className="hover:text-amber-300 transition cursor-pointer"
+              >
+                পরিচিতি ও ভিশন
+              </button>
+              <button 
+                type="button" 
+                onClick={() => scrollToSection('president')} 
+                className="hover:text-amber-300 transition cursor-pointer"
+              >
+                প্রেসিডেন্টের বার্তা
+              </button>
+              <button 
+                type="button" 
+                onClick={() => scrollToSection('projects')} 
+                className="hover:text-amber-300 transition cursor-pointer"
+              >
+                প্রকল্পসমূহ
+              </button>
+            </nav>
+
+            <div className="flex items-center gap-2">
+              <a
+                href={`https://wa.me/${(systemSettings.adminWhatsApp || "+8801711000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Assalamu Alaikum, I need assistance with PBC Portal.")}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition"
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>হেল্পলাইন</span>
+              </a>
+
+              <button
+                type="button"
+                onClick={scrollToLogin}
+                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-lg shadow transition active:scale-95 cursor-pointer"
+              >
+                মেম্বার লগইন
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* HERO LOGIN / REGISTRATION SECTION */}
+        <section id="login" className="flex-1 flex flex-col items-center justify-center pt-8 sm:pt-12 pb-6 px-4">
+          <div id="login-card" className="w-full max-w-md">
+            {renderAuthCard(false)}
+          </div>
+
+          {/* Quick anchor to Public Showcase below */}
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => scrollToSection('about')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wide transition shadow-lg group cursor-pointer active:scale-95"
+            >
+              <span>Explore Probashi Business Club (পরিচিতি ও ভিশন)</span>
+              <ChevronDown className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+            </button>
+          </div>
+        </section>
+
+        {/* PUBLIC CLUB SHOWCASE (About, Board of Directors, Strategic Projects, Digital Perks, Contacts) */}
+        <PublicClubShowcase onScrollToLogin={scrollToLogin} />
+
+      </div>
+    );
+  }
+
+  if (!isAuthModalOpen) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#030712]/85 backdrop-blur-md flex items-center justify-center p-4">
+      {renderAuthCard(true)}
     </div>
   );
 };

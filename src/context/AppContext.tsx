@@ -102,6 +102,7 @@ interface AppContextType {
   stats: ClubStats;
   notifications: NotificationItem[];
   directors: BoardDirector[];
+  boardDirectors: BoardDirector[];
   canManageDirectors: boolean;
   quotes: QuoteItem[];
   
@@ -242,7 +243,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [directors, setDirectors] = useState<BoardDirector[]>(INITIAL_DIRECTORS);
+  const [directors, setDirectors] = useState<BoardDirector[]>(() => {
+    try {
+      const cached = safeStorage.getItem('pbc_cached_directors');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Could not read cached directors:', e);
+    }
+    return INITIAL_DIRECTORS;
+  });
   const [systemSettings, setSystemSettings] = useState<SystemSettings>(() => {
     try {
       const saved = safeStorage.getItem('pbc_system_settings');
@@ -604,6 +616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let unsubscribeAuth: (() => void) | undefined;
     let unsubSettings: (() => void) | undefined;
+    let unsubDirectors: (() => void) | undefined;
 
     const initFirebaseCore = async () => {
       unsubSettings = subscribeSystemSettings((data) => {
@@ -614,6 +627,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (e) {
             console.warn('Could not cache system settings:', e);
           }
+        }
+      });
+
+      unsubDirectors = subscribeBoardDirectors((data) => {
+        if (data && data.length > 0) {
+          setDirectors(data);
         }
       });
 
@@ -779,6 +798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       if (unsubSettings) unsubSettings();
+      if (unsubDirectors) unsubDirectors();
       if (unsubscribeAuth) unsubscribeAuth();
     };
   }, []);
@@ -840,10 +860,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    unsubDirectors = subscribeBoardDirectors((data) => {
-      setDirectors(data || []);
-    });
-
     unsubQuotes = subscribeQuotes((data) => {
       setQuotes(data || []);
     });
@@ -859,7 +875,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubProjects) unsubProjects();
       if (unsubReports) unsubReports();
       if (unsubTemplate) unsubTemplate();
-      if (unsubDirectors) unsubDirectors();
       if (unsubQuotes) unsubQuotes();
     };
   }, [isLoggedIn, systemSettings.maintenanceMode, role, currentMember?.id]);
@@ -1876,6 +1891,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stats,
         notifications,
         directors,
+        boardDirectors: directors,
         canManageDirectors,
         quotes,
         addQuote: async (quote) => {
@@ -1915,17 +1931,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteReport,
         addDirector: async (director) => {
           const tempId = `dir-${Date.now()}`;
-          setDirectors(prev => [...prev, { ...director, id: tempId }]);
+          setDirectors(prev => {
+            const next = [...prev, { ...director, id: tempId }];
+            safeStorage.setItem('pbc_cached_directors', JSON.stringify(next));
+            return next;
+          });
           await addDirectorDoc(director);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Add Board Director', `Added director: ${director.name}`);
         },
         updateDirector: async (id, director) => {
-          setDirectors(prev => prev.map(d => d.id === id ? { ...d, ...director } : d));
+          setDirectors(prev => {
+            const next = prev.map(d => d.id === id ? { ...d, ...director } : d);
+            safeStorage.setItem('pbc_cached_directors', JSON.stringify(next));
+            return next;
+          });
           await updateDirectorDoc(id, director);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Update Board Director', `Updated director ID: ${id}`);
         },
         deleteDirector: async (id) => {
-          setDirectors(prev => prev.filter(d => d.id !== id));
+          setDirectors(prev => {
+            const next = prev.filter(d => d.id !== id);
+            safeStorage.setItem('pbc_cached_directors', JSON.stringify(next));
+            return next;
+          });
           await deleteDirectorDoc(id);
           await addActivityLogDoc(authUser?.email || 'admin@pbcclub.org', 'Delete Board Director', `Deleted director ID: ${id}`);
         },

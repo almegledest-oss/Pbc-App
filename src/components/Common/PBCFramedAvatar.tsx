@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { safeStorage } from '../../utils/safeStorage';
 
@@ -21,6 +21,10 @@ export const PBCFramedAvatar: React.FC<PBCFramedAvatarProps> = ({
 }) => {
   const { systemSettings } = useApp();
   const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [photoUrl]);
 
   // Retrieve saved overlay from systemSettings or localStorage or generated default PNG
   const frameOverlayUrl =
@@ -48,6 +52,7 @@ export const PBCFramedAvatar: React.FC<PBCFramedAvatarProps> = ({
           src={cleanPhotoUrl}
           alt={alt || name || 'Member'}
           className="w-full h-full object-cover rounded-[inherit]"
+          referrerPolicy="no-referrer"
           onError={() => setImgError(true)}
         />
       ) : (

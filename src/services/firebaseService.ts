@@ -429,12 +429,12 @@ export async function updateDirectorDoc(id: string, director: Partial<BoardDirec
   });
 
   try {
-    await updateDoc(doc(db, 'board_directors', id), payload);
+    await setDoc(doc(db, 'board_directors', id), payload, { merge: true });
   } catch (err: any) {
     notifyQuotaExceeded(err);
     if (err?.message?.includes('exceeds the maximum allowed size') && photoUrl) {
       const tightPhoto = await compressDataUrlIfNeeded(photoUrl, 500, 0.5);
-      await updateDoc(doc(db, 'board_directors', id), { ...payload, photoUrl: tightPhoto });
+      await setDoc(doc(db, 'board_directors', id), { ...payload, photoUrl: tightPhoto }, { merge: true });
     } else {
       throw err;
     }
