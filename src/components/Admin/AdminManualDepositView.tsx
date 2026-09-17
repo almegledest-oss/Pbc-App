@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { Member, Deposit } from '../../types';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { DepositReceiptModal } from '../Deposits/DepositReceiptModal';
+import { SmartDepositCalculator, DepositMode } from '../Deposits/SmartDepositCalculator';
 import { compressImageToDataUrl } from '../../services/firebaseService';
 import { 
   Wallet, 
@@ -113,6 +114,14 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
   const [shareCount, setShareCount] = useState<number>(1);
   const [amountBDT, setAmountBDT] = useState<number | ''>(5000);
 
+  // Multi-Month & Multi-Share Smart States
+  const [depositMode, setDepositMode] = useState<DepositMode>('single_month');
+  const [monthlyRate, setMonthlyRate] = useState<number>(1);
+  const [monthsCount, setMonthsCount] = useState<number>(1);
+  const [startMonth, setStartMonth] = useState<string>('August 2026');
+  const [endMonth, setEndMonth] = useState<string>('August 2026');
+  const [coveredPeriodText, setCoveredPeriodText] = useState<string>('August 2026');
+
   const handleShareCountChange = (newCount: number) => {
     const validCount = Math.max(1, newCount);
     setShareCount(validCount);
@@ -125,7 +134,7 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
   const [bankOrBranch, setBankOrBranch] = useState<string>('');
   const [targetMonth, setTargetMonth] = useState<string>('August 2026');
   const [notes, setNotes] = useState<string>(
-    isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬' : 'Monthly Contribution - August 2026'
+    isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬ (১টি শেয়ার)' : 'Monthly Contribution - August 2026 (1 Share)'
   );
   const [receiptImage, setReceiptImage] = useState<string>('');
   const [autoApprove, setAutoApprove] = useState<boolean>(true);
@@ -181,6 +190,11 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     setSelectedMember(member);
     setMemberSearch(`${member.fullName} (${member.id})`);
     setIsDropdownOpen(false);
+    const initialRate = member.monthlyShareCommitment || 1;
+    setMonthlyRate(initialRate);
+    const total = initialRate * (depositMode === 'general' ? 1 : monthsCount);
+    setShareCount(total);
+    setAmountBDT(total * shareUnitPrice);
   };
 
   const handleQuickAmount = (val: number) => {
@@ -256,7 +270,14 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
       const adminName = currentMember?.fullName || authUser?.displayName || (role === 'super_admin' ? 'Super Admin' : 'Admin');
       const adminId = currentMember?.id || (role === 'super_admin' ? 'PBC-00001' : 'PBC-ADMIN');
 
-      const monthLabel = targetMonth && targetMonth !== 'general' ? `Contribution Month: ${targetMonth}` : null;
+      const computedPeriod = depositMode === 'general'
+        ? undefined
+        : (coveredPeriodText || (monthsCount > 1 ? `${startMonth} - ${endMonth}` : startMonth));
+      const computedTargetMonth = depositMode === 'general'
+        ? undefined
+        : (monthsCount > 1 ? `${startMonth} - ${endMonth}` : startMonth);
+
+      const monthLabel = computedPeriod ? `Contribution Period: ${computedPeriod}` : null;
       const fullNotes = [
         monthLabel,
         notes.trim(),
@@ -274,13 +295,17 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
         amount: numAmount,
         shareCount: shareCount,
         shareUnitPrice: shareUnitPrice,
+        monthlyShareCommitment: monthlyRate,
+        monthCount: depositMode === 'general' ? 1 : monthsCount,
+        depositMode: depositMode,
+        coveredPeriodText: computedPeriod,
         category: category,
         currency: 'BDT',
         depositDate: depositDate || new Date().toISOString().split('T')[0],
         paymentMethod: paymentMethod,
         referenceNumber: referenceNumber || `ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
         notes: fullNotes,
-        targetMonth: targetMonth !== 'general' ? targetMonth : undefined,
+        targetMonth: computedTargetMonth,
         receiptUrl: receiptImage || undefined,
         status: autoApprove ? 'Approved' : 'Pending',
         approvedByAdminName: autoApprove ? adminName : undefined,
@@ -317,10 +342,16 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     setCreatedDeposit(null);
     setSelectedMember(null);
     setMemberSearch('');
+    setDepositMode('single_month');
+    setMonthlyRate(1);
+    setMonthsCount(1);
+    setStartMonth('August 2026');
+    setEndMonth('August 2026');
+    setCoveredPeriodText('August 2026');
     setShareCount(1);
     setAmountBDT(shareUnitPrice);
     setTargetMonth('August 2026');
-    setNotes(isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬' : 'Monthly Contribution - August 2026');
+    setNotes(isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬ (১টি শেয়ার)' : 'Monthly Contribution - August 2026 (1 Share)');
   };
 
   return (
@@ -692,163 +723,29 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
             </div>
           </div>
 
-          {/* Share Selection & Unit Calculator */}
-          <div className="p-4 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl space-y-3.5 shadow-inner">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-amber-500/20">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                  <Layers className="w-4 h-4" />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-white block">
-                    {isBn ? 'শেয়ার সংখ্যা নির্বাচন করুন (Share Selection)' : 'Select Share Count'}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {isBn ? 'প্রতি শেয়ারের নির্ধারিত মূল্য অনুযায়ী স্বয়ংক্রিয় হিসাব' : 'Auto-calculated based on institutional share unit price'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Current Unit Price Badge */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/15 border border-amber-500/40 rounded-full self-start sm:self-auto">
-                <Sparkles className="w-3 h-3 text-amber-400" />
-                <span className="text-[11px] font-bold text-amber-300">
-                  {isBn ? `রেট: ৳${shareUnitPrice.toLocaleString('en-BD')} / শেয়ার` : `Rate: ৳${shareUnitPrice.toLocaleString('en-BD')} / Share`}
-                </span>
-              </div>
-            </div>
-
-            {/* Counter Control */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {/* Decrement button */}
-                <button
-                  type="button"
-                  onClick={() => handleShareCountChange(shareCount - 1)}
-                  disabled={shareCount <= 1}
-                  className="w-10 h-10 rounded-xl bg-[#0B1528] hover:bg-[#112244] disabled:opacity-30 disabled:cursor-not-allowed border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
-                  title={isBn ? 'কমিয়ে দিন' : 'Decrease'}
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-
-                {/* Share count input */}
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    value={shareCount}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value, 10);
-                      handleShareCountChange(isNaN(val) || val < 1 ? 1 : val);
-                    }}
-                    className="w-20 text-center py-2 bg-[#0B1528] border-2 border-amber-500/50 rounded-xl text-amber-300 font-mono font-black text-lg focus:outline-none focus:border-amber-400 shadow-inner"
-                  />
-                  <span className="ml-2 text-xs font-bold text-slate-300">
-                    {isBn ? 'টি শেয়ার' : (shareCount === 1 ? 'Share' : 'Shares')}
-                  </span>
-                </div>
-
-                {/* Increment button */}
-                <button
-                  type="button"
-                  onClick={() => handleShareCountChange(shareCount + 1)}
-                  className="w-10 h-10 rounded-xl bg-[#0B1528] hover:bg-[#112244] border border-amber-500/40 flex items-center justify-center text-amber-300 hover:text-amber-200 transition active:scale-95 shadow-sm"
-                  title={isBn ? 'বাড়িয়ে দিন' : 'Increase'}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
-
-              {/* Live formula summary pill */}
-              <div className="px-3.5 py-2 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center gap-2">
-                <span className="text-[11px] text-emerald-300/80 font-mono">
-                  {shareCount} × ৳{shareUnitPrice.toLocaleString('en-BD')} =
-                </span>
-                <span className="text-sm font-mono font-black text-emerald-300">
-                  ৳{(shareCount * shareUnitPrice).toLocaleString('en-BD')}
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Share Chips */}
-            <div className="flex items-center gap-1.5 flex-wrap pt-1">
-              <span className="text-[10px] font-bold text-slate-400 mr-1 uppercase tracking-wider">
-                {isBn ? 'কুইক সিলেক্ট:' : 'Quick Select:'}
-              </span>
-              {[1, 2, 3, 4, 5, 10].map((count) => {
-                const isSelected = shareCount === count;
-                return (
-                  <button
-                    key={count}
-                    type="button"
-                    onClick={() => handleShareCountChange(count)}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer active:scale-95 border ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md font-black'
-                        : 'bg-[#0B1528] text-amber-300 border-amber-500/30 hover:border-amber-400 hover:bg-[#112244]'
-                    }`}
-                  >
-                    {count} {isBn ? 'টি শেয়ার' : count === 1 ? 'Share' : 'Shares'}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Amount in BDT */}
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>{isBn ? 'জমার মোট পরিমাণ (টাকা - BDT) *' : 'Total Deposit Amount in BDT (৳) *'}</span>
-              <span className="text-xs font-black text-amber-300 font-mono">
-                ৳{typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : '0'}
-              </span>
-            </label>
-
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-amber-400">৳</span>
-              <input
-                type="number"
-                required
-                min="100"
-                placeholder="5000"
-                value={amountBDT}
-                onChange={(e) => {
-                  const val = e.target.value === '' ? '' : Number(e.target.value);
-                  setAmountBDT(val);
-                  if (typeof val === 'number' && val > 0) {
-                    setShareCount(Math.max(1, Math.round(val / shareUnitPrice)));
-                  }
-                }}
-                className="w-full pl-10 pr-4 py-3.5 bg-[#070D1B] border-2 border-[#D4AF37]/40 focus:border-amber-400 rounded-2xl text-white font-mono font-black text-xl placeholder-slate-600 focus:outline-none transition shadow-inner"
-              />
-            </div>
-
-            {/* Quick Preset Buttons */}
-            <div className="flex items-center gap-2 flex-wrap pt-1">
-              <span className="text-[11px] text-slate-400 font-bold mr-1">{isBn ? 'কুইক যোগ:' : 'Quick add:'}</span>
-              {[5000, 10000, 25000, 50000, 100000].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => handleQuickAmount(preset)}
-                  className="px-3 py-1 bg-[#070D1B] hover:bg-[#112244] border border-[#D4AF37]/30 hover:border-amber-400 text-amber-300 font-bold text-xs rounded-xl transition cursor-pointer active:scale-95 shadow-sm"
-                >
-                  +৳{preset >= 100000 ? `${preset / 100000} Lakh` : `${preset / 1000}k`}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setAmountBDT('');
-                  setShareCount(1);
-                }}
-                className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold rounded-xl transition cursor-pointer"
-              >
-                {isBn ? 'মুছুন' : 'Clear'}
-              </button>
-            </div>
-          </div>
+          {/* Smart Multi-Month & Multi-Share Deposit Engine */}
+          <SmartDepositCalculator
+            shareUnitPrice={shareUnitPrice}
+            isBn={isBn}
+            memberCommitment={selectedMember?.monthlyShareCommitment}
+            depositMode={depositMode}
+            onDepositModeChange={setDepositMode}
+            monthlyRate={monthlyRate}
+            onMonthlyRateChange={setMonthlyRate}
+            monthsCount={monthsCount}
+            onMonthsCountChange={setMonthsCount}
+            startMonth={startMonth}
+            onStartMonthChange={setStartMonth}
+            endMonth={endMonth}
+            onEndMonthChange={setEndMonth}
+            amountBDT={amountBDT}
+            onAmountBDTChange={setAmountBDT}
+            shareCount={shareCount}
+            onShareCountChange={setShareCount}
+            onPeriodTextChange={setCoveredPeriodText}
+            onAutoNotesGenerated={setNotes}
+            memberJoinDate={selectedMember?.joinDate}
+          />
         </div>
 
         {/* Step 3: Payment Method & Reference Details */}
@@ -999,64 +896,28 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
             )}
           </div>
 
-          {/* Contribution Month (পদ্ধতি ২) & Remarks / Notes */}
+          {/* Selected Period & Remarks / Notes */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Contribution Month Dropdown */}
-            <div className="text-xs">
-              <div className="flex items-center justify-between mb-1">
-                <label className="font-semibold text-slate-300 flex items-center gap-1.5">
+            {/* Period Summary Indicator */}
+            <div className="p-3.5 bg-[#070D1B] rounded-2xl border border-amber-500/30 flex flex-col justify-between">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                  <span>
-                    {isBn ? 'কোন মাসের কিস্তি / জমা (Contribution Month)' : 'For Month / Deposit Period'}
-                  </span>
-                </label>
-                <span className="text-[10px] text-amber-400/90 font-medium">
-                  {isBn ? 'পদ্ধতি ২: মাস নির্বাচন' : 'Target Month'}
+                  {isBn ? 'নির্ধারিত জমাকৃত মেয়াদ / মাস' : 'Covered Period / Target Period'}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
+                  {depositMode === 'advance' ? (isBn ? 'অগ্রিম জমা' : 'Advance') : 
+                   depositMode === 'backdated' ? (isBn ? 'পূর্বের বকেয়া' : 'Backdated') :
+                   depositMode === 'general' ? (isBn ? 'সাধারণ জমা' : 'General') : (isBn ? 'একক মাস' : 'Single Month')}
                 </span>
               </div>
-
-              <div className="relative">
-                <select
-                  value={targetMonth}
-                  onChange={(e) => handleTargetMonthChange(e.target.value)}
-                  className="w-full px-3.5 py-3 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 appearance-none cursor-pointer pr-10"
-                >
-                  <optgroup label={isBn ? "চলতি ও সাম্প্রতিক মাসসমূহ (Months)" : "Select Contribution Month"}>
-                    {GENERATED_MONTH_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value} className="bg-[#0B1528] text-white">
-                        {isBn ? `${opt.labelBn} (${opt.value})` : opt.labelEn}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <option value="general" className="bg-[#0B1528] text-amber-300 font-semibold">
-                    {isBn ? '📌 সাধারণ জমা (কোনো নির্দিষ্ট মাসের কিস্তি নয়)' : '📌 General Deposit (Non-Monthly)'}
-                  </option>
-                </select>
-                <ChevronDown className="w-4 h-4 text-amber-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="text-sm font-bold text-amber-300 font-mono">
+                {depositMode === 'general' ? (isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General Non-Monthly') : (coveredPeriodText || startMonth)}
               </div>
-
-              {/* Quick Select Preset Buttons */}
-              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                <span className="text-[10px] text-slate-400 font-medium mr-0.5">
-                  {isBn ? 'কুইক সিলেক্ট:' : 'Quick:'}
-                </span>
-                {QUICK_MONTH_PRESETS.map((preset) => {
-                  const isSelected = targetMonth === preset.value;
-                  return (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => handleTargetMonthChange(preset.value)}
-                      className={`px-2 py-0.5 text-[11px] font-bold rounded-lg border transition cursor-pointer ${
-                        isSelected
-                          ? 'bg-amber-500/30 border-amber-400 text-amber-300 shadow-sm ring-1 ring-amber-400/40'
-                          : 'bg-slate-900/70 border-slate-700/60 text-slate-400 hover:text-slate-200 hover:border-slate-500'
-                      }`}
-                    >
-                      {isBn ? preset.labelBn : preset.labelEn}
-                    </button>
-                  );
-                })}
+              <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                <span>{isBn ? `মেয়াদ: ${monthsCount} মাস` : `Duration: ${monthsCount} mo`}</span>
+                <span>•</span>
+                <span>{isBn ? `মোট: ${shareCount} শেয়ার (৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : 0})` : `Total: ${shareCount} Shares (৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : 0})`}</span>
               </div>
             </div>
 
@@ -1076,8 +937,8 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
                 <Info className="w-3 h-3 text-amber-400/80 shrink-0" />
                 <span>
                   {isBn 
-                    ? 'মাস পরিবর্তন করলে মন্তব্য স্বয়ংক্রিয়ভাবে আপডেট হয় এবং আপনি প্রয়োজনমতো সম্পাদনাও করতে পারবেন।' 
-                    : 'Auto-syncs with selected month; editable anytime.'}
+                    ? 'স্মার্ট ক্যালকুলেটরের হিসাব অনুযায়ী স্বয়ংক্রিয়ভাবে তৈরি হয়েছে, আপনি চাইলে এডিট করতে পারেন।' 
+                    : 'Auto-synced with smart calculator breakdown; editable.'}
                 </span>
               </p>
             </div>

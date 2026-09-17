@@ -38,7 +38,7 @@ function numberToWordsBDT(num: number): { bn: string; en: string } {
 }
 
 export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposit, isOpen, onClose }) => {
-  const { language, currentMember } = useApp();
+  const { language, currentMember, members } = useApp();
   const [downloading, setDownloading] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -48,6 +48,22 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
   const isBn = language === 'bn';
   const receiptNumber = `RCP-${deposit.id.replace('DEP-', '')}-${deposit.depositDate.replace(/-/g, '')}`;
   const amountWords = numberToWordsBDT(deposit.amount);
+
+  const memberObj = members.find(m => m.id === deposit.memberId);
+  const monthlyRate = deposit.monthlyShareCommitment || memberObj?.monthlyShareCommitment || 1;
+  const totalShares = deposit.shareCount || Math.max(1, Math.round(deposit.amount / (deposit.shareUnitPrice || 5000)));
+  const monthsCount = deposit.monthCount || (monthlyRate > 0 ? Math.max(1, Math.round(totalShares / monthlyRate)) : 1);
+
+  const isBackdated = deposit.depositMode === 'new_member_backdated' || 
+    Boolean(deposit.notes && (deposit.notes.includes('বকেয়া') || deposit.notes.includes('Backdated') || deposit.notes.includes('পূর্ববর্তী')));
+  const isAdvance = deposit.depositMode === 'advance_multi_month' || (!isBackdated && monthsCount > 1) ||
+    Boolean(deposit.notes && (deposit.notes.includes('অগ্রিম') || deposit.notes.includes('Advance')));
+
+  const depositTypeLabel = isBackdated
+    ? (isBn ? 'নতুন সদস্যের পূর্ববর্তী বকেয়া কিস্তি' : 'New Member Joining Dues (Backdated)')
+    : isAdvance
+    ? (isBn ? `অগ্রিম মাসিক সঞ্চয় (${monthsCount} মাস)` : `Advance Monthly Contribution (${monthsCount} Months)`)
+    : (isBn ? 'নিয়মিত মাসিক সঞ্চয়' : 'Regular Monthly Contribution');
 
   const handlePrint = () => {
     window.print();
@@ -288,6 +304,67 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
                   </span>
                 </div>
 
+                {/* Deposit Purpose / Type */}
+                <div className="flex flex-col justify-center">
+                  <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
+                    Deposit Purpose / জমার ধরন:
+                  </span>
+                  <span 
+                    className="font-bold text-xs sm:text-sm mt-0.5" 
+                    style={{ color: isBackdated ? '#F59E0B' : isAdvance ? '#38BDF8' : '#34D399' }}
+                  >
+                    {depositTypeLabel}
+                  </span>
+                </div>
+
+                {/* Member Monthly Rate */}
+                <div className="flex flex-col justify-center">
+                  <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
+                    Monthly Commitment / মাসিক হার:
+                  </span>
+                  <span 
+                    className="font-bold text-xs sm:text-sm mt-0.5" 
+                    style={{ color: '#E2E8F0' }}
+                  >
+                    {monthlyRate} {monthlyRate === 1 ? 'Share / Month' : 'Shares / Month'}
+                    <span className="text-[10px] ml-1 text-amber-300/80">({isBn ? `মাসিক ${monthlyRate} শেয়ার` : `${monthlyRate}/mo`})</span>
+                  </span>
+                </div>
+
+                {/* Target Month / Covered Period */}
+                <div className="flex flex-col justify-center">
+                  <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
+                    Period / আওতাভুক্ত মাস:
+                  </span>
+                  <span 
+                    className="font-bold text-xs sm:text-sm mt-0.5 flex items-center gap-1" 
+                    style={{ color: '#FCD34D' }}
+                  >
+                    <span>📅</span> {deposit.coveredPeriodText || deposit.targetMonth || (isBn ? 'সাধারণ জমা' : 'General Deposit')}
+                    {monthsCount > 1 && (
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">
+                        {monthsCount} {isBn ? 'মাস' : 'Months'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                {/* Paid Share Units in this Voucher */}
+                <div className="flex flex-col justify-center">
+                  <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
+                    Paid Shares / পরিশোধিত মোট শেয়ার:
+                  </span>
+                  <span 
+                    className="font-black text-xs sm:text-sm mt-0.5" 
+                    style={{ color: '#FCD34D' }}
+                  >
+                    {totalShares} {totalShares === 1 ? 'Share' : 'Shares'}
+                    <span className="text-[10px] text-slate-300 font-normal ml-1">
+                      (@ ৳{(deposit.shareUnitPrice || 5000).toLocaleString('en-BD')})
+                    </span>
+                  </span>
+                </div>
+
                 {/* Deposit Date */}
                 <div className="flex flex-col justify-center">
                   <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
@@ -320,38 +397,31 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
                     className="font-bold text-xs sm:text-sm mt-0.5" 
                     style={{ color: '#38BDF8' }}
                   >
-                    {deposit.category}
+                    {deposit.category || 'Fund Raising'}
                   </span>
                 </div>
 
-                {/* Share Units (if present) */}
-                {deposit.shareCount && deposit.shareCount > 0 && (
-                  <div className="flex flex-col justify-center">
-                    <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
-                      Share Count / শেয়ার:
-                    </span>
-                    <span 
-                      className="font-black text-xs sm:text-sm mt-0.5" 
-                      style={{ color: '#FCD34D' }}
-                    >
-                      {deposit.shareCount} {deposit.shareCount === 1 ? 'Share' : 'Shares'}
-                      {deposit.shareUnitPrice ? ` (@ ৳${deposit.shareUnitPrice.toLocaleString('en-BD')})` : ''}
-                    </span>
-                  </div>
-                )}
-
-                {/* Target Month (if present) */}
-                {deposit.targetMonth && (
-                  <div className="flex flex-col justify-center">
-                    <span className="text-[11px] font-semibold tracking-wide" style={{ color: '#94A3B8' }}>
-                      For Month / কিস্তির মাস:
-                    </span>
-                    <span 
-                      className="font-bold text-xs sm:text-sm mt-0.5 flex items-center gap-1" 
-                      style={{ color: '#FCD34D' }}
-                    >
-                      <span>📅</span> {deposit.targetMonth}
-                    </span>
+                {/* Transparent Calculation Breakdown Bar */}
+                {(monthsCount > 1 || monthlyRate > 1 || totalShares > 1) && (
+                  <div className="col-span-1 sm:col-span-2 lg:col-span-3 p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-1.5" style={{ backgroundColor: 'rgba(212, 175, 55, 0.1)', borderColor: 'rgba(212, 175, 55, 0.4)' }}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">💡</span>
+                      <div className="text-[11px] font-semibold" style={{ color: '#FDE68A' }}>
+                        <span>
+                          {isBn ? 'শেয়ার হিসাব বিবরণী: ' : 'Share Calculation Formula: '}
+                        </span>
+                        <span className="font-mono font-bold" style={{ color: '#FFFFFF' }}>
+                          {isBn
+                            ? `মাসিক ${monthlyRate}টি শেয়ার × ${monthsCount} মাস = মোট ${totalShares}টি ইউনিট শেয়ার`
+                            : `Monthly ${monthlyRate} ${monthlyRate === 1 ? 'Share' : 'Shares'} × ${monthsCount} ${monthsCount === 1 ? 'Month' : 'Months'} = Total ${totalShares} Unit Shares`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-md font-bold" style={{ backgroundColor: '#064E3B', color: '#34D399', border: '1px solid #10B981' }}>
+                        ৳{(deposit.shareUnitPrice || 5000).toLocaleString('en-BD')} × {totalShares} = ৳{deposit.amount.toLocaleString('en-BD')}
+                      </span>
+                    </div>
                   </div>
                 )}
 

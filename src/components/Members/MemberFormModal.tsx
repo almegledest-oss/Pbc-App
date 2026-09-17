@@ -59,6 +59,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     barcodeData: '',
     totalDeposit: 0,
     userRole: 'member' as UserRole,
+    monthlyShareCommitment: 1,
     notes: 'Expat Investor',
     familyInfoName: '',
     familyInfoRelation: '',
@@ -128,6 +129,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         barcodeData: memberToEdit.barcodeData || '',
         totalDeposit: memberToEdit.totalDeposit || 0,
         userRole: memberToEdit.role || 'member',
+        monthlyShareCommitment: memberToEdit.monthlyShareCommitment || 1,
         notes: memberToEdit.notes || '',
         password: memberToEdit.password || 'PBC-Pass-1234',
         familyInfoName: memberToEdit.familyInfoName || memberToEdit.nomineeName || '',
@@ -319,6 +321,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
         barcodeData: finalBarcode,
         totalDeposit: Number(formData.totalDeposit) || 0,
         role: formData.userRole,
+        monthlyShareCommitment: Number(formData.monthlyShareCommitment) || 1,
         notes: formData.notes,
         password: formData.password,
         familyInfoName: formData.familyInfoName.trim(),
@@ -538,7 +541,7 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="sm:col-span-2">
                 <CountryCitySelector
                   country={formData.country}
@@ -560,6 +563,24 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   onChange={e => setFormData({ ...formData, joinDate: e.target.value })}
                   className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white focus:outline-none focus:border-amber-400 text-sm"
                 />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm">
+                  {language === 'bn' ? 'মাসিক শেয়ার (প্রতিশ্রুতি)' : 'Monthly Shares'}
+                </label>
+                <select
+                  value={formData.monthlyShareCommitment || 1}
+                  onChange={e => setFormData({ ...formData, monthlyShareCommitment: parseInt(e.target.value, 10) || 1 })}
+                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-amber-300 font-bold focus:outline-none focus:border-amber-400 text-sm"
+                >
+                  <option value={1}>১টি শেয়ার (৳৫,০০০/মাস)</option>
+                  <option value={2}>২টি শেয়ার (৳১০,০০০/মাস)</option>
+                  <option value={3}>৩টি শেয়ার (৳১৫,০০০/মাস)</option>
+                  <option value={4}>৪টি শেয়ার (৳২০,০০০/মাস)</option>
+                  <option value={5}>৫টি শেয়ার (৳২৫,০০০/মাস)</option>
+                  <option value={10}>১০টি শেয়ার (৳৫০,০০০/মাস)</option>
+                </select>
               </div>
             </div>
           </div>

@@ -188,6 +188,7 @@ export interface Member {
   idCardNumber?: string;
   batchNumber?: string;
   password?: string;
+  monthlyShareCommitment?: number; // Member's default monthly share commitment (e.g. 1, 2, 3...)
   // Family Information (ID Card Back)
   familyInfoName?: string;
   familyInfoRelation?: string;
@@ -234,7 +235,11 @@ export interface Deposit {
   memberId: string;
   memberName: string;
   amount: number; // in BDT (৳)
-  shareCount?: number; // Number of shares (e.g. 1, 2, 3...)
+  shareCount?: number; // Total number of shares paid in this voucher (e.g. 1, 2, 4...)
+  monthlyShareCommitment?: number; // Member monthly commitment rate (e.g. 1 share/mo, 2 shares/mo)
+  monthCount?: number; // Number of months covered by this payment (e.g. 1, 2, 3, 4...)
+  depositMode?: 'single_month' | 'advance_multi_month' | 'new_member_backdated' | 'general';
+  coveredPeriodText?: string; // Text representation of covered period (e.g. "August 2026 - September 2026")
   shareUnitPrice?: number; // Share unit price at the time of deposit (e.g. 5000 BDT)
   category?: 'Fund Raising' | 'Real Estate';
   currency: 'BDT';
