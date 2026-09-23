@@ -798,17 +798,29 @@ export const DepositList: React.FC = () => {
             </div>
           )}
 
-          {role === 'member' && currentMember?.status === 'active' && systemSettings?.allowMemberDepositSubmission && (
-            <button
-              onClick={handleAddDepositClick}
-              className="flex items-center justify-center gap-1.5 px-4 py-3 min-h-[48px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition shrink-0 active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>
-                {language === 'bn' ? 'জমা ভাউচার দিন' : 'Submit Deposit Voucher'}
-              </span>
-            </button>
-          )}
+          {/* Member Direct WhatsApp Action Button */}
+          {role === 'member' && (() => {
+            const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
+            const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
+            const defaultMsg = encodeURIComponent(
+              `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
+            );
+            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
+            return (
+              <a
+                href={whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition shrink-0 active:scale-95 cursor-pointer"
+                title={language === 'bn' ? 'WhatsApp-এ জমার স্লিপ পাঠান' : 'Send Slip via WhatsApp'}
+              >
+                <MessageCircle className="w-4 h-4 fill-current" />
+                <span>
+                  {language === 'bn' ? 'WhatsApp-এ স্লিপ পাঠান' : 'Send Slip on WhatsApp'}
+                </span>
+              </a>
+            );
+          })()}
         </div>
       </div>
 
