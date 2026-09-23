@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Member, Deposit } from '../../types';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 import { DepositReceiptModal } from '../Deposits/DepositReceiptModal';
-import { SmartDepositCalculator, DepositMode } from '../Deposits/SmartDepositCalculator';
 import { compressImageToDataUrl } from '../../services/firebaseService';
 import { 
   Wallet, 
@@ -13,7 +12,6 @@ import {
   ArrowLeft, 
   DollarSign, 
   CreditCard, 
-  Building, 
   Calendar, 
   User, 
   Tag, 
@@ -21,28 +19,18 @@ import {
   Upload, 
   FileText, 
   RefreshCw, 
-  Phone, 
-  Mail, 
-  Globe, 
   ShieldCheck, 
   Printer, 
-  Share2, 
   X, 
   Plus, 
   Minus,
-  Layers,
   Sparkles,
   ChevronDown,
   Info,
-  Check
+  Check,
+  Building,
+  Image as ImageIcon
 } from 'lucide-react';
-
-interface CurrencyRate {
-  code: string;
-  name: string;
-  symbol: string;
-  defaultRate: number; // approximate rate to BDT
-}
 
 const MONTH_NAMES_EN = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -54,8 +42,8 @@ const MONTH_NAMES_BN = [
   'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
 ];
 
-// Helper to generate selectable contribution months
-const GENERATED_MONTH_OPTIONS = [2027, 2026, 2025, 2024].flatMap(year => 
+// Generate selectable months for 2024 - 2027
+const ALL_MONTH_OPTIONS = [2027, 2026, 2025, 2024].flatMap(year => 
   MONTH_NAMES_EN.map((monthEn, idx) => ({
     value: `${monthEn} ${year}`,
     labelEn: `${monthEn} ${year}`,
@@ -65,28 +53,11 @@ const GENERATED_MONTH_OPTIONS = [2027, 2026, 2025, 2024].flatMap(year =>
   }))
 );
 
-const QUICK_MONTH_PRESETS = [
-  { value: 'August 2026', labelEn: 'Aug 2026', labelBn: 'আগস্ট ২০২৬' },
-  { value: 'September 2026', labelEn: 'Sep 2026', labelBn: 'সেপ্টেম্বর ২০২৬' },
-  { value: 'October 2026', labelEn: 'Oct 2026', labelBn: 'অক্টোবর ২০২৬' },
-  { value: 'general', labelEn: 'Non-Monthly', labelBn: 'সাধারণ জমা' },
-];
+interface AdminManualDepositViewProps {
+  onBack?: () => void;
+}
 
-const POPULAR_CURRENCIES: CurrencyRate[] = [
-  { code: 'BDT', name: 'Bangladeshi Taka (৳)', symbol: '৳', defaultRate: 1 },
-  { code: 'AED', name: 'UAE Dirham (د.إ)', symbol: 'AED', defaultRate: 32.8 },
-  { code: 'SAR', name: 'Saudi Riyal (﷼)', symbol: 'SAR', defaultRate: 32.1 },
-  { code: 'QAR', name: 'Qatari Riyal (﷼)', symbol: 'QAR', defaultRate: 33.0 },
-  { code: 'KWD', name: 'Kuwaiti Dinar (د.ك)', symbol: 'KWD', defaultRate: 391.0 },
-  { code: 'OMR', name: 'Omani Rial (﷼)', symbol: 'OMR', defaultRate: 312.0 },
-  { code: 'USD', name: 'US Dollar ($)', symbol: '$', defaultRate: 121.5 },
-  { code: 'EUR', name: 'Euro (€)', symbol: '€', defaultRate: 131.0 },
-  { code: 'GBP', name: 'British Pound (£)', symbol: '£', defaultRate: 153.5 },
-  { code: 'MYR', name: 'Malaysian Ringgit (RM)', symbol: 'MYR', defaultRate: 27.5 },
-  { code: 'SGD', name: 'Singapore Dollar (S$)', symbol: 'SGD', defaultRate: 90.5 },
-];
-
-export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBack }) => {
+export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ onBack }) => {
   const { 
     members, 
     addDeposit, 
@@ -94,146 +65,111 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     role, 
     currentMember, 
     authUser,
-    navigateWithHistory,
-    goBack,
     systemSettings
   } = useApp();
 
   const isBn = language === 'bn';
-
   const shareUnitPrice = systemSettings?.shareUnitPrice || 5000;
 
-  // Member Selection State
+  // Determine current, next, and previous months
+  const currentDate = new Date();
+  const currentMonthIdx = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  const currentMonthVal = `${MONTH_NAMES_EN[currentMonthIdx]} ${currentYear}`;
+  const currentMonthBn = `${MONTH_NAMES_BN[currentMonthIdx]} ${currentYear}`;
+
+  const nextMonthIdx = (currentMonthIdx + 1) % 12;
+  const nextYear = currentMonthIdx === 11 ? currentYear + 1 : currentYear;
+  const nextMonthVal = `${MONTH_NAMES_EN[nextMonthIdx]} ${nextYear}`;
+  const nextMonthBn = `${MONTH_NAMES_BN[nextMonthIdx]} ${nextYear}`;
+
+  const prevMonthIdx = (currentMonthIdx + 11) % 12;
+  const prevYear = currentMonthIdx === 0 ? currentYear - 1 : currentYear;
+  const prevMonthVal = `${MONTH_NAMES_EN[prevMonthIdx]} ${prevYear}`;
+  const prevMonthBn = `${MONTH_NAMES_BN[prevMonthIdx]} ${prevYear}`;
+
+  // 1. Member Selection
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Deposit Form State
-  const [category, setCategory] = useState<'Fund Raising' | 'Real Estate'>('Fund Raising');
-  const [paymentMethod, setPaymentMethod] = useState<Deposit['paymentMethod']>('Cash');
+  // 2. Share Count (Defaults to 1 or member's commitment)
   const [shareCount, setShareCount] = useState<number>(1);
-  const [amountBDT, setAmountBDT] = useState<number | ''>(5000);
+  const [isCustomAmount, setIsCustomAmount] = useState(false);
+  const [customAmount, setCustomAmount] = useState<number | ''>('');
 
-  // Multi-Month & Multi-Share Smart States
-  const [depositMode, setDepositMode] = useState<DepositMode>('single_month');
-  const [monthlyRate, setMonthlyRate] = useState<number>(1);
-  const [monthsCount, setMonthsCount] = useState<number>(1);
-  const [startMonth, setStartMonth] = useState<string>('August 2026');
-  const [endMonth, setEndMonth] = useState<string>('August 2026');
-  const [coveredPeriodText, setCoveredPeriodText] = useState<string>('August 2026');
+  // 3. Target Month
+  const [targetMonth, setTargetMonth] = useState<string>(currentMonthVal);
 
-  const handleShareCountChange = (newCount: number) => {
-    const validCount = Math.max(1, newCount);
-    setShareCount(validCount);
-    setAmountBDT(validCount * shareUnitPrice);
-  };
-  const [depositDate, setDepositDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // 4. Fund Type / Category (Fund Raising vs Real Estate)
+  const [category, setCategory] = useState<'Fund Raising' | 'Real Estate'>('Fund Raising');
+
+  // 5. Payment Method (Bank, bKash, Nagad, Cash)
+  const [paymentMethod, setPaymentMethod] = useState<Deposit['paymentMethod']>('Bank');
+  const [showAllPaymentMethods, setShowAllPaymentMethods] = useState(false);
+
+  // Optional Details
   const [referenceNumber, setReferenceNumber] = useState<string>(
     `ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`
   );
-  const [bankOrBranch, setBankOrBranch] = useState<string>('');
-  const [targetMonth, setTargetMonth] = useState<string>('August 2026');
-  const [notes, setNotes] = useState<string>(
-    isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬ (১টি শেয়ার)' : 'Monthly Contribution - August 2026 (1 Share)'
-  );
+  const [depositDate, setDepositDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [receiptImage, setReceiptImage] = useState<string>('');
+  const [showOptionalFields, setShowOptionalFields] = useState<boolean>(false);
+  const [notes, setNotes] = useState<string>('');
   const [autoApprove, setAutoApprove] = useState<boolean>(true);
-
-  const handleTargetMonthChange = (selected: string) => {
-    setTargetMonth(selected);
-    if (
-      !notes || 
-      notes.includes('Monthly Contribution') || 
-      notes.includes('মাসিক কিস্তি') || 
-      notes === 'Admin Manual Deposit Entry' || 
-      notes.includes('General Deposit') || 
-      notes.includes('সাধারণ জমা')
-    ) {
-      if (selected === 'general') {
-        setNotes(isBn ? 'সাধারণ জমা / নন-মান্থলি অ্যাডমিন এন্ট্রি' : 'General Deposit / Non-Monthly Entry');
-      } else {
-        const found = GENERATED_MONTH_OPTIONS.find(m => m.value === selected);
-        const displayLabel = isBn && found ? found.labelBn : selected;
-        setNotes(isBn ? `মাসিক কিস্তি ও সঞ্চয় - ${displayLabel}` : `Monthly Contribution - ${selected}`);
-      }
-    }
-  };
-
-  // Expatriate Currency Conversion Helper State
-  const [enableCurrencyCalculator, setEnableCurrencyCalculator] = useState(false);
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyRate>(POPULAR_CURRENCIES[1]); // AED by default
-  const [foreignAmount, setForeignAmount] = useState<number | ''>('');
-  const [exchangeRate, setExchangeRate] = useState<number>(32.8);
 
   // Submission & Receipt State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdDeposit, setCreatedDeposit] = useState<Deposit | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [successToast, setSuccessToast] = useState(false);
+
+  // Calculate actual amount in BDT
+  const calculatedAmount = isCustomAmount && typeof customAmount === 'number' && customAmount > 0
+    ? customAmount
+    : shareCount * shareUnitPrice;
 
   // Filtered members for smart search
   const filteredMembers = useMemo(() => {
-    if (!memberSearch.trim()) return members.slice(0, 10);
+    if (!memberSearch.trim()) return members.slice(0, 8);
     const q = memberSearch.toLowerCase().trim();
     return members.filter(m => 
       m.id.toLowerCase().includes(q) ||
       m.fullName.toLowerCase().includes(q) ||
       (m.fullNameBn && m.fullNameBn.toLowerCase().includes(q)) ||
       m.phone.toLowerCase().includes(q) ||
-      m.email.toLowerCase().includes(q) ||
-      m.country.toLowerCase().includes(q) ||
-      m.city.toLowerCase().includes(q)
-    );
+      (m.email && m.email.toLowerCase().includes(q)) ||
+      (m.country && m.country.toLowerCase().includes(q))
+    ).slice(0, 10);
   }, [members, memberSearch]);
 
   const handleSelectMember = (member: Member) => {
     setSelectedMember(member);
     setMemberSearch(`${member.fullName} (${member.id})`);
     setIsDropdownOpen(false);
-    const initialRate = member.monthlyShareCommitment || 1;
-    setMonthlyRate(initialRate);
-    const total = initialRate * (depositMode === 'general' ? 1 : monthsCount);
-    setShareCount(total);
-    setAmountBDT(total * shareUnitPrice);
+    
+    // Auto-set share count based on member's commitment if available
+    const commitment = member.monthlyShareCommitment || 1;
+    setShareCount(commitment);
+    setIsCustomAmount(false);
+    setCustomAmount('');
   };
 
-  const handleQuickAmount = (val: number) => {
-    setAmountBDT(prev => {
-      const current = typeof prev === 'number' ? prev : 0;
-      const next = current + val;
-      setShareCount(Math.max(1, Math.round(next / shareUnitPrice)));
-      return next;
-    });
-  };
-
-  const handleForeignAmountChange = (val: number | '') => {
-    setForeignAmount(val);
-    if (typeof val === 'number' && val > 0 && exchangeRate > 0) {
-      const calculatedBDT = Math.round(val * exchangeRate);
-      setAmountBDT(calculatedBDT);
-      setNotes(`Admin Manual Deposit: ${val} ${selectedCurrency.code} @ ৳${exchangeRate}/unit = ৳${calculatedBDT.toLocaleString('en-BD')}`);
-    }
-  };
-
-  const handleCurrencyChange = (currCode: string) => {
-    const found = POPULAR_CURRENCIES.find(c => c.code === currCode) || POPULAR_CURRENCIES[0];
-    setSelectedCurrency(found);
-    setExchangeRate(found.defaultRate);
-    if (typeof foreignAmount === 'number' && foreignAmount > 0) {
-      const calculatedBDT = Math.round(foreignAmount * found.defaultRate);
-      setAmountBDT(calculatedBDT);
-      setNotes(`Admin Manual Deposit: ${foreignAmount} ${found.code} @ ৳${found.defaultRate}/unit = ৳${calculatedBDT.toLocaleString('en-BD')}`);
-    }
-  };
-
-  const handleExchangeRateChange = (rate: number) => {
-    setExchangeRate(rate);
-    if (typeof foreignAmount === 'number' && foreignAmount > 0) {
-      const calculatedBDT = Math.round(foreignAmount * rate);
-      setAmountBDT(calculatedBDT);
-      setNotes(`Admin Manual Deposit: ${foreignAmount} ${selectedCurrency.code} @ ৳${rate}/unit = ৳${calculatedBDT.toLocaleString('en-BD')}`);
-    }
-  };
+  // Sync auto notes whenever month, shares, or category changes
+  useEffect(() => {
+    const monthLabel = targetMonth === 'general' 
+      ? (isBn ? 'সাধারণ জমা' : 'General Deposit') 
+      : targetMonth;
+    const catLabel = category === 'Fund Raising' 
+      ? (isBn ? 'তহবিল সংগ্রহ / মূলধন' : 'Fund Raising') 
+      : (isBn ? 'রিয়েল এস্টেট' : 'Real Estate');
+    
+    const autoNote = isBn 
+      ? `${monthLabel} - ${shareCount}টি শেয়ার (৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]` 
+      : `${monthLabel} - ${shareCount} Share(s) (৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]`;
+    
+    setNotes(autoNote);
+  }, [targetMonth, shareCount, calculatedAmount, category, paymentMethod, isBn]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -253,14 +189,14 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!selectedMember) {
       alert(isBn ? 'অনুগ্রহ করে প্রথমে একজন সদস্য নির্বাচন করুন।' : 'Please select a member first.');
       return;
     }
 
-    const numAmount = Number(amountBDT);
-    if (!numAmount || numAmount <= 0) {
-      alert(isBn ? 'সঠিক জমার পরিমাণ (টাকা) প্রদান করুন।' : 'Please enter a valid deposit amount.');
+    if (!calculatedAmount || calculatedAmount <= 0) {
+      alert(isBn ? 'সঠিক জমার পরিমাণ নির্বাচন করুন।' : 'Please specify a valid deposit amount.');
       return;
     }
 
@@ -269,47 +205,44 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
     try {
       const adminName = currentMember?.fullName || authUser?.displayName || (role === 'super_admin' ? 'Super Admin' : 'Admin');
       const adminId = currentMember?.id || (role === 'super_admin' ? 'PBC-00001' : 'PBC-ADMIN');
+      const adminSig = currentMember?.adminSignature || undefined;
 
-      const computedPeriod = depositMode === 'general'
-        ? undefined
-        : (coveredPeriodText || (monthsCount > 1 ? `${startMonth} - ${endMonth}` : startMonth));
-      const computedTargetMonth = depositMode === 'general'
-        ? undefined
-        : (monthsCount > 1 ? `${startMonth} - ${endMonth}` : startMonth);
+      const finalTargetMonth = targetMonth === 'general' ? undefined : targetMonth;
+      const monthLabel = finalTargetMonth ? `Contribution Month: ${finalTargetMonth}` : 'General Contribution';
 
-      const monthLabel = computedPeriod ? `Contribution Period: ${computedPeriod}` : null;
       const fullNotes = [
         monthLabel,
         notes.trim(),
-        bankOrBranch ? `Channel Details: ${bankOrBranch}` : null,
-        `Manual Entry recorded by ${adminName} (${adminId})`
+        `Admin Entry by ${adminName} (${adminId})`
       ].filter(Boolean).join(' | ');
 
       const depositData: Omit<Deposit, 'id' | 'status'> & { 
         status?: 'Approved' | 'Pending' | 'Rejected'; 
         approvedByAdminName?: string; 
-        approvedByAdminId?: string 
+        approvedByAdminId?: string;
+        approvedByAdminSignature?: string;
       } = {
         memberId: selectedMember.id,
         memberName: selectedMember.fullName,
-        amount: numAmount,
+        amount: calculatedAmount,
         shareCount: shareCount,
         shareUnitPrice: shareUnitPrice,
-        monthlyShareCommitment: monthlyRate,
-        monthCount: depositMode === 'general' ? 1 : monthsCount,
-        depositMode: depositMode,
-        coveredPeriodText: computedPeriod,
+        monthlyShareCommitment: selectedMember.monthlyShareCommitment || 1,
+        monthCount: 1,
+        depositMode: targetMonth === 'general' ? 'general' : 'single_month',
+        coveredPeriodText: finalTargetMonth,
         category: category,
         currency: 'BDT',
         depositDate: depositDate || new Date().toISOString().split('T')[0],
         paymentMethod: paymentMethod,
         referenceNumber: referenceNumber || `ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
         notes: fullNotes,
-        targetMonth: computedTargetMonth,
+        targetMonth: finalTargetMonth,
         receiptUrl: receiptImage || undefined,
         status: autoApprove ? 'Approved' : 'Pending',
         approvedByAdminName: autoApprove ? adminName : undefined,
-        approvedByAdminId: autoApprove ? adminId : undefined
+        approvedByAdminId: autoApprove ? adminId : undefined,
+        approvedByAdminSignature: autoApprove ? adminSig : undefined
       };
 
       await addDeposit(depositData);
@@ -321,74 +254,66 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
       };
 
       setCreatedDeposit(generatedDeposit);
-      setSuccessToast(true);
       setShowReceiptModal(true);
 
-      // Reset Form fields for next entry
+      // Reset fields for the next entry
       setReferenceNumber(`ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`);
-      setBankOrBranch('');
       setReceiptImage('');
-      setForeignAmount('');
     } catch (err: any) {
-      console.error('Error recording manual deposit:', err);
-      alert((isBn ? 'ডিপোজিট অ্যান্ট্রি করতে সমস্যা হয়েছে: ' : 'Failed to record manual deposit: ') + (err?.message || err));
+      console.error('Error recording deposit:', err);
+      alert((isBn ? 'ডিপোজিট এন্ট্রি করতে সমস্যা হয়েছে: ' : 'Failed to record deposit: ') + (err?.message || err));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleNewDeposit = () => {
+  const handleResetForNext = () => {
     setShowReceiptModal(false);
     setCreatedDeposit(null);
     setSelectedMember(null);
     setMemberSearch('');
-    setDepositMode('single_month');
-    setMonthlyRate(1);
-    setMonthsCount(1);
-    setStartMonth('August 2026');
-    setEndMonth('August 2026');
-    setCoveredPeriodText('August 2026');
     setShareCount(1);
-    setAmountBDT(shareUnitPrice);
-    setTargetMonth('August 2026');
-    setNotes(isBn ? 'মাসিক কিস্তি ও সঞ্চয় - আগস্ট ২০২৬ (১টি শেয়ার)' : 'Monthly Contribution - August 2026 (1 Share)');
+    setIsCustomAmount(false);
+    setCustomAmount('');
+    setReceiptImage('');
+    setReferenceNumber(`ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`);
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-16 animate-in fade-in duration-200">
+    <div className="space-y-6 max-w-4xl mx-auto pb-16 animate-in fade-in duration-200">
       
-      {/* Top Banner / Header Card */}
-      <div className="bg-gradient-to-r from-[#070D1B] via-[#0B1528] to-[#112244] p-6 rounded-3xl text-white border-2 border-[#D4AF37]/40 shadow-2xl relative overflow-hidden">
+      {/* Top Banner Card */}
+      <div className="bg-gradient-to-r from-[#070D1B] via-[#0B1528] to-[#112244] p-6 rounded-3xl text-white border-2 border-amber-500/40 shadow-2xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 text-[10px] font-black bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 rounded-full uppercase tracking-widest shadow-md">
-                {isBn ? 'অ্যাডমিন কন্ট্রোল পোর্টাল' : 'ADMIN CONTROL PORTAL'}
+                {isBn ? 'অ্যাডমিন ডাইরেক্ট এন্ট্রি' : 'ADMIN DIRECT ENTRY'}
               </span>
               <span className="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
-                {isBn ? 'ডাইরেক্ট ক্রেডিট সিস্টেম' : 'Direct Credit Engine'}
+                {isBn ? '১০ সেকেন্ডে দ্রুত এন্ট্রি' : 'Fast 10s Entry'}
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-amber-300 uppercase flex items-center gap-3">
-              <Wallet className="w-8 h-8 text-amber-400" />
-              <span>{isBn ? 'অ্যাডমিন ম্যানুয়াল ডিপোজিট' : 'Admin Manual Deposit'}</span>
+              <Wallet className="w-7 h-7 text-amber-400 shrink-0" />
+              <span>{isBn ? 'অ্যাডমিন ডিপোজিট এন্ট্রি' : 'Admin Deposit Entry'}</span>
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
               {isBn 
-                ? 'প্রবাসী ও সাধারণ সদস্যগণ যারা সরাসরি অ্যাপে পেমেন্ট করতে পারেন না, তাদের ব্যাংক ড্রাফট, ক্যাশ, বা রেমিট্যান্সের মাধ্যমে প্রাপ্ত টাকা অ্যাডমিন সরাসরি সদস্যের নামে জমা করে দিতে পারবেন।'
-                : 'Directly credit funds received via Cash, Bank Wire, Remittance, or Mobile Banking for expatriate & club members.'}
+                ? 'মেম্বারদের প্রাপ্ত কিস্তির টাকা মাত্র ৫টি সহজ ধাপে সরাসরি অ্যাডমিন প্যানেল থেকে এন্ট্রি দিন। সিস্টেম স্বয়ংক্রিয়ভাবে সিল ও সিগনেচারযুক্ত পাকা রসিদ তৈরি করে দেবে।'
+                : 'Directly credit member shares in 5 simple steps. Automatically calculates amount and issues official signed vouchers.'}
             </p>
           </div>
 
           {/* Admin Info Badge */}
-          <div className="bg-[#070D1B]/90 border border-[#D4AF37]/40 p-4 rounded-2xl shrink-0 flex items-center gap-3 shadow-inner">
+          <div className="bg-[#070D1B]/90 border border-amber-500/40 p-3.5 rounded-2xl shrink-0 flex items-center gap-3 shadow-inner">
             <PBCFramedAvatar 
               photoUrl={currentMember?.photoUrl} 
               name={currentMember?.fullName || 'Admin'} 
-              className="w-12 h-12 rounded-xl object-cover ring-2 ring-amber-400" 
+              className="w-11 h-11 rounded-xl object-cover ring-2 ring-amber-400" 
             />
             <div className="text-xs">
               <span className="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">
@@ -398,382 +323,503 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
                 {currentMember?.fullName || authUser?.displayName || 'PBC Admin'}
               </span>
               <span className="text-[10px] text-slate-300 font-mono">
-                {currentMember?.id || 'PBC-ADMIN'} • {role.toUpperCase()}
+                {currentMember?.id || 'PBC-ADMIN'}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Form Container */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Main Streamlined Form */}
+      <form onSubmit={handleSubmit} className="space-y-5">
         
-        {/* Step 1: Member Selection */}
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4AF37]/20">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xs">
+        {/* ========================================================= */}
+        {/* STEP 1: মেম্বার নির্বাচন (SELECT MEMBER) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
                 ১
               </div>
-              <h2 className="text-base font-extrabold text-white tracking-wide">
-                {isBn ? 'সদস্য নির্বাচন করুন (Select Member)' : 'Select Member'}
-              </h2>
+              <div>
+                <h2 className="text-base font-extrabold text-white tracking-wide">
+                  {isBn ? 'মেম্বার নির্বাচন করুন' : '1. Select Member'}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {isBn ? 'নাম, মেম্বার আইডি বা ফোন নম্বর দিয়ে খুঁজে বের করুন' : 'Search by ID, Name or Mobile'}
+                </p>
+              </div>
             </div>
+
             {selectedMember && (
-              <span className="px-2.5 py-0.5 text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full flex items-center gap-1">
-                <Check className="w-3.5 h-3.5" />
-                {isBn ? 'সদস্য নির্বাচিত' : 'Member Selected'}
-              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedMember(null);
+                  setMemberSearch('');
+                }}
+                className="text-xs text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer"
+              >
+                {isBn ? 'পরিবর্তন করুন' : 'Change'}
+              </button>
             )}
           </div>
 
-          {/* Search Box with Live Dropdown */}
-          <div className="relative">
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>{isBn ? 'মেম্বার আইডি, নাম বা ফোন নম্বর দিয়ে সার্চ করুন *' : 'Search by Member ID, Full Name, or Phone *'}</span>
-              <span className="text-[10px] text-amber-400 font-mono">{members.length} {isBn ? 'জন সদস্য ডাটাবেজে রয়েছে' : 'Total Members'}</span>
-            </label>
-
+          {!selectedMember ? (
             <div className="relative">
-              <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder={isBn ? "যেমন: PBC-1001, Shakil Rana, বা 017..." : "Type ID (e.g. PBC-1001), Name, or Mobile..."}
-                value={memberSearch}
-                onChange={(e) => {
-                  setMemberSearch(e.target.value);
-                  setIsDropdownOpen(true);
-                  if (selectedMember && e.target.value !== `${selectedMember.fullName} (${selectedMember.id})`) {
-                    setSelectedMember(null);
-                  }
-                }}
-                onFocus={() => setIsDropdownOpen(true)}
-                className="w-full pl-11 pr-10 py-3.5 bg-[#070D1B] border-2 border-[#D4AF37]/40 focus:border-amber-400 rounded-2xl text-white placeholder-slate-500 text-sm font-medium focus:outline-none transition shadow-inner"
-              />
-              {memberSearch && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMemberSearch('');
-                    setSelectedMember(null);
+              <div className="relative">
+                <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder={isBn ? "যেমন: PBC-1001, শাকিল রানা, বা ০১৭১..." : "Type ID (e.g. PBC-1001), Name, or Mobile..."}
+                  value={memberSearch}
+                  onChange={(e) => {
+                    setMemberSearch(e.target.value);
                     setIsDropdownOpen(true);
                   }}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+                  onFocus={() => setIsDropdownOpen(true)}
+                  className="w-full pl-11 pr-4 py-3.5 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 text-sm font-semibold shadow-inner"
+                />
+              </div>
 
-            {/* Smart Interactive Dropdown Menu */}
-            {isDropdownOpen && filteredMembers.length > 0 && (
-              <div className="absolute z-30 left-0 right-0 mt-2 max-h-72 overflow-y-auto bg-[#070D1B] border-2 border-[#D4AF37]/50 rounded-2xl shadow-2xl divide-y divide-[#D4AF37]/20 backdrop-blur-md">
-                {filteredMembers.map((m) => {
-                  const isSelected = selectedMember?.id === m.id;
-                  return (
+              {/* Suggestions Dropdown */}
+              {isDropdownOpen && filteredMembers.length > 0 && (
+                <div className="absolute z-30 left-0 right-0 mt-2 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto">
+                  <div className="p-2 text-[10px] uppercase font-bold text-amber-300/80 bg-[#0B1528] border-b border-slate-800 px-3">
+                    {isBn ? 'মেম্বার তালিকা থেকে সিলেক্ট করুন:' : 'Matching Members:'}
+                  </div>
+                  {filteredMembers.map((m) => (
                     <div
                       key={m.id}
                       onClick={() => handleSelectMember(m)}
-                      className={`p-3.5 flex items-center justify-between gap-3 hover:bg-[#112244] transition cursor-pointer ${
-                        isSelected ? 'bg-[#112244] border-l-4 border-amber-400' : ''
-                      }`}
+                      className="p-3 hover:bg-[#112244] border-b border-slate-800/60 last:border-none flex items-center justify-between gap-3 cursor-pointer transition"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center gap-3">
                         <PBCFramedAvatar 
                           photoUrl={m.photoUrl} 
                           name={m.fullName} 
-                          className="w-10 h-10 rounded-xl object-cover ring-1 ring-amber-400/50 shrink-0" 
+                          className="w-10 h-10 rounded-xl object-cover ring-1 ring-amber-400/50" 
                         />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white truncate">{m.fullName}</span>
-                            <span className="font-mono text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-bold">
-                              {m.id}
-                            </span>
-                            {m.role === 'super_admin' && (
-                              <span className="text-[9px] px-1.5 py-0.2 bg-amber-400 text-slate-950 font-black rounded">👑 SUPER</span>
+                        <div>
+                          <div className="font-extrabold text-white text-xs sm:text-sm">
+                            {m.fullName}
+                          </div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                            <span className="text-amber-400 font-mono font-bold">{m.id}</span>
+                            <span>•</span>
+                            <span>{m.phone}</span>
+                            {m.country && (
+                              <>
+                                <span>•</span>
+                                <span>{m.country}</span>
+                              </>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                            {m.phone} • {m.country}
-                          </p>
                         </div>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <span className="text-[10px] text-slate-400 block">{isBn ? 'বর্তমান জমা' : 'Current Deposit'}</span>
-                        <span className="text-xs font-black text-amber-300 font-mono">
-                          ৳{(m.totalDeposit || 0).toLocaleString('en-BD')}
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 block">
+                          {m.monthlyShareCommitment || 1} {isBn ? 'শেয়ার/মাস' : 'share/mo'}
                         </span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Selected Member Detail Summary Card */}
-          {selectedMember && (
-            <div className="p-4 bg-gradient-to-r from-[#070D1B] to-[#0A182F] rounded-2xl border-2 border-amber-400/40 shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2 duration-200">
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Selected Member Card */
+            <div className="p-4 bg-gradient-to-r from-amber-500/10 via-[#070D1B] to-emerald-500/10 rounded-2xl border-2 border-amber-400/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-3.5">
                 <PBCFramedAvatar 
                   photoUrl={selectedMember.photoUrl} 
                   name={selectedMember.fullName} 
-                  className="w-14 h-14 rounded-2xl object-cover ring-2 ring-amber-400 shrink-0 shadow-md" 
+                  className="w-13 h-13 rounded-2xl object-cover ring-2 ring-amber-400 shadow-md" 
                 />
-                <div className="space-y-0.5">
+                <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black text-white">{selectedMember.fullName}</h3>
-                    {selectedMember.fullNameBn && (
-                      <span className="text-xs text-amber-300 font-semibold">({selectedMember.fullNameBn})</span>
-                    )}
+                    <h3 className="font-black text-white text-base">
+                      {selectedMember.fullName}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                      ● {selectedMember.status}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap text-xs text-slate-300">
-                    <span className="font-mono px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded font-bold">
-                      {selectedMember.id}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-slate-400" />
-                      {selectedMember.phone}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Globe className="w-3 h-3 text-slate-400" />
-                      {selectedMember.city}, {selectedMember.country}
-                    </span>
+                  <div className="text-xs text-slate-300 flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-amber-400 font-mono font-bold">{selectedMember.id}</span>
+                    <span>•</span>
+                    <span>{selectedMember.phone}</span>
+                    {selectedMember.country && (
+                      <>
+                        <span>•</span>
+                        <span>{selectedMember.country}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Balances */}
-              <div className="flex items-center gap-3 bg-[#070D1B]/80 p-3 rounded-xl border border-[#D4AF37]/30 shrink-0 justify-between sm:justify-end">
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
-                    {isBn ? 'বর্তমান মোট ব্যালেন্স' : 'Total Deposit'}
+              <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-slate-700/60 pt-3 sm:pt-0 sm:pl-4">
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
+                    {isBn ? 'প্রতিশ্রুতি' : 'Monthly Rate'}
                   </span>
-                  <span className="text-base font-black text-amber-400 font-mono">
+                  <span className="text-xs font-black text-amber-300">
+                    {selectedMember.monthlyShareCommitment || 1} {isBn ? 'টি শেয়ার/মাস' : 'Share(s)/mo'}
+                  </span>
+                </div>
+                <div className="h-7 w-px bg-slate-700" />
+                <div>
+                  <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
+                    {isBn ? 'পূর্বের মোট জমা' : 'Total Deposit'}
+                  </span>
+                  <span className="text-xs font-black text-emerald-400 font-mono">
                     ৳{(selectedMember.totalDeposit || 0).toLocaleString('en-BD')}
                   </span>
                 </div>
-                <div className="h-8 w-px bg-slate-800" />
-                <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
-                    {isBn ? 'স্ট্যাটাস' : 'Status'}
-                  </span>
-                  <span className="text-xs font-bold text-emerald-400 capitalize">
-                    ● {selectedMember.status}
-                  </span>
-                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Step 2: Deposit Amount & Category */}
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-[#D4AF37]/20">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xs">
+        {/* ========================================================= */}
+        {/* STEP 2: শেয়ার সংখ্যা নির্বাচন (SELECT SHARE COUNT) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
                 ২
               </div>
-              <h2 className="text-base font-extrabold text-white tracking-wide">
-                {isBn ? 'জমার ক্যাটাগরি ও পরিমাণ (Deposit Amount & Category)' : 'Amount & Category'}
-              </h2>
+              <div>
+                <h2 className="text-base font-extrabold text-white tracking-wide">
+                  {isBn ? 'শেয়ার সংখ্যা নির্বাচন করুন' : '2. Select Share Count'}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {isBn ? `১টি শেয়ার = ৳${shareUnitPrice.toLocaleString('en-BD')} (টাকা অটোমেটিক গুণ হবে)` : `1 Share = ৳${shareUnitPrice.toLocaleString('en-BD')} (auto-calculated)`}
+                </p>
+              </div>
             </div>
 
-            {/* Currency Converter Toggle */}
             <button
               type="button"
-              onClick={() => setEnableCurrencyCalculator(!enableCurrencyCalculator)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
-                enableCurrencyCalculator
-                  ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md font-black'
-                  : 'bg-[#070D1B] text-amber-400 border-[#D4AF37]/40 hover:bg-[#112244]'
-              }`}
+              onClick={() => {
+                setIsCustomAmount(!isCustomAmount);
+                if (!isCustomAmount) {
+                  setCustomAmount(shareCount * shareUnitPrice);
+                }
+              }}
+              className="text-xs text-amber-400 hover:underline font-bold"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isBn ? 'প্রবাসী কারেন্সি কনভার্টার' : 'Expat Currency Calculator'}</span>
+              {isCustomAmount ? (isBn ? 'শেয়ার মোডে ফিরুন' : 'Back to Shares') : (isBn ? 'কাস্টম টাকার অংক' : 'Custom Amount')}
             </button>
           </div>
 
-          {/* Expatriate Currency Conversion Calculator Box */}
-          {enableCurrencyCalculator && (
-            <div className="p-4 bg-gradient-to-r from-amber-500/10 via-[#070D1B] to-amber-500/10 rounded-2xl border-2 border-dashed border-amber-400/50 space-y-4 animate-in slide-in-from-top-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Globe className="w-4 h-4 text-amber-400" />
-                  {isBn ? 'প্রবাসী মুদ্রা থেকে টাকায় হিসাব (Foreign Currency to BDT)' : 'Expatriate Currency Converter'}
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {isBn ? 'স্বয়ংক্রিয়ভাবে টাকায় কনভার্ট হবে' : 'Auto-calculates BDT total'}
-                </span>
+          {!isCustomAmount ? (
+            <div className="space-y-4">
+              {/* Quick Pills for 1, 2, 3, 4, 5, 10 shares */}
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {[1, 2, 3, 4, 5, 10].map((num) => {
+                  const isSelected = shareCount === num;
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setShareCount(num)}
+                      className={`py-3 px-2 rounded-2xl border-2 transition font-black text-center cursor-pointer flex flex-col items-center justify-center ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-300 text-slate-950 shadow-lg scale-[1.02]'
+                          : 'bg-[#070D1B] border-slate-700/80 text-white hover:border-amber-400'
+                      }`}
+                    >
+                      <span className="text-base sm:text-lg">{num}</span>
+                      <span className={`text-[10px] ${isSelected ? 'text-slate-950 font-bold' : 'text-slate-400'}`}>
+                        {isBn ? 'শেয়ার' : 'Share(s)'}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                {/* Currency Selector */}
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    {isBn ? 'মুদ্রা (Currency)' : 'Foreign Currency'}
-                  </label>
-                  <select
-                    value={selectedCurrency.code}
-                    onChange={(e) => handleCurrencyChange(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-white font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
+              {/* Counter [-] [+] */}
+              <div className="flex items-center justify-between p-3.5 bg-[#070D1B] rounded-2xl border border-slate-700/60">
+                <span className="text-xs text-slate-300 font-bold">
+                  {isBn ? 'অন্য সংখ্যা প্রয়োজন?' : 'Need a different count?'}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShareCount(Math.max(1, shareCount - 1))}
+                    disabled={shareCount <= 1}
+                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                   >
-                    {POPULAR_CURRENCIES.map(curr => (
-                      <option key={curr.code} value={curr.code}>
-                        {curr.code} - {curr.name}
-                      </option>
-                    ))}
-                  </select>
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-lg font-black text-amber-300 font-mono w-10 text-center">
+                    {shareCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShareCount(shareCount + 1)}
+                    className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold flex items-center justify-center cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
+              </div>
 
-                {/* Foreign Amount */}
+              {/* Auto Total Display */}
+              <div className="p-4 bg-gradient-to-r from-[#112244] to-[#070D1B] rounded-2xl border border-amber-500/40 flex items-center justify-between">
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    {isBn ? `পরিমাণ (${selectedCurrency.code})` : `Amount in ${selectedCurrency.code}`}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="e.g. 500"
-                    value={foreignAmount}
-                    onChange={(e) => handleForeignAmountChange(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-amber-300 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  />
+                  <span className="text-xs text-slate-300 block">
+                    {isBn ? `মোট জমার পরিমাণ (${shareCount}টি শেয়ার × ৳${shareUnitPrice.toLocaleString('en-BD')}):` : `Total Amount (${shareCount} share(s) × ৳${shareUnitPrice}):`}
+                  </span>
+                  <span className="text-xs text-emerald-400 font-semibold">
+                    {isBn ? 'সরাসরি মেম্বার অ্যাকাউন্টে ক্রেডিট হবে' : 'Will be directly credited'}
+                  </span>
                 </div>
-
-                {/* Exchange Rate */}
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1">
-                    {isBn ? 'রেট (১ ইউনিট = কত টাকা)' : 'Rate (BDT per unit)'}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={exchangeRate}
-                    onChange={(e) => handleExchangeRateChange(Number(e.target.value))}
-                    className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  />
+                <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
+                  ৳{(shareCount * shareUnitPrice).toLocaleString('en-BD')}
                 </div>
+              </div>
+            </div>
+          ) : (
+            /* Custom Amount Input */
+            <div className="space-y-3">
+              <label className="block text-xs font-bold text-slate-300">
+                {isBn ? 'কাস্টম জমার পরিমাণ লিখুন (টাকা) *' : 'Enter Custom Deposit Amount (BDT) *'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-amber-400 font-mono">৳</span>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  placeholder="e.g. 5000"
+                  value={customAmount}
+                  onChange={(e) => {
+                    const val = e.target.value === '' ? '' : Number(e.target.value);
+                    setCustomAmount(val);
+                    if (typeof val === 'number') {
+                      setShareCount(Math.max(1, Math.round(val / shareUnitPrice)));
+                    }
+                  }}
+                  className="w-full pl-10 pr-4 py-3.5 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl text-amber-300 font-mono font-black text-xl focus:outline-none focus:border-amber-400"
+                />
               </div>
             </div>
           )}
-
-          {/* Category Selector */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              {isBn ? 'জমার তহবিল ক্যাটাগরি নির্বাচন করুন *' : 'Select Deposit Fund Category *'}
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setCategory('Fund Raising')}
-                className={`p-4 rounded-2xl border-2 transition text-left flex items-center justify-between cursor-pointer ${
-                  category === 'Fund Raising'
-                    ? 'bg-[#112244] border-amber-400 text-white shadow-lg'
-                    : 'bg-[#070D1B] border-[#D4AF37]/30 text-slate-400 hover:border-[#D4AF37]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                    category === 'Fund Raising' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-                  }`}>
-                    ৳
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">
-                      {isBn ? 'তহবিল সংগ্রহ (Fund Raising)' : 'Fund Raising / General Fund'}
-                    </h4>
-                    <p className="text-[11px] text-slate-300">
-                      {isBn ? 'মাসিক নিয়মিত সঞ্চয় ও শেয়ার মূলধন' : 'Monthly savings & regular club equity'}
-                    </p>
-                  </div>
-                </div>
-                {category === 'Fund Raising' && <CheckCircle2 className="w-5 h-5 text-amber-400" />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCategory('Real Estate')}
-                className={`p-4 rounded-2xl border-2 transition text-left flex items-center justify-between cursor-pointer ${
-                  category === 'Real Estate'
-                    ? 'bg-[#112244] border-emerald-400 text-white shadow-lg'
-                    : 'bg-[#070D1B] border-[#D4AF37]/30 text-slate-400 hover:border-[#D4AF37]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-                    category === 'Real Estate' ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-                  }`}>
-                    <Building2 className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white">
-                      {isBn ? 'রিয়েল এস্টেট বিনিয়োগ (Real Estate)' : 'Real Estate Investment'}
-                    </h4>
-                    <p className="text-[11px] text-slate-300">
-                      {isBn ? 'জমি, বিল্ডিং ও প্রজেক্ট ইনভেস্টমেন্ট ফান্ড' : 'Land, project & property capital fund'}
-                    </p>
-                  </div>
-                </div>
-                {category === 'Real Estate' && <CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Smart Multi-Month & Multi-Share Deposit Engine */}
-          <SmartDepositCalculator
-            shareUnitPrice={shareUnitPrice}
-            isBn={isBn}
-            memberCommitment={selectedMember?.monthlyShareCommitment}
-            depositMode={depositMode}
-            onDepositModeChange={setDepositMode}
-            monthlyRate={monthlyRate}
-            onMonthlyRateChange={setMonthlyRate}
-            monthsCount={monthsCount}
-            onMonthsCountChange={setMonthsCount}
-            startMonth={startMonth}
-            onStartMonthChange={setStartMonth}
-            endMonth={endMonth}
-            onEndMonthChange={setEndMonth}
-            amountBDT={amountBDT}
-            onAmountBDTChange={setAmountBDT}
-            shareCount={shareCount}
-            onShareCountChange={setShareCount}
-            onPeriodTextChange={setCoveredPeriodText}
-            onAutoNotesGenerated={setNotes}
-            memberJoinDate={selectedMember?.joinDate}
-          />
         </div>
 
-        {/* Step 3: Payment Method & Reference Details */}
-        <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-[#D4AF37]/30 shadow-xl space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-[#D4AF37]/20">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-xs">
+        {/* ========================================================= */}
+        {/* STEP 3: কোন মাসের কিস্তি/শেয়ার (SELECT MONTH) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-amber-500/20">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
               ৩
             </div>
-            <h2 className="text-base font-extrabold text-white tracking-wide">
-              {isBn ? 'পেমেন্ট চ্যানেল ও রেফারেন্স (Payment Details)' : 'Payment Channel & Reference'}
-            </h2>
+            <div>
+              <h2 className="text-base font-extrabold text-white tracking-wide">
+                {isBn ? 'কোন মাসের শেয়ার বা কিস্তি?' : '3. Contribution Month'}
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                {isBn ? '১ ক্লিকে চলতি বা যেকোনো মাস সিলেক্ট করুন' : 'Select target month'}
+              </p>
+            </div>
           </div>
 
-          {/* Payment Method Selector Grid */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
-              {isBn ? 'পেমেন্ট গ্রহণের মাধ্যম (Payment Method) *' : 'Payment Method *'}
+          {/* Quick Month Pills */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { val: currentMonthVal, label: isBn ? `চলতি মাস (${currentMonthBn})` : `Current (${currentMonthVal})` },
+              { val: nextMonthVal, label: isBn ? `পরবর্তী (${nextMonthBn})` : `Next (${nextMonthVal})` },
+              { val: prevMonthVal, label: isBn ? `পূর্ববর্তী (${prevMonthBn})` : `Prev (${prevMonthVal})` },
+              { val: 'general', label: isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly' },
+            ].map(m => {
+              const isSelected = targetMonth === m.val;
+              return (
+                <button
+                  key={m.val}
+                  type="button"
+                  onClick={() => setTargetMonth(m.val)}
+                  className={`p-3 rounded-2xl border-2 transition text-center cursor-pointer text-xs font-bold ${
+                    isSelected
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-lg scale-[1.02]'
+                      : 'bg-[#070D1B] border-slate-700/80 text-slate-300 hover:border-amber-400'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* All Months Dropdown Selector */}
+          <div className="pt-1">
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>{isBn ? 'অন্য কোনো মাস বেছে নিতে ড্রপডাউন ব্যবহার করুন:' : 'Or choose from all months:'}</span>
+              <span className="text-[11px] text-amber-400 font-bold">
+                {isBn ? 'নির্বাচিত:' : 'Selected:'} {targetMonth === 'general' ? (isBn ? 'সাধারণ জমা' : 'General') : targetMonth}
+              </span>
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <select
+              value={targetMonth}
+              onChange={(e) => setTargetMonth(e.target.value)}
+              className="w-full px-4 py-3 bg-[#070D1B] border border-amber-500/40 rounded-xl text-white font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 cursor-pointer"
+            >
+              <option value="general">{isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly Deposit'}</option>
+              {ALL_MONTH_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {isBn ? opt.labelBn : opt.labelEn}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* STEP 4: তহবিল টাইপ (FUND RAISING vs REAL ESTATE) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-amber-500/20">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
+              ৪
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold text-white tracking-wide">
+                {isBn ? 'তহবিল টাইপ নির্বাচন করুন' : '4. Select Fund Type'}
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                {isBn ? 'ফান্ডরেইজিং নাকি রিয়েল এস্টেট প্রজেক্ট' : 'Fund Raising or Real Estate'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {/* Fund Raising */}
+            <button
+              type="button"
+              onClick={() => setCategory('Fund Raising')}
+              className={`p-4 sm:p-5 rounded-2xl border-2 transition text-left flex items-center justify-between cursor-pointer ${
+                category === 'Fund Raising'
+                  ? 'bg-[#112244] border-amber-400 text-white shadow-xl ring-2 ring-amber-400/30'
+                  : 'bg-[#070D1B] border-slate-700/80 text-slate-400 hover:border-amber-400'
+              }`}
+            >
+              <div className="flex items-center gap-3.5">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg font-black ${
+                  category === 'Fund Raising' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  🏢
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-white">
+                    {isBn ? 'ফান্ডরেইজিং (Fund Raising)' : 'Fund Raising'}
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {isBn ? 'মাসিক নিয়মিত কিস্তি ও ক্লাব মূলধন' : 'Monthly savings & regular club equity'}
+                  </p>
+                </div>
+              </div>
+              {category === 'Fund Raising' && <CheckCircle2 className="w-6 h-6 text-amber-400 shrink-0" />}
+            </button>
+
+            {/* Real Estate */}
+            <button
+              type="button"
+              onClick={() => setCategory('Real Estate')}
+              className={`p-4 sm:p-5 rounded-2xl border-2 transition text-left flex items-center justify-between cursor-pointer ${
+                category === 'Real Estate'
+                  ? 'bg-[#112244] border-emerald-400 text-white shadow-xl ring-2 ring-emerald-400/30'
+                  : 'bg-[#070D1B] border-slate-700/80 text-slate-400 hover:border-emerald-400'
+              }`}
+            >
+              <div className="flex items-center gap-3.5">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-lg font-black ${
+                  category === 'Real Estate' ? 'bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                }`}>
+                  🏗️
+                </div>
+                <div>
+                  <h4 className="text-sm sm:text-base font-black text-white">
+                    {isBn ? 'রিয়েল এস্টেট (Real Estate)' : 'Real Estate'}
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {isBn ? 'জমি ক্রয়, আবাসন প্রকল্প ও প্রজেক্ট শেয়ার' : 'Land, project & property capital fund'}
+                  </p>
+                </div>
+              </div>
+              {category === 'Real Estate' && <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />}
+            </button>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* STEP 5: পেমেন্ট মেথড (PAYMENT METHOD) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
+                ৫
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-white tracking-wide">
+                  {isBn ? 'পেমেন্ট মাধ্যম সিলেক্ট করুন' : '5. Select Payment Method'}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {isBn ? 'টাকা কীভাবে জমা দেওয়া হয়েছে' : 'Payment Channel'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAllPaymentMethods(!showAllPaymentMethods)}
+              className="text-xs text-amber-400 hover:underline font-bold"
+            >
+              {showAllPaymentMethods ? (isBn ? 'সংক্ষিপ্ত করুন' : 'Less') : (isBn ? '+ অন্যান্য মাধ্যম' : '+ More Methods')}
+            </button>
+          </div>
+
+          {/* 4 Primary Payment Methods */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { id: 'Bank', label: isBn ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer', icon: '🏦' },
+              { id: 'bKash', label: 'bKash / বিকাশ', icon: '📱' },
+              { id: 'Nagad', label: 'Nagad / নগদ', icon: '📲' },
+              { id: 'Cash', label: isBn ? 'নগদ ক্যাশ' : 'Cash', icon: '💵' },
+            ].map((m) => {
+              const isSelected = paymentMethod === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setPaymentMethod(m.id as any)}
+                  className={`p-3.5 rounded-2xl border-2 transition text-center cursor-pointer flex flex-col items-center justify-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-amber-500 to-amber-600 border-amber-300 text-slate-950 font-black shadow-lg scale-[1.02]'
+                      : 'bg-[#070D1B] border-slate-700/80 text-white hover:border-amber-400 font-bold'
+                  }`}
+                >
+                  <span className="text-2xl">{m.icon}</span>
+                  <span className="text-xs">{m.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Extended Methods if toggled */}
+          {showAllPaymentMethods && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 animate-in fade-in">
               {[
-                { id: 'Cash', label: isBn ? 'নগদ ক্যাশ গ্রহণ' : 'Cash', icon: '💵', desc: 'Direct Cash' },
-                { id: 'Bank', label: isBn ? 'ব্যাংক ট্রান্সফার' : 'Bank Transfer', icon: '🏦', desc: 'Bank Deposit' },
-                { id: 'Bank Wire', label: isBn ? 'রেমিট্যান্স / ওয়্যার' : 'Remittance Wire', icon: '✈️', desc: 'Expat Wire' },
-                { id: 'bKash', label: 'bKash / বিকাশ', icon: '📱', desc: 'Mobile Banking' },
-                { id: 'Nagad', label: 'Nagad / নগদ', icon: '📱', desc: 'Mobile Banking' },
-                { id: 'Wise', label: 'Wise / Exchange', icon: '🌐', desc: 'Money Exchange' },
-                { id: 'Cheque', label: isBn ? 'চেক (Cheque)' : 'Bank Cheque', icon: '📜', desc: 'Clearing Cheque' },
-                { id: 'Stripe/Card', label: isBn ? 'কার্ড / পিওএস' : 'Card / POS', icon: '💳', desc: 'Debit/Credit Card' },
+                { id: 'Bank Wire', label: isBn ? 'রেমিট্যান্স / ওয়্যার' : 'Bank Wire', icon: '✈️' },
+                { id: 'Wise', label: 'Wise / Exchange', icon: '🌐' },
+                { id: 'Cheque', label: isBn ? 'চেক (Cheque)' : 'Cheque', icon: '📜' },
+                { id: 'Stripe/Card', label: isBn ? 'কার্ড / পিওএস' : 'Card / POS', icon: '💳' },
               ].map((m) => {
                 const isSelected = paymentMethod === m.id;
                 return (
@@ -781,213 +827,157 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id as any)}
-                    className={`p-3 rounded-2xl border transition text-left flex flex-col justify-between cursor-pointer ${
+                    className={`p-3 rounded-2xl border transition text-center cursor-pointer flex flex-col items-center justify-center gap-1 ${
                       isSelected
-                        ? 'bg-[#112244] border-amber-400 text-white shadow-lg ring-1 ring-amber-400'
-                        : 'bg-[#070D1B] border-[#D4AF37]/30 text-slate-400 hover:border-[#D4AF37]'
+                        ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-md'
+                        : 'bg-[#070D1B] border-slate-800 text-slate-300 hover:border-amber-400 font-semibold'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xl">{m.icon}</span>
-                      {isSelected && <Check className="w-4 h-4 text-amber-400" />}
-                    </div>
-                    <div className="mt-2">
-                      <span className="font-bold text-xs text-white block truncate">{m.label}</span>
-                      <span className="text-[10px] text-slate-400 block">{m.desc}</span>
-                    </div>
+                    <span className="text-xl">{m.icon}</span>
+                    <span className="text-xs">{m.label}</span>
                   </button>
                 );
               })}
             </div>
-          </div>
-
-          {/* Reference & Deposit Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                <span>{isBn ? 'রেফারেন্স / ট্রানজেকশন / স্লিপ নম্বর *' : 'Reference / TrxID / Slip No *'}</span>
-                <button
-                  type="button"
-                  onClick={() => setReferenceNumber(`ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`)}
-                  className="text-[10px] text-amber-400 hover:underline flex items-center gap-1 font-bold"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  {isBn ? 'নতুন আইডি' : 'Auto Generate'}
-                </button>
-              </label>
-              <input
-                type="text"
-                required
-                value={referenceNumber}
-                onChange={(e) => setReferenceNumber(e.target.value)}
-                className="w-full px-3.5 py-3 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-amber-300 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-            </div>
-
-            <div>
-              <label className="block font-semibold text-slate-300 mb-1">
-                {isBn ? 'জমার তারিখ (Deposit Date) *' : 'Deposit Date *'}
-              </label>
-              <input
-                type="date"
-                required
-                value={depositDate}
-                onChange={(e) => setDepositDate(e.target.value)}
-                className="w-full px-3.5 py-3 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-white font-bold focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-            </div>
-          </div>
-
-          {/* Bank / Branch / Money Exchange Office (Optional) */}
-          <div className="text-xs">
-            <label className="block font-semibold text-slate-300 mb-1">
-              {isBn ? 'ব্যাংক শাখা / এক্সচেঞ্জ হাউস / কাউন্টার বিবরণ (ঐচ্ছিক)' : 'Bank Branch / Exchange House / Counter Details (Optional)'}
-            </label>
-            <input
-              type="text"
-              placeholder={isBn ? "যেমন: আল আনসারি এক্সচেঞ্জ দুবাই, অথবা ইসলামী ব্যাংক প্রিন্সিপাল শাখা" : "e.g. Al Ansari Exchange Deira, or Cash Counter PBC Office"}
-              value={bankOrBranch}
-              onChange={(e) => setBankOrBranch(e.target.value)}
-              className="w-full px-3.5 py-3 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-            />
-          </div>
-
-          {/* Deposit Slip / Voucher Photo Upload (Optional) */}
-          <div className="text-xs space-y-2">
-            <label className="block font-semibold text-slate-300 flex items-center justify-between">
-              <span>{isBn ? 'ব্যাংক স্লিপ / ভাউচার রসিদের ছবি (ঐচ্ছিক)' : 'Upload Bank Deposit Slip / Voucher Photo (Optional)'}</span>
-              {receiptImage && (
-                <button
-                  type="button"
-                  onClick={() => setReceiptImage('')}
-                  className="text-rose-400 hover:text-rose-300 text-[11px] font-bold"
-                >
-                  {isBn ? 'ছবি মুছুন' : 'Remove Image'}
-                </button>
-              )}
-            </label>
-
-            {receiptImage ? (
-              <div className="p-3 bg-[#070D1B] rounded-2xl border border-emerald-500/40 flex items-center gap-4">
-                <img src={receiptImage} alt="Voucher Preview" className="w-16 h-16 rounded-xl object-cover border border-amber-400 shadow-md" />
-                <div>
-                  <span className="text-emerald-400 font-bold block flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4" />
-                    {isBn ? 'ছবি সফলভাবে সংযুক্ত হয়েছে' : 'Voucher attached successfully'}
-                  </span>
-                  <span className="text-[11px] text-slate-400">
-                    {isBn ? 'মানি রিসিটে এটি সংরক্ষিত থাকবে' : 'Will be embedded into official digital receipt'}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <label className="p-4 bg-[#070D1B] hover:bg-[#112244] rounded-2xl border-2 border-dashed border-[#D4AF37]/40 hover:border-amber-400 transition flex items-center justify-center gap-3 cursor-pointer text-slate-300">
-                <Upload className="w-5 h-5 text-amber-400" />
-                <span className="font-bold text-xs">
-                  {isBn ? 'স্লিপ বা রসিদের ছবি নির্বাচন করুন (গ্যালারি বা ক্যামেরা)' : 'Click to upload bank slip / receipt voucher'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-            )}
-          </div>
-
-          {/* Selected Period & Remarks / Notes */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Period Summary Indicator */}
-            <div className="p-3.5 bg-[#070D1B] rounded-2xl border border-amber-500/30 flex flex-col justify-between">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                  {isBn ? 'নির্ধারিত জমাকৃত মেয়াদ / মাস' : 'Covered Period / Target Period'}
-                </span>
-                <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
-                  {depositMode === 'advance' ? (isBn ? 'অগ্রিম জমা' : 'Advance') : 
-                   depositMode === 'backdated' ? (isBn ? 'পূর্বের বকেয়া' : 'Backdated') :
-                   depositMode === 'general' ? (isBn ? 'সাধারণ জমা' : 'General') : (isBn ? 'একক মাস' : 'Single Month')}
-                </span>
-              </div>
-              <div className="text-sm font-bold text-amber-300 font-mono">
-                {depositMode === 'general' ? (isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General Non-Monthly') : (coveredPeriodText || startMonth)}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
-                <span>{isBn ? `মেয়াদ: ${monthsCount} মাস` : `Duration: ${monthsCount} mo`}</span>
-                <span>•</span>
-                <span>{isBn ? `মোট: ${shareCount} শেয়ার (৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : 0})` : `Total: ${shareCount} Shares (৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : 0})`}</span>
-              </div>
-            </div>
-
-            {/* Remarks / Notes */}
-            <div className="text-xs">
-              <label className="block font-semibold text-slate-300 mb-1">
-                {isBn ? 'অ্যাডমিন মন্তব্য / নোট (Admin Remarks / Notes)' : 'Admin Notes / Remarks'}
-              </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={isBn ? "যেমনঃ মাসিক কিস্তি বা দুবাই অফিস জমা" : "e.g. Monthly contribution received at Dubai office"}
-                className="w-full px-3.5 py-3 bg-[#070D1B] border border-[#D4AF37]/30 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
-              <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
-                <Info className="w-3 h-3 text-amber-400/80 shrink-0" />
-                <span>
-                  {isBn 
-                    ? 'স্মার্ট ক্যালকুলেটরের হিসাব অনুযায়ী স্বয়ংক্রিয়ভাবে তৈরি হয়েছে, আপনি চাইলে এডিট করতে পারেন।' 
-                    : 'Auto-synced with smart calculator breakdown; editable.'}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Instant Credit Toggle */}
-          <div className="p-4 bg-[#070D1B] rounded-2xl border border-[#D4AF37]/30 flex items-center justify-between gap-4">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-white block">
-                {isBn ? 'তাৎক্ষণিক কার্যকর ও ব্যালেন্সে যোগ (Instant Direct Credit)' : 'Instant Direct Credit & Approval'}
-              </span>
-              <p className="text-[11px] text-slate-400">
-                {isBn 
-                  ? 'চালু থাকলে সাথে সাথে মেম্বারের মোট জমা ও ক্লাবের তহবিলে টাকাটি যুক্ত হয়ে যাবে।'
-                  : 'Immediately approves deposit & updates member balance without waiting in audit queue.'}
-              </p>
-            </div>
-
-            <label className="relative inline-flex items-center cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={autoApprove}
-                onChange={(e) => setAutoApprove(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 border border-slate-700"></div>
-            </label>
-          </div>
+          )}
         </div>
 
-        {/* Submit Action Buttons */}
+        {/* ========================================================= */}
+        {/* OPTIONAL DETAILS (Collapsible / Clean) */}
+        {/* ========================================================= */}
+        <div className="bg-[#0B1528] text-white p-5 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+          <div 
+            onClick={() => setShowOptionalFields(!showOptionalFields)}
+            className="flex items-center justify-between cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-400" />
+              <span className="text-xs sm:text-sm font-bold text-slate-300 group-hover:text-amber-300 transition">
+                {isBn ? 'অতিরিক্ত ঐচ্ছিক তথ্য (স্লিপ ছবি, TrxID, তারিখ)' : 'Optional Details (Slip photo, TrxID, Date)'}
+              </span>
+            </div>
+            <span className="text-xs text-amber-400 font-bold">
+              {showOptionalFields ? (isBn ? 'লুকান ▲' : 'Hide ▲') : (isBn ? 'দেখান ▼' : 'Show ▼')}
+            </span>
+          </div>
+
+          {showOptionalFields && (
+            <div className="space-y-4 pt-3 border-t border-slate-800/80 animate-in fade-in">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* TrxID / Ref */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
+                    <span>{isBn ? 'TrxID / ভাউচার রেফারেন্স' : 'TrxID / Reference No'}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReferenceNumber(`ADM-DEP-${Math.floor(100000 + Math.random() * 900000)}`)}
+                      className="text-[10px] text-amber-400 hover:underline flex items-center gap-1 font-bold"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      {isBn ? 'নতুন রেফারেন্স' : 'Refresh'}
+                    </button>
+                  </label>
+                  <input
+                    type="text"
+                    value={referenceNumber}
+                    onChange={(e) => setReferenceNumber(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-slate-700 rounded-xl text-amber-300 font-mono font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {/* Deposit Date */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">
+                    {isBn ? 'জমার তারিখ' : 'Deposit Date'}
+                  </label>
+                  <input
+                    type="date"
+                    value={depositDate}
+                    onChange={(e) => setDepositDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-slate-700 rounded-xl text-white font-bold focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Bank Slip Upload */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between text-xs">
+                  <span>{isBn ? 'পেমেন্ট স্লিপের ছবি (ঐচ্ছিক)' : 'Payment Slip Screenshot (Optional)'}</span>
+                  {receiptImage && (
+                    <button
+                      type="button"
+                      onClick={() => setReceiptImage('')}
+                      className="text-rose-400 hover:underline text-[11px] font-bold"
+                    >
+                      {isBn ? 'ছবি মুছুন' : 'Remove'}
+                    </button>
+                  )}
+                </label>
+
+                {receiptImage ? (
+                  <div className="p-3 bg-[#070D1B] rounded-2xl border border-emerald-500/40 flex items-center gap-3">
+                    <img src={receiptImage} alt="Receipt preview" className="w-14 h-14 rounded-xl object-cover border border-amber-400 shadow-md" />
+                    <div>
+                      <span className="text-xs font-bold text-emerald-300 block flex items-center gap-1">
+                        <Check className="w-4 h-4" />
+                        {isBn ? 'স্লিপের ছবি সংযুক্ত হয়েছে' : 'Slip attached'}
+                      </span>
+                      <span className="text-[11px] text-slate-400">
+                        {isBn ? 'মানি রিসিটে সংরক্ষিত থাকবে' : 'Will be embedded into voucher'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="p-3 bg-[#070D1B] hover:bg-[#112244] rounded-2xl border-2 border-dashed border-slate-700 hover:border-amber-400 transition flex items-center justify-center gap-2 cursor-pointer text-slate-400 text-xs font-bold">
+                    <Upload className="w-4 h-4 text-amber-400" />
+                    <span>{isBn ? 'ক্লিক করে স্লিপ ছবি আপলোড করুন' : 'Click to attach receipt slip'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 text-xs">
+                  {isBn ? 'অটো-নোটস (ভাউচারে প্রিন্ট হবে)' : 'Notes on Receipt'}
+                </label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-[#070D1B] border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ========================================================= */}
+        {/* SUBMIT BUTTON */}
+        {/* ========================================================= */}
         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
           <button
             type="submit"
             disabled={isSubmitting || !selectedMember}
-            className="w-full sm:flex-1 py-4 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm rounded-2xl shadow-xl transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+            className="w-full sm:flex-1 py-4 sm:py-4.5 bg-gradient-to-r from-amber-500 via-amber-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base rounded-2xl shadow-2xl shadow-amber-950/40 transition active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2.5"
           >
             {isSubmitting ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
-                <span>{isBn ? 'ডাটাবেজে যুক্ত হচ্ছে...' : 'Crediting Account...'}</span>
+                <span>{isBn ? 'ডাটাবেজে যুক্ত হচ্ছে...' : 'Saving Deposit...'}</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
+                <CheckCircle2 className="w-6 h-6 stroke-[2.5]" />
                 <span>
                   {isBn 
-                    ? `৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : '0'} জমা চূড়ান্ত করুন ও রসিদ তৈরি করুন` 
-                    : `Submit ৳${typeof amountBDT === 'number' ? amountBDT.toLocaleString('en-BD') : '0'} Deposit & Generate Receipt`}
+                    ? `৳${calculatedAmount.toLocaleString('en-BD')} জমা কনফার্ম করুন ও রসিদ তৈরি করুন` 
+                    : `Confirm ৳${calculatedAmount.toLocaleString('en-BD')} Deposit & Issue Receipt`}
                 </span>
               </>
             )}
@@ -997,20 +987,20 @@ export const AdminManualDepositView: React.FC<{ onBack?: () => void }> = ({ onBa
             <button
               type="button"
               onClick={onBack}
-              className="w-full sm:w-auto px-6 py-4 bg-[#0B1528] hover:bg-[#112244] text-slate-300 hover:text-white border border-[#D4AF37]/30 font-bold text-xs rounded-2xl transition cursor-pointer"
+              className="w-full sm:w-auto px-6 py-4 bg-[#0B1528] hover:bg-[#112244] text-slate-300 hover:text-white border border-slate-700 font-bold text-xs rounded-2xl transition cursor-pointer"
             >
-              {isBn ? 'ফিরে যান' : 'Back to Hub'}
+              {isBn ? 'ফিরে যান' : 'Back'}
             </button>
           )}
         </div>
       </form>
 
-      {/* Success Notification / Generated Money Receipt Modal */}
+      {/* Generated Money Receipt Modal */}
       {showReceiptModal && createdDeposit && (
         <DepositReceiptModal
           deposit={createdDeposit}
           isOpen={showReceiptModal}
-          onClose={() => setShowReceiptModal(false)}
+          onClose={handleResetForNext}
         />
       )}
 

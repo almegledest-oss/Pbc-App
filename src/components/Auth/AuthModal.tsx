@@ -736,11 +736,18 @@ export const AuthModal: React.FC = () => {
   };
 
   const scrollToLogin = () => {
-    const el = document.getElementById('login-card');
+    const el = document.getElementById('login-section');
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const card = document.getElementById('embedded-login-card');
+      if (card) {
+        card.classList.add('ring-4', 'ring-amber-400', 'ring-offset-4', 'ring-offset-[#070D1B]');
+        setTimeout(() => {
+          card.classList.remove('ring-4', 'ring-amber-400', 'ring-offset-4', 'ring-offset-[#070D1B]');
+        }, 1800);
+      }
     } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setIsAuthModalOpen(true);
     }
   };
 
@@ -754,7 +761,9 @@ export const AuthModal: React.FC = () => {
   const renderAuthCard = (showClose: boolean = false) => (
     <div 
       data-nosnippet="true" 
-      className="bg-[#070D1B] rounded-3xl p-6 sm:p-8 max-w-md w-full border-2 border-[#D4AF37]/40 relative shadow-[0_0_60px_rgba(212,175,55,0.18)] animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto mx-auto"
+      className={`bg-[#070D1B] rounded-3xl p-6 sm:p-8 max-w-md w-full border-2 border-[#D4AF37]/40 relative shadow-[0_0_60px_rgba(212,175,55,0.18)] animate-in fade-in zoom-in-95 mx-auto ${
+        showClose ? 'max-h-[90vh] overflow-y-auto' : ''
+      }`}
     >
       {showClose && (
         <button
@@ -1351,7 +1360,10 @@ export const AuthModal: React.FC = () => {
         {/* TOP BRAND NAV BAR (Sticky, with Sitelink Anchors) */}
         <header className="sticky top-0 z-40 bg-[#070D1B]/95 backdrop-blur-md border-b border-[#D4AF37]/25 px-4 sm:px-6 py-3 transition shadow-md">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 cursor-pointer" onClick={scrollToLogin}>
+            <div 
+              className="flex items-center gap-3 cursor-pointer" 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            >
               <PbcLogo variant="gold" className="w-9 h-9 sm:w-10 sm:h-10" />
               <div>
                 <h1 className="text-sm sm:text-base font-black text-white tracking-wide leading-tight">
@@ -1388,7 +1400,7 @@ export const AuthModal: React.FC = () => {
               </button>
             </nav>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
               <a
                 href={`https://wa.me/${(systemSettings.adminWhatsApp || "+8801711000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Assalamu Alaikum, I need assistance with PBC Portal.")}`}
                 target="_blank"
@@ -1402,35 +1414,36 @@ export const AuthModal: React.FC = () => {
               <button
                 type="button"
                 onClick={scrollToLogin}
-                className="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-lg shadow transition active:scale-95 cursor-pointer"
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-amber-500/20 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
               >
-                মেম্বার লগইন
+                <LogIn className="w-4 h-4 text-slate-950" />
+                <span>লগইন / সাইন ইন</span>
               </button>
             </div>
           </div>
         </header>
 
-        {/* HERO LOGIN / REGISTRATION SECTION */}
-        <section id="login" className="flex-1 flex flex-col items-center justify-center pt-8 sm:pt-12 pb-6 px-4">
-          <div id="login-card" className="w-full max-w-md">
-            {renderAuthCard(false)}
-          </div>
+        {/* PUBLIC CLUB SHOWCASE (About, Board of Directors, Strategic Projects, Digital Perks, Embedded Login Card at Bottom) */}
+        <PublicClubShowcase 
+          onScrollToLogin={scrollToLogin} 
+          loginSectionSlot={renderAuthCard(false)} 
+        />
 
-          {/* Quick anchor to Public Showcase below */}
-          <div className="mt-8 text-center">
-            <button
-              type="button"
-              onClick={() => scrollToSection('about')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wide transition shadow-lg group cursor-pointer active:scale-95"
-            >
-              <span>Explore Probashi Business Club (পরিচিতি ও ভিশন)</span>
-              <ChevronDown className="w-4 h-4 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
-            </button>
+        {/* LOGIN / SIGN UP POPUP MODAL */}
+        {isAuthModalOpen && (
+          <div 
+            className="fixed inset-0 z-50 bg-[#030712]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setIsAuthModalOpen(false);
+              }
+            }}
+          >
+            <div className="relative w-full max-w-md my-auto">
+              {renderAuthCard(true)}
+            </div>
           </div>
-        </section>
-
-        {/* PUBLIC CLUB SHOWCASE (About, Board of Directors, Strategic Projects, Digital Perks, Contacts) */}
-        <PublicClubShowcase onScrollToLogin={scrollToLogin} />
+        )}
 
       </div>
     );
@@ -1441,8 +1454,17 @@ export const AuthModal: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#030712]/85 backdrop-blur-md flex items-center justify-center p-4">
-      {renderAuthCard(true)}
+    <div 
+      className="fixed inset-0 z-50 bg-[#030712]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-in fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          setIsAuthModalOpen(false);
+        }
+      }}
+    >
+      <div className="relative w-full max-w-md my-auto">
+        {renderAuthCard(true)}
+      </div>
     </div>
   );
 };

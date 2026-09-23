@@ -29,6 +29,7 @@ export interface SystemSettings {
   maintenanceMessage?: string;
   activeThemeId?: string;
   adminWhatsApp?: string;
+  allowMemberDepositSubmission?: boolean;
   allowMemberSelfEdit?: boolean;
   allowMemberPhotoUpload?: boolean;
   allowMemberCardDownload?: boolean;

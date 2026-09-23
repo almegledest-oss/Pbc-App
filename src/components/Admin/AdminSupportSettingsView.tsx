@@ -58,7 +58,8 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
     bankAccountNumber: systemSettings.bankAccountNumber || '2050XXXXXXXXXXXXX',
     bankBranchName: systemSettings.bankBranchName || 'Principal Branch, Dhaka',
     bankRoutingNumber: systemSettings.bankRoutingNumber || '125270000',
-    depositInstructions: systemSettings.depositInstructions || 'টাকা পাঠানোর পর প্রাপ্ত ট্রানজেকশন আইডি (TrxID) সংরক্ষণ করুন এবং অ্যাপের ডিপোজিট রিকোয়েস্টে সঠিক তথ্য দিন।'
+    depositInstructions: systemSettings.depositInstructions || 'টাকা পাঠানোর পর প্রাপ্ত ট্রানজেকশন আইডি (TrxID) সংরক্ষণ করুন এবং WhatsApp-এ পাঠিয়ে দিন।',
+    allowMemberDepositSubmission: systemSettings.allowMemberDepositSubmission ?? false
   });
 
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -342,6 +343,53 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
             />
           </div>
 
+        </div>
+      </div>
+
+      {/* Form Section: Deposit Management Policy & Member Self-Submission Control */}
+      <div className="bg-[#0B1528] text-white p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
+        <div className="border-b border-[#D4AF37]/20 pb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-black text-amber-300 flex items-center gap-2">
+              <Building className="w-5 h-5 text-amber-400" />
+              <span>{isBn ? 'ডিপোজিট ম্যানেজমেন্ট পলিসি (Deposit Policy & Access)' : 'Deposit Policy & Access'}</span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              {isBn 
+                ? 'মেম্বাররা নিজে ডিপোজিট ফর্ম সাবমিট করতে পারবে নাকি শুধুমাত্র অ্যাডমিন প্যানেল থেকে এন্ট্রি হবে তা নিয়ন্ত্রণ করুন' 
+                : 'Control whether members can self-submit deposits or only admins can enter deposits'}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-4 rounded-2xl bg-[#070D1B] border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-white">
+                {isBn ? 'মেম্বারদের সরাসরি ডিপোজিট ফর্ম সাবমিশন' : 'Allow Members to Self-Submit Deposit Form'}
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                formData.allowMemberDepositSubmission ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+              }`}>
+                {formData.allowMemberDepositSubmission ? (isBn ? 'চালু' : 'Active') : (isBn ? 'বন্ধ (সুপারিশকৃত)' : 'Disabled (Recommended)')}
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+              {isBn 
+                ? 'বন্ধ রাখলে (সুপারিশকৃত): মেম্বাররা জটিল ফর্ম দেখতে পাবে না; তারা টাকা পাঠিয়ে WhatsApp-এ স্লিপ পাঠাবে এবং অ্যাডমিন প্যানেল থেকে সরাসরি শতভাগ নির্ভুলভাবে এন্ট্রি দেওয়া হবে।' 
+                : 'When disabled (recommended): Members see a clean notice to send slips to WhatsApp, avoiding input errors. Only admins record deposits.'}
+            </p>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={formData.allowMemberDepositSubmission}
+              onChange={e => setFormData({ ...formData, allowMemberDepositSubmission: e.target.checked })}
+              className="sr-only peer"
+            />
+            <div className="w-12 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 border border-slate-700"></div>
+          </label>
         </div>
       </div>
 

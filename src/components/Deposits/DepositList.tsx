@@ -44,7 +44,8 @@ import {
   Layers,
   Sparkles,
   ArrowUpDown,
-  FileSpreadsheet
+  FileSpreadsheet,
+  MessageCircle
 } from 'lucide-react';
 
 const MONTH_NAMES_EN = [
@@ -797,7 +798,7 @@ export const DepositList: React.FC = () => {
             </div>
           )}
 
-          {role === 'member' && currentMember?.status === 'active' && (
+          {role === 'member' && currentMember?.status === 'active' && systemSettings?.allowMemberDepositSubmission && (
             <button
               onClick={handleAddDepositClick}
               className="flex items-center justify-center gap-1.5 px-4 py-3 min-h-[48px] bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition shrink-0 active:scale-95 cursor-pointer"
@@ -810,6 +811,69 @@ export const DepositList: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Member-Facing Official Deposit Guidance Notice (When Self-Submission is Managed by Admin) */}
+      {role === 'member' && !systemSettings?.allowMemberDepositSubmission && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-[#0B1528] via-[#070D1B] to-[#112244] border-2 border-amber-500/40 shadow-2xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-500/20 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                <ShieldAlert className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-amber-300">
+                  {language === 'bn' ? 'অফিসিয়াল ডিপোজিট নির্দেশনা (অ্যাডমিন পরিচালিত)' : 'Official Deposit System (Admin Managed)'}
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {language === 'bn' 
+                    ? 'হিসাবের শতভাগ নির্ভুলতা নিশ্চিত করতে ডিপোজিট সরাসরি অ্যাডমিন ভেরিফিকেশনের মাধ্যমে এন্ট্রি হয়' 
+                    : 'Deposits are directly recorded by Authorized Admins upon slip verification to avoid calculation errors'}
+                </p>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 self-start sm:self-center shrink-0">
+              {language === 'bn' ? '● শতভাগ নিরাপদ ও দ্রুত' : '● 100% Safe & Verified'}
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-200 leading-relaxed bg-[#030712]/70 p-4 rounded-2xl border border-slate-700/60">
+            {language === 'bn' 
+              ? 'সম্মানিত সদস্য, ক্লাবের অফিসিয়াল ব্যাংক একাউন্ট অথবা বিকাশ/নগদে আপনার কিস্তি বা শেয়ারের টাকা পাঠানোর পর প্রাপ্ত জমার স্লিপ বা TrxID-এর স্ক্রিনশট আমাদের অফিসিয়াল WhatsApp-এ পাঠিয়ে দিন। অ্যাডমিন যাচাই করে আপনার অ্যাকাউন্টে ডিজিটাল সিল ও সিগনেচারযুক্ত অফিসিয়াল মানি রিসিট যুক্ত করে দেবে।' 
+              : 'Dear Member, after transferring your share contribution to the club bank or bKash/Nagad accounts, please send the payment slip/screenshot to our official WhatsApp. The admin will verify and attach the official sealed money receipt directly to your ledger.'}
+          </p>
+
+          <div className="flex items-center gap-3 flex-wrap pt-1">
+            {(() => {
+              const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
+              const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
+              const defaultMsg = encodeURIComponent(
+                `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
+              );
+              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
+              return (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-5 py-3 min-h-[46px] rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition cursor-pointer active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>{language === 'bn' ? 'WhatsApp-এ জমার স্লিপ পাঠান' : 'Send Payment Slip via WhatsApp'}</span>
+                </a>
+              );
+            })()}
+
+            <button
+              type="button"
+              onClick={() => navigateWithHistory('deposit_accounts')}
+              className="flex items-center gap-2 px-4 py-3 min-h-[46px] rounded-xl bg-[#070D1B] hover:bg-[#112244] text-amber-300 hover:text-white font-bold text-xs border border-[#D4AF37]/40 transition cursor-pointer active:scale-95"
+            >
+              <Landmark className="w-4 h-4 text-amber-400" />
+              <span>{language === 'bn' ? 'বিকাশ ও ব্যাংক একাউন্ট নম্বর দেখুন' : 'View bKash & Bank Accounts'}</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Summary Banner Card */}
       <div className="bg-[#0B1528] p-5 rounded-3xl border border-[#D4AF37]/40 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

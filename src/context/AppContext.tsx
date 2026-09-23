@@ -358,9 +358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return safeStorage.getItem('pbc_logged_in') === 'true';
   });
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(() => {
-    return safeStorage.getItem('pbc_logged_in') !== 'true';
-  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const openMoreMenu = () => setIsMoreMenuOpen(true);

@@ -20,17 +20,26 @@ import {
   Layers,
   Lock,
   PhoneCall,
-  Quote
+  Quote,
+  LogIn
 } from 'lucide-react';
 import { PbcLogo } from '../Common/PbcLogo';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
 
 interface PublicClubShowcaseProps {
   onScrollToLogin: () => void;
+  loginSectionSlot?: React.ReactNode;
 }
 
-export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScrollToLogin }) => {
+export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScrollToLogin, loginSectionSlot }) => {
   const { boardDirectors, systemSettings } = useApp();
+
+  const scrollToAbout = () => {
+    const el = document.getElementById('about');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Check director list or fallback to safeStorage if freshly edited
   const leader = (boardDirectors && boardDirectors.length > 0)
@@ -61,8 +70,87 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
   const leaderMobile = leader?.mobile || '+8801711008874';
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-12 pb-24 text-slate-200">
+    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-24 text-slate-200">
       
+      {/* HERO SPOTLIGHT BANNER */}
+      <section className="mb-14 text-center relative">
+        <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 mb-4 shadow-[0_0_30px_rgba(212,175,55,0.15)]">
+          <PbcLogo variant="gold" className="w-20 h-20 sm:w-24 sm:h-24 mx-auto" />
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-[#E5A93C] text-xs sm:text-sm font-black tracking-[0.3em] uppercase mb-3">
+          <span className="text-[11px]">❖</span>
+          <span>TOGETHER WE RISE</span>
+          <span className="text-[11px]">❖</span>
+        </div>
+
+        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight max-w-3xl mx-auto">
+          প্রবাসী বিজনেস ক্লাব
+          <span className="block text-xl sm:text-2xl font-bold text-amber-400 mt-2 tracking-wide">
+            PROBASHI BUSINESS CLUB (PBC)
+          </span>
+        </h1>
+
+        <p className="mt-4 text-sm sm:text-base text-slate-300 max-w-2xl mx-auto leading-relaxed">
+          বিশ্বজুড়ে ছড়িয়ে থাকা প্রবাসী বাংলাদেশি ব্যবসায়ী, উদ্যোক্তা ও মেম্বারদের একটি সুদৃঢ় প্রাতিষ্ঠানিক প্ল্যাটফর্ম। যৌথ পুঁজির নিরাপদ বিনিয়োগ ও পারস্পরিক সহযোগিতার বিশ্বস্ত ঠিকানা।
+        </p>
+
+        {/* Primary Call to Action Buttons */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={onScrollToLogin}
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.3)] transition transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex items-center gap-2"
+          >
+            <LogIn className="w-5 h-5 text-slate-950" />
+            <span>লগইন / সাইন ইন (নিচে যান)</span>
+            <ChevronDown className="w-4 h-4 text-slate-950 animate-bounce" />
+          </button>
+
+          <button
+            type="button"
+            onClick={scrollToAbout}
+            className="px-6 py-3.5 bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/30 text-amber-300 hover:text-white text-sm font-bold rounded-xl transition cursor-pointer flex items-center gap-2 active:scale-95 shadow-md"
+          >
+            <span>পরিচিতি ও ভিশন</span>
+            <ChevronDown className="w-4 h-4 text-amber-400" />
+          </button>
+        </div>
+
+        {/* 3 Value Pillars Mini Bar */}
+        <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto text-left">
+          <div className="bg-[#070D1B]/80 border border-amber-500/20 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">১০০% স্বচ্ছ তহবিল</div>
+              <div className="text-[11px] text-slate-400">নিরাপদ হিসাব ও রিয়েল-টাইম ট্র্যাকিং</div>
+            </div>
+          </div>
+
+          <div className="bg-[#070D1B]/80 border border-amber-500/20 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">রিয়েল এস্টেট প্রজেক্ট</div>
+              <div className="text-[11px] text-slate-400">লাভজনক দীর্ঘমেয়াদী বিনিয়োগ</div>
+            </div>
+          </div>
+
+          <div className="bg-[#070D1B]/80 border border-amber-500/20 rounded-xl p-3.5 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-bold text-white">ডিজিটাল স্মার্ট কার্ড</div>
+              <div className="text-[11px] text-slate-400">মেম্বারদের অফিসিয়াল ভেরিফিকেশন</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* SECTION 1: ABOUT & VISION */}
       <section id="about" className="scroll-mt-24 mb-16">
         <div className="text-center max-w-3xl mx-auto mb-10">
@@ -343,6 +431,27 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
         </div>
       </section>
 
+      {/* SECTION: LOGIN & REGISTRATION AT THE BOTTOM */}
+      {loginSectionSlot && (
+        <section id="login-section" className="scroll-mt-24 mb-16">
+          <div className="text-center mb-6 max-w-md mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold mb-2">
+              <LogIn className="w-3.5 h-3.5" />
+              <span>মেম্বার ও এডমিন পোর্টাল</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-white">
+              মেম্বার সাইন ইন ও এক্সেস
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              আপনার মেম্বার আইডি বা ইমেইল দিয়ে লগইন করুন অথবা নতুন সদস্য হিসেবে আবেদন করুন
+            </p>
+          </div>
+          <div id="embedded-login-card" className="w-full max-w-md mx-auto transition-all duration-500 rounded-3xl">
+            {loginSectionSlot}
+          </div>
+        </section>
+      )}
+
       {/* SECTION 5: CONTACT & ACTION FOOTER */}
       <section className="bg-gradient-to-b from-[#0A1226] to-[#040813] border border-amber-500/40 rounded-3xl p-6 sm:p-10 text-center shadow-2xl">
         <PbcLogo variant="gold" className="w-16 h-16 mx-auto mb-3" />
@@ -357,10 +466,10 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
           <button
             type="button"
             onClick={onScrollToLogin}
-            className="px-6 py-3 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
           >
-            <ArrowUp className="w-4 h-4" />
-            <span>লগইন পেজে যান (Go to Sign In)</span>
+            <LogIn className="w-4 h-4" />
+            <span>লগইন ফর্মে যান (Member Sign In)</span>
           </button>
 
           <a
@@ -385,6 +494,18 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
           </div>
         </div>
       </section>
+
+      {/* MOBILE FLOATING QUICK ACTION PILL */}
+      <div className="fixed bottom-4 right-4 z-40 sm:hidden">
+        <button
+          type="button"
+          onClick={onScrollToLogin}
+          className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-slate-950 font-black text-xs rounded-full shadow-[0_4px_25px_rgba(212,175,55,0.45)] border border-amber-300/40 active:scale-95 transition flex items-center gap-1.5"
+        >
+          <LogIn className="w-3.5 h-3.5 text-slate-950" />
+          <span>লগইন করুন ⌄</span>
+        </button>
+      </div>
 
     </div>
   );

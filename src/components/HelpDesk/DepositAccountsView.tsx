@@ -10,11 +10,12 @@ import {
   Wallet, 
   ArrowRight,
   Info,
-  Sparkles
+  Sparkles,
+  MessageCircle
 } from 'lucide-react';
 
 export const DepositAccountsView: React.FC = () => {
-  const { systemSettings, language, navigateWithHistory } = useApp();
+  const { systemSettings, language, navigateWithHistory, currentMember } = useApp();
   const { currentTheme } = useTheme();
   const isBn = language === 'bn';
 
@@ -24,7 +25,7 @@ export const DepositAccountsView: React.FC = () => {
     navigator.clipboard.writeText(text);
     setCopiedField(fieldId);
     setTimeout(() => {
-      setCopiedField(null), 2000;
+      setCopiedField(null);
     }, 2000);
   };
 
@@ -64,20 +65,39 @@ export const DepositAccountsView: React.FC = () => {
 
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
               {isBn 
-                ? 'টাকা জমা দেওয়ার অফিশিয়াল বিকাশ, নগদ, রকেট এবং ব্যাংক অ্যাকাউন্ট নম্বর। নম্বর কপি করে সরাসরি টাকা পাঠিয়ে ডিপোজিট ভাউচার সাবমিট করুন।'
-                : 'Official bKash, Nagad, Rocket and Bank account details for depositing club shares and monthly contributions.'}
+                ? 'টাকা জমা দেওয়ার অফিশিয়াল বিকাশ, নগদ, রকেট এবং ব্যাংক অ্যাকাউন্ট নম্বর। নম্বর কপি করে সরাসরি টাকা পাঠিয়ে স্লিপটি আমাদের অফিশিয়াল WhatsApp-এ পাঠিয়ে দিন। অ্যাডমিন ভেরিফাই করে সরাসরি আপনার অ্যাকাউন্টে পাকা রসিদ যুক্ত করে দেবে।'
+                : 'Official bKash, Nagad, Rocket and Bank account details for depositing club shares. After sending funds, send the slip to our WhatsApp for direct receipt verification.'}
             </p>
           </div>
 
-          {/* Submit Deposit Request Button */}
-          <div className="shrink-0">
+          {/* Action Buttons */}
+          <div className="shrink-0 flex items-center gap-3 flex-wrap">
+            {(() => {
+              const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
+              const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
+              const defaultMsg = encodeURIComponent(
+                `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
+              );
+              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
+              return (
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-emerald-950/40 border border-emerald-400/40 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4 fill-current" />
+                  <span>{isBn ? 'WhatsApp-এ স্লিপ পাঠান' : 'Send Slip via WhatsApp'}</span>
+                </a>
+              );
+            })()}
+
             <button
               onClick={() => navigateWithHistory('deposits')}
-              className="w-full sm:w-auto px-5 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-amber-950/40 border border-amber-300 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              className="px-4 py-3.5 bg-[#070D1B] hover:bg-[#112244] text-amber-300 hover:text-white font-bold text-xs sm:text-sm rounded-2xl border border-amber-500/40 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               <Wallet className="w-4 h-4" />
-              <span>{isBn ? 'ডিপোজিট রিকোয়েস্ট করুন' : 'Submit Deposit Request'}</span>
-              <ArrowRight className="w-4 h-4" />
+              <span>{isBn ? 'ডিপোজিট হিস্টোরি' : 'Deposit Ledger'}</span>
             </button>
           </div>
         </div>
