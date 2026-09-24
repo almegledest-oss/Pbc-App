@@ -119,10 +119,12 @@ export const MemberList: React.FC = () => {
       d => (d.memberId === member.id || (member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())) && 
       isApproved(d.status)
     );
-    const total = memberDeps.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    const voucherSum = memberDeps.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    const total = Math.max(voucherSum, Number(member.totalDeposit) || 0);
+    const unallocated = Math.max(0, total - voucherSum);
     const fundRaising = memberDeps
       .filter(d => d.category === 'Fund Raising' || !d.category)
-      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+      .reduce((sum, d) => sum + (Number(d.amount) || 0), 0) + unallocated;
     const realEstate = memberDeps
       .filter(d => d.category === 'Real Estate')
       .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);

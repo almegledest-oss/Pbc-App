@@ -88,10 +88,13 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
   const approvedDeposits = memberDeposits.filter(d => isApproved(d.status));
   const pendingDeposits = memberDeposits.filter(d => d.status?.toLowerCase().trim() === 'pending');
 
-  const totalDepositAmount = approvedDeposits.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalVoucherSum = approvedDeposits.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+  const totalDepositAmount = Math.max(totalVoucherSum, Number(member.totalDeposit) || 0);
+  const unvoucheredBalance = Math.max(0, totalDepositAmount - totalVoucherSum);
+
   const fundRaisingAmount = approvedDeposits
     .filter(d => d.category === 'Fund Raising' || !d.category)
-    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+    .reduce((sum, d) => sum + (Number(d.amount) || 0), 0) + unvoucheredBalance;
   const realEstateAmount = approvedDeposits
     .filter(d => d.category === 'Real Estate')
     .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
@@ -270,7 +273,9 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
             ৳{totalDepositAmount.toLocaleString()} <span className="text-xs font-normal text-slate-400">BDT</span>
           </h3>
           <p className="text-[11px] text-slate-400 mt-1">
-            {isBn ? `${approvedDeposits.length} টি অনুমোদিত ট্রানজ্যাকশন` : `${approvedDeposits.length} approved transactions`}
+            {isBn 
+              ? `${approvedDeposits.length} টি অনুমোদিত ট্রানজ্যাকশন${unvoucheredBalance > 0 ? ` (+৳${unvoucheredBalance.toLocaleString()} প্রোফাইল ব্যালেন্স)` : ''}`
+              : `${approvedDeposits.length} approved transaction(s)${unvoucheredBalance > 0 ? ` (+৳${unvoucheredBalance.toLocaleString()} profile balance)` : ''}`}
           </p>
         </div>
 

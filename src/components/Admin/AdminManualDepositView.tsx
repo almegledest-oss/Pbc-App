@@ -60,6 +60,7 @@ interface AdminManualDepositViewProps {
 export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ onBack }) => {
   const { 
     members, 
+    deposits,
     addDeposit, 
     language, 
     role, 
@@ -476,7 +477,12 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                     {isBn ? 'পূর্বের মোট জমা' : 'Total Deposit'}
                   </span>
                   <span className="text-xs font-black text-emerald-400 font-mono">
-                    ৳{(selectedMember.totalDeposit || 0).toLocaleString('en-BD')}
+                    ৳{Math.max(
+                      deposits
+                        .filter(d => (d.memberId === selectedMember.id || (selectedMember.fullName && d.memberName && d.memberName.toLowerCase().trim() === selectedMember.fullName.toLowerCase().trim())) && d.status?.toLowerCase().trim() === 'approved')
+                        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
+                      Number(selectedMember.totalDeposit) || 0
+                    ).toLocaleString('en-BD')}
                   </span>
                 </div>
               </div>
