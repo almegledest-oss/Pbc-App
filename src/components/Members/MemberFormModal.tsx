@@ -556,7 +556,9 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm">Join Date</label>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm">
+                  {language === 'bn' ? 'যোগদানের তারিখ' : 'Join Date'}
+                </label>
                 <input
                   type="date"
                   value={formData.joinDate}
@@ -582,7 +584,29 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                   <option value={10}>১০টি শেয়ার (৳৫০,০০০/মাস)</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm flex items-center justify-between">
+                  <span>{language === 'bn' ? 'মোট ডিপোজিট (৳)' : 'Total Deposit (৳)'}</span>
+                  <span className="text-[10px] text-emerald-400 font-bold">{language === 'bn' ? 'প্রোফাইল' : 'Profile'}</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="500"
+                  value={formData.totalDeposit}
+                  onChange={e => setFormData({ ...formData, totalDeposit: Number(e.target.value) || 0 })}
+                  className="w-full px-3 py-2.5 bg-[#070D1B] border border-[#D4AF37]/40 rounded-xl text-emerald-400 font-mono font-bold focus:outline-none focus:border-amber-400 text-sm"
+                />
+              </div>
             </div>
+            {formData.totalDeposit === 0 && isEditMode && (
+              <p className="text-[11px] text-amber-400/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20 mt-2">
+                {language === 'bn' 
+                  ? '💡 পরামর্শ: প্রোফাইল ডিপোজিট ০ করা হলেও যদি এই মেম্বারের জমা তালিকায় (Deposits) পূর্বের অনুমোদিত ভাউচার থাকে, অ্যাপ ভাউচার হিসেব করবে। ভাউচার সহ সমস্ত ডিপোজিট ০ করতে চাইলে মেম্বার ডিটেইলস পেইজের "ডিপোজিট অডিট ও রিসেট" ব্যবহার করুন অথবা জমা তালিকা থেকে ভাউচার ডিলিট করুন।'
+                  : '💡 Note: If approved vouchers exist in the Deposits list, the app will continue to count them. To zero out completely, also delete or reset vouchers from Member Details ("Audit & Reset Deposit") or the Deposits ledger.'}
+              </p>
+            )}
           </div>
 
           {/* Section 3: Personal Verification & ID Cards */}

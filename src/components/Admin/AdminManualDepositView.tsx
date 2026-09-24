@@ -476,14 +476,33 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                   <span className="text-[10px] text-slate-400 block font-bold uppercase tracking-wider">
                     {isBn ? 'পূর্বের মোট জমা' : 'Total Deposit'}
                   </span>
-                  <span className="text-xs font-black text-emerald-400 font-mono">
-                    ৳{Math.max(
-                      deposits
-                        .filter(d => (d.memberId === selectedMember.id || (selectedMember.fullName && d.memberName && d.memberName.toLowerCase().trim() === selectedMember.fullName.toLowerCase().trim())) && d.status?.toLowerCase().trim() === 'approved')
-                        .reduce((sum, d) => sum + (Number(d.amount) || 0), 0),
-                      Number(selectedMember.totalDeposit) || 0
-                    ).toLocaleString('en-BD')}
-                  </span>
+                  {(() => {
+                    const approvedVouchers = deposits.filter(
+                      d => (d.memberId === selectedMember.id || (selectedMember.fullName && d.memberName && d.memberName.toLowerCase().trim() === selectedMember.fullName.toLowerCase().trim())) && 
+                      d.status?.toLowerCase().trim() === 'approved'
+                    );
+                    const voucherSum = approvedVouchers.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+                    const profileDeposit = Number(selectedMember.totalDeposit) || 0;
+                    const calculatedTotal = Math.max(voucherSum, profileDeposit);
+
+                    return (
+                      <div>
+                        <span className="text-xs font-black text-emerald-400 font-mono">
+                          ৳{calculatedTotal.toLocaleString('en-BD')}
+                        </span>
+                        {voucherSum > 0 && (
+                          <span className="text-[9px] text-amber-400/90 block font-normal leading-tight">
+                            {isBn ? `(${approvedVouchers.length}টি অনুমোদিত ভাউচার)` : `(${approvedVouchers.length} approved voucher${approvedVouchers.length > 1 ? 's' : ''})`}
+                          </span>
+                        )}
+                        {voucherSum === 0 && profileDeposit > 0 && (
+                          <span className="text-[9px] text-slate-400 block font-normal leading-tight">
+                            {isBn ? '(প্রোফাইল ব্যালেন্স)' : '(Profile balance)'}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

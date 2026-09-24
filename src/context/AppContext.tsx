@@ -69,6 +69,8 @@ import {
   saveCardTemplateDoc,
   getUserRoleAndStatus,
   getIsGlobalQuotaExceeded,
+  getCachedItem,
+  setCachedItem,
   ReportItem,
   UserProfile,
   auth,
@@ -219,6 +221,7 @@ interface AppContextType {
   setIsTrashBoxOpen: (open: boolean) => void;
   deleteMemberWithReason: (id: string, reason: string) => Promise<void>;
   deleteDepositWithReason: (id: string, reason: string) => Promise<void>;
+  resetMemberDeposits: (memberId: string, reason?: string) => Promise<void>;
   deleteProjectWithReason: (id: string, reason: string) => Promise<void>;
   deleteReportWithReason: (id: string, reason: string) => Promise<void>;
   deleteDirectorWithReason: (id: string, reason: string) => Promise<void>;
@@ -1433,14 +1436,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteDepositWithReason = async (id: string, reason: string) => {
-    if (role !== 'super_admin' && role !== 'admin') {
-      alert('Security Restriction: Members cannot delete deposit records.');
+    const isPrivileged = 
+      role === 'super_admin' || 
+      role === 'admin' || 
+      accountRole === 'super_admin' || 
+      accountRole === 'admin' || 
+      isSuperAdminUser ||
+      currentMember?.role === 'super_admin' || 
+      currentMember?.role === 'admin' ||
+      authUser?.email === 'fokrulislammir9897@gmail.com' || 
+      authUser?.email === 'almegledest@gmail.com';
+
+    if (!isPrivileged) {
+      console.warn('Security Restriction: Members cannot delete deposit records.');
       return;
     }
     const target = deposits.find(d => d.id === id);
     if (target) {
       // 1. Instant optimistic local state update for 0ms latency UI response
       setDeposits(prev => prev.filter(d => d.id !== id));
+
+      // Instant cache synchronization
+      try {
+        const cachedDeps = getCachedItem<Deposit[]>('pbc_cached_deposits', []);
+        if (cachedDeps && cachedDeps.length > 0) {
+          setCachedItem('pbc_cached_deposits', cachedDeps.filter(d => d.id !== id));
+        }
+      } catch (err) {
+        console.warn('Failed to update cache on delete deposit:', err);
+      }
 
       // 2. If the deleted deposit was Approved, adjust member total deposit immediately
       if (target.status === 'Approved' || target.status?.toLowerCase() === 'approved') {
@@ -1478,6 +1502,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         console.warn('Error during deleteDeposit async sync:', e);
       }
     }
+  };
+
+  const resetMemberDeposits = async (memberId: string, reason: string = 'Reset member deposits to ৳0') => {
+    const isStrictSuperAdmin = 
+      role === 'super_admin' || 
+      accountRole === 'super_admin' || 
+      isSuperAdminUser ||
+      currentMember?.role === 'super_admin' || 
+      authUser?.email === 'fokrulislammir9897@gmail.com' || 
+      authUser?.email === 'almegledest@gmail.com';
+
+    if (!isStrictSuperAdmin) {
+      console.warn('Security Restriction: Only Super Admin can reset deposits.');
+      return;
+    }
+
+    const targetMember = members.find(m => m.id === memberId);
+    const memberNameTrimmed = targetMember?.fullName?.toLowerCase().trim() || '';
+
+    // Find all matching deposits
+    const matchingDeposits = deposits.filter(d => 
+      d.memberId === memberId || 
+      (memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+    );
+
+    // 1. Optimistic instant state clear
+    setDeposits(prev => prev.filter(d => 
+      d.memberId !== memberId && 
+      !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+    ));
+
+    setMembers(prev => prev.map(m => m.id === memberId ? {
+      ...m,
+      totalDeposit: 0,
+      totalFundRaisingDeposit: 0,
+      totalRealEstateDeposit: 0
+    } : m));
+
+    // 2. Instant cache wipe for these records
+    try {
+      const cachedDeps = getCachedItem<Deposit[]>('pbc_cached_deposits', []);
+      if (cachedDeps && cachedDeps.length > 0) {
+        setCachedItem('pbc_cached_deposits', cachedDeps.filter(d => 
+          d.memberId !== memberId && 
+          !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+        ));
+      }
+      const cachedMems = getCachedItem<Member[]>('pbc_cached_members', []);
+      if (cachedMems && cachedMems.length > 0) {
+        setCachedItem('pbc_cached_members', cachedMems.map(m => m.id === memberId ? {
+          ...m,
+          totalDeposit: 0,
+          totalFundRaisingDeposit: 0,
+          totalRealEstateDeposit: 0
+        } : m));
+      }
+    } catch (e) {
+      console.warn('Cache clear error:', e);
+    }
+
+    // 3. Update Member document in Firestore
+    try {
+      await updateMemberDoc(memberId, {
+        totalDeposit: 0,
+        totalFundRaisingDeposit: 0,
+        totalRealEstateDeposit: 0
+      });
+    } catch (e) {
+      console.warn('Firestore updateMemberDoc error:', e);
+    }
+
+    // 4. Delete deposit docs in Firestore & record in trash box
+    const delPromises = matchingDeposits.map(async (dep) => {
+      try {
+        await Promise.allSettled([
+          addTrashedItemDoc({
+            itemType: 'Deposit',
+            title: `Deposit ${dep.id} - ৳${(dep.amount || 0).toLocaleString()} (${dep.memberName || 'Member'})`,
+            originalId: dep.id,
+            originalCollection: 'deposits',
+            itemData: {
+              ...dep,
+              receiptUrl: dep.receiptUrl && dep.receiptUrl.length > 50000 ? '' : dep.receiptUrl
+            },
+            deletedByEmail: authUser?.email || currentMember?.email || 'admin@pbcclub.org',
+            deletedByName: currentMember?.fullName || authUser?.displayName || 'Admin',
+            deletedByRole: role === 'super_admin' ? 'Super Admin' : 'Admin',
+            reason: reason,
+            deletedAt: new Date().toISOString()
+          }),
+          deleteDepositDoc(dep.id)
+        ]);
+      } catch (err) {
+        console.warn('Error deleting deposit doc:', dep.id, err);
+      }
+    });
+
+    await Promise.allSettled(delPromises);
+
+    await addActivityLog(
+      'Member Deposits Reset', 
+      `All deposits (${matchingDeposits.length} vouchers) reset to ৳0 for ${targetMember?.fullName || memberId}. Reason: ${reason}`
+    );
+    addNotification('Deposits Reset', `Deposits reset to ৳0 for ${targetMember?.fullName || memberId}`, 'deposit');
   };
 
   const deleteDeposit = async (id: string) => {
@@ -2002,6 +2130,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsTrashBoxOpen,
         deleteMemberWithReason,
         deleteDepositWithReason,
+        resetMemberDeposits,
         deleteProjectWithReason,
         deleteReportWithReason,
         deleteDirectorWithReason,

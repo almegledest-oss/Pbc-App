@@ -1214,6 +1214,10 @@ export async function updateDepositDoc(id: string, data: Partial<Deposit>) {
 
 export async function deleteDepositDoc(id: string) {
   try {
+    const cached = getCachedItem<Deposit[]>('pbc_cached_deposits', []);
+    if (cached && cached.length > 0) {
+      setCachedItem('pbc_cached_deposits', cached.filter(d => d.id !== id));
+    }
     await deleteDoc(doc(db, 'deposits', id));
   } catch (err) {
     notifyQuotaExceeded(err);

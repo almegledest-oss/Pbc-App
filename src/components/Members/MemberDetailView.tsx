@@ -30,8 +30,13 @@ import {
   Check, 
   UserCheck, 
   Receipt, 
-  Layers
+  Layers,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  X
 } from 'lucide-react';
+import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 
 interface MemberDetailViewProps {
   memberId: string;
@@ -49,15 +54,34 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
     navigateWithHistory, 
     updateMember, 
     approveMember, 
-    rejectMember 
+    rejectMember,
+    deleteDeposit,
+    deleteDepositWithReason,
+    resetMemberDeposits,
+    accountRole,
+    authUser,
+    currentMember
   } = useApp();
 
   const isBn = language === 'bn';
   const member = members.find(m => m.id === memberId);
 
+  // Strict Super Admin Verification
+  const isSuperAdminOnly = 
+    role === 'super_admin' || 
+    accountRole === 'super_admin' || 
+    currentMember?.role === 'super_admin' ||
+    authUser?.email === 'almegledest@gmail.com' ||
+    authUser?.email === 'fokrulislammir9897@gmail.com';
+
   // Sub-modal states
   const [isCardModalOpen, setIsCardModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetFeedback, setResetFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<Deposit | null>(null);
 
   if (!member) {
@@ -121,6 +145,59 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
     const cleanPhone = member.phone.replace(/[^0-9+]/g, '');
     const url = `https://wa.me/${cleanPhone.replace('+', '')}`;
     window.open(url, '_blank');
+  };
+
+  const handleExecuteReset = async () => {
+    setIsResetting(true);
+    setResetFeedback(null);
+    try {
+      await resetMemberDeposits(member.id, 'Reset member deposits to ৳0 by admin');
+      setResetFeedback({
+        type: 'success',
+        message: isBn 
+          ? '✓ সফলভাবে সমস্ত ভাউচার মুছে ফেলা হয়েছে এবং মোট জমা ৳০ করা হয়েছে!' 
+          : '✓ All vouchers permanently removed and total deposit reset to ৳0!'
+      });
+      setShowResetConfirm(false);
+      setTimeout(() => {
+        setIsAuditModalOpen(false);
+        setResetFeedback(null);
+      }, 1600);
+    } catch (err: any) {
+      setResetFeedback({
+        type: 'error',
+        message: (isBn ? 'ডিলিট করতে সমস্যা হয়েছে: ' : 'Error during reset: ') + (err?.message || 'Failed')
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleSyncWithVouchers = async () => {
+    setIsResetting(true);
+    setResetFeedback(null);
+    try {
+      await updateMember(member.id, {
+        totalDeposit: totalVoucherSum
+      });
+      setResetFeedback({
+        type: 'success',
+        message: isBn 
+          ? `✓ সফলভাবে ভাউচারের সাথে মোট জমা (৳${totalVoucherSum.toLocaleString()}) সিঙ্ক করা হয়েছে!` 
+          : `✓ Synced total deposit with vouchers (৳${totalVoucherSum.toLocaleString()}) successfully!`
+      });
+      setTimeout(() => {
+        setIsAuditModalOpen(false);
+        setResetFeedback(null);
+      }, 1600);
+    } catch (err: any) {
+      setResetFeedback({
+        type: 'error',
+        message: (isBn ? 'সিঙ্ক করতে ব্যর্থ হয়েছে: ' : 'Error syncing: ') + (err?.message || 'Failed')
+      });
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -277,6 +354,17 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
               ? `${approvedDeposits.length} টি অনুমোদিত ট্রানজ্যাকশন${unvoucheredBalance > 0 ? ` (+৳${unvoucheredBalance.toLocaleString()} প্রোফাইল ব্যালেন্স)` : ''}`
               : `${approvedDeposits.length} approved transaction(s)${unvoucheredBalance > 0 ? ` (+৳${unvoucheredBalance.toLocaleString()} profile balance)` : ''}`}
           </p>
+
+          {isSuperAdminOnly && (
+            <button
+              type="button"
+              onClick={() => setIsAuditModalOpen(true)}
+              className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition cursor-pointer"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+              <span>{isBn ? 'ডিপোজিট অডিট ও রিসেট (সুপার অ্যাডমিন)' : 'Audit & Reset Deposit (Super Admin)'}</span>
+            </button>
+          )}
         </div>
 
         <div className="bg-[#0B1528] p-5 rounded-2xl border border-[#D4AF37]/30 shadow-lg">
@@ -443,16 +531,31 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenVoucher(dep);
-                        }}
-                        className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-lg text-[11px] font-bold transition cursor-pointer"
-                      >
-                        {isBn ? 'ভাউচার দেখুন' : 'View Voucher'}
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenVoucher(dep);
+                          }}
+                          className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                        >
+                          {isBn ? 'ভাউচার দেখুন' : 'View Voucher'}
+                        </button>
+                        {(role === 'admin' || role === 'super_admin') && (
+                          <button
+                            type="button"
+                            title={isBn ? 'ভাউচার ডিলিট করুন' : 'Delete voucher'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDepositToDelete(dep);
+                            }}
+                            className="p-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white rounded-lg transition cursor-pointer border border-rose-500/20"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -532,6 +635,167 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
           isOpen={!!selectedVoucher}
           onClose={() => setSelectedVoucher(null)}
         />
+      )}
+
+      {/* Individual Deposit Delete Confirm Modal */}
+      {depositToDelete && (
+        <DeleteConfirmModal
+          isOpen={!!depositToDelete}
+          title={isBn ? 'ডিপোজিট ভাউচার ডিলিট (Delete Voucher)' : 'Delete Deposit Voucher'}
+          itemName={`Voucher ${depositToDelete.id} - ৳${(depositToDelete.amount || 0).toLocaleString()} (${depositToDelete.memberName})`}
+          language={language}
+          onClose={() => setDepositToDelete(null)}
+          onConfirm={async (reason) => {
+            await deleteDepositWithReason(depositToDelete.id, reason);
+            setDepositToDelete(null);
+          }}
+        />
+      )}
+
+      {/* Admin Deposit Audit & Reset Modal */}
+      {isAuditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#0B1528] border-2 border-amber-500/50 rounded-3xl max-w-lg w-full p-6 text-white shadow-2xl relative space-y-5">
+            <button
+              type="button"
+              onClick={() => {
+                setIsAuditModalOpen(false);
+                setShowResetConfirm(false);
+                setResetFeedback(null);
+              }}
+              className="absolute top-5 right-5 text-slate-400 hover:text-white p-1 rounded-xl hover:bg-slate-800 transition cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-amber-500/20 pb-4">
+              <div className="p-3 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/30">
+                <Layers className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">
+                  {isBn ? 'ডিপোজিট অডিট ও রিসেট কন্ট্রোল' : 'Deposit Audit & Reset Control'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {member.fullName} ({member.id})
+                </p>
+              </div>
+            </div>
+
+            {/* Status Feedback Banner */}
+            {resetFeedback && (
+              <div className={`p-3.5 rounded-xl border text-xs font-bold flex items-center gap-2.5 animate-fadeIn ${
+                resetFeedback.type === 'success' 
+                  ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' 
+                  : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+              }`}>
+                {resetFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0" />
+                )}
+                <span>{resetFeedback.message}</span>
+              </div>
+            )}
+
+            {/* Breakdown Information Box */}
+            <div className="bg-[#070D1B] rounded-2xl p-4 border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? 'মেম্বার প্রোফাইল মোট জমা (members কালেকশন):' : 'Member Profile Total (members collection):'}</span>
+                <span className="font-mono font-bold text-amber-300">৳{Number(member.totalDeposit || 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs pb-2 border-b border-slate-800">
+                <span className="text-slate-400">{isBn ? `অনুমোদিত ভাউচার মোট (${approvedDeposits.length}টি ভাউচার):` : `Approved Vouchers Sum (${approvedDeposits.length} vouchers):`}</span>
+                <span className="font-mono font-bold text-emerald-400">৳{totalVoucherSum.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs pt-1">
+                <span className="text-slate-200 font-bold">{isBn ? 'অ্যাপে প্রদর্শিত বর্তমান মোট জমা:' : 'Current Calculated Total in App:'}</span>
+                <span className="font-mono font-black text-amber-400 text-sm">৳{totalDepositAmount.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300/90 leading-relaxed">
+              <p>
+                {isBn 
+                  ? '💡 ব্যাখ্যা: ফায়ারবেসে মেম্বারের প্রোফাইল ব্যালেন্স এবং জমা তালিকার ভাউচার দুটি ভিন্ন জায়গায় থাকে। নিচের বাটন দিয়ে আপনি সমস্ত ভাউচার নিশ্চিতভাবে মুছে ফেলতে পারেন এবং মেম্বার ব্যালেন্স স্থায়ীভাবে ৳০ করতে পারেন।'
+                  : '💡 Note: Deposits exist in both member documents and deposit vouchers. The red action below will permanently delete all vouchers from Firebase and reset deposit balance to ৳0.'}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-3 pt-2">
+              {showResetConfirm ? (
+                <div className="p-4 rounded-2xl bg-rose-950/70 border-2 border-rose-500/80 space-y-3 animate-fadeIn">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-xs font-black text-rose-200 uppercase tracking-wider">
+                        {isBn ? 'চূড়ান্ত নিশ্চয়তা প্রয়োজন (Confirm Permanent Reset)' : 'Confirm Permanent Reset'}
+                      </h4>
+                      <p className="text-xs text-rose-300 mt-1 leading-relaxed">
+                        {isBn 
+                          ? `${member.fullName} (${member.id})-এর সমস্ত ভাউচার (${memberDeposits.length}টি) ফায়ারবেস থেকে স্থায়ীভাবে মুছে ফেলা হবে এবং মোট জমা ৳০ হয়ে যাবে।`
+                          : `All ${memberDeposits.length} voucher(s) for ${member.fullName} (${member.id}) will be deleted from Firebase and total deposit will become ৳0.`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={isResetting}
+                      onClick={handleExecuteReset}
+                      className="flex-1 py-3 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                      <span>{isResetting ? (isBn ? 'ডিলিট হচ্ছে...' : 'Deleting...') : (isBn ? 'হ্যাঁ, নিশ্চিতভাবে সব মুছে ৳০ করুন' : 'Yes, Delete All & Reset to ৳0')}</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isResetting}
+                      onClick={() => setShowResetConfirm(false)}
+                      className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                    >
+                      {isBn ? 'বাতিল' : 'Cancel'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isResetting}
+                  onClick={() => setShowResetConfirm(true)}
+                  className="w-full py-3.5 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition active:scale-98 disabled:opacity-50 cursor-pointer"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>{isBn ? 'সব ভাউচার ডিলিট ও মোট জমা ৳০ করুন' : 'Delete All Vouchers & Reset Total to ৳0'}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                disabled={isResetting || totalVoucherSum === Number(member.totalDeposit)}
+                onClick={handleSyncWithVouchers}
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center justify-center gap-2 transition disabled:opacity-40 cursor-pointer"
+              >
+                {isResetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                <span>{isBn ? 'ভাউচারের সাথে প্রোফাইল ব্যালেন্স সিঙ্ক করুন' : 'Sync Profile Balance to Vouchers'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isResetting}
+                onClick={() => {
+                  setIsAuditModalOpen(false);
+                  setShowResetConfirm(false);
+                  setResetFeedback(null);
+                }}
+                className="w-full py-2 text-center text-xs text-slate-400 hover:text-white transition font-semibold cursor-pointer"
+              >
+                {isBn ? 'বন্ধ করুন' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
