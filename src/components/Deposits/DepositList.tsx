@@ -99,17 +99,23 @@ function normalizeDateStr(dateStr?: string): string {
 
 /**
  * Checks if a deposit belongs to the selected month (e.g., 'August 2026').
- * Supports direct targetMonth matching, depositDate (YYYY-MM) matching, and notes fallback.
+ * Supports direct targetMonth matching, coveredPeriodText matching, depositDate (YYYY-MM) matching, and notes fallback.
  */
 function matchesDepositMonth(d: Deposit, selectedMonth: string): boolean {
   if (selectedMonth === 'All' || !selectedMonth) return true;
+  const cleanSelected = selectedMonth.toLowerCase().trim();
   
   // 1. Direct targetMonth match (case-insensitive)
-  if (d.targetMonth && d.targetMonth.toLowerCase().trim() === selectedMonth.toLowerCase().trim()) {
+  if (d.targetMonth && d.targetMonth.toLowerCase().trim() === cleanSelected) {
     return true;
   }
 
-  // 2. Parse "Month Year" (e.g. "August 2026") and compare with depositDate
+  // 2. Multi-month coveredPeriodText match (e.g. "August 2026, September 2026, October 2026")
+  if (d.coveredPeriodText && d.coveredPeriodText.toLowerCase().includes(cleanSelected)) {
+    return true;
+  }
+
+  // 3. Parse "Month Year" (e.g. "August 2026") and compare with depositDate
   const parts = selectedMonth.trim().split(' ');
   if (parts.length === 2) {
     const monthName = parts[0];
@@ -124,8 +130,8 @@ function matchesDepositMonth(d: Deposit, selectedMonth: string): boolean {
     }
   }
 
-  // 3. Fallback: check if notes mention selectedMonth
-  if (d.notes && d.notes.toLowerCase().includes(selectedMonth.toLowerCase())) {
+  // 4. Fallback: check if notes mention selectedMonth
+  if (d.notes && d.notes.toLowerCase().includes(cleanSelected)) {
     return true;
   }
 

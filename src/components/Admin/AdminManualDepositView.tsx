@@ -100,8 +100,10 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
   const [isCustomAmount, setIsCustomAmount] = useState(false);
   const [customAmount, setCustomAmount] = useState<number | ''>('');
 
-  // 3. Target Month
-  const [targetMonth, setTargetMonth] = useState<string>(currentMonthVal);
+  // 3. Target Month (Single or Multiple Months)
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonthVal]);
+  const [isMonthDropdownOpen, setIsMonthDropdownOpen] = useState(false);
+  const [monthSearchQuery, setMonthSearchQuery] = useState('');
 
   // 4. Fund Type / Category (Fund Raising vs Real Estate)
   const [category, setCategory] = useState<'Fund Raising' | 'Real Estate'>('Fund Raising');
@@ -125,10 +127,55 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
   const [createdDeposit, setCreatedDeposit] = useState<Deposit | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
 
-  // Calculate actual amount in BDT
+  // Month count calculation: if 'general' or empty, month count is 1
+  const effectiveMonthCount = selectedMonths.includes('general') ? 1 : Math.max(1, selectedMonths.length);
+
+  // Calculate actual amount in BDT:
+  // If not custom amount: sharesPerMonth * monthCount * shareUnitPrice
   const calculatedAmount = isCustomAmount && typeof customAmount === 'number' && customAmount > 0
     ? customAmount
-    : shareCount * shareUnitPrice;
+    : shareCount * effectiveMonthCount * shareUnitPrice;
+
+  // Toggle or select a month in multi-select
+  const handleToggleMonth = (mVal: string) => {
+    if (mVal === 'general') {
+      setSelectedMonths(['general']);
+      return;
+    }
+
+    setSelectedMonths(prev => {
+      // If previously 'general', replace with clicked month
+      const cleanPrev = prev.filter(m => m !== 'general');
+      if (cleanPrev.includes(mVal)) {
+        const remaining = cleanPrev.filter(m => m !== mVal);
+        return remaining.length > 0 ? remaining : [mVal];
+      } else {
+        // Keep chronologically ordered based on ALL_MONTH_OPTIONS
+        const newSelection = [...cleanPrev, mVal];
+        return ALL_MONTH_OPTIONS
+          .map(opt => opt.value)
+          .filter(val => newSelection.includes(val));
+      }
+    });
+  };
+
+  const handleSelectSingleMonth = (mVal: string) => {
+    setSelectedMonths([mVal]);
+  };
+
+  // Human readable label for selected months
+  const selectedMonthsLabel = useMemo(() => {
+    if (selectedMonths.includes('general')) {
+      return isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly';
+    }
+    if (selectedMonths.length === 0) {
+      return currentMonthVal;
+    }
+    if (selectedMonths.length === 1) {
+      return selectedMonths[0];
+    }
+    return selectedMonths.join(', ');
+  }, [selectedMonths, isBn, currentMonthVal]);
 
   // Filtered members for smart search
   const filteredMembers = useMemo(() => {
@@ -156,21 +203,26 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
     setCustomAmount('');
   };
 
-  // Sync auto notes whenever month, shares, or category changes
+  // Sync auto notes whenever months, shares, or category changes
   useEffect(() => {
-    const monthLabel = targetMonth === 'general' 
-      ? (isBn ? 'সাধারণ জমা' : 'General Deposit') 
-      : targetMonth;
+    const monthLabel = selectedMonths.includes('general')
+      ? (isBn ? 'সাধারণ জমা' : 'General Deposit')
+      : selectedMonths.length > 1
+      ? `${selectedMonths.join(', ')} (${selectedMonths.length} ${isBn ? 'মাসের কিস্তি' : 'months'})`
+      : selectedMonths[0] || (isBn ? 'চলতি মাস' : 'Current Month');
+
     const catLabel = category === 'Fund Raising' 
       ? (isBn ? 'তহবিল সংগ্রহ / মূলধন' : 'Fund Raising') 
       : (isBn ? 'রিয়েল এস্টেট' : 'Real Estate');
     
+    const totalSharesCalculated = shareCount * effectiveMonthCount;
+
     const autoNote = isBn 
-      ? `${monthLabel} - ${shareCount}টি শেয়ার (৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]` 
-      : `${monthLabel} - ${shareCount} Share(s) (৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]`;
+      ? `${monthLabel} - মাসিক ${shareCount}টি শেয়ার (মোট ${totalSharesCalculated} শেয়ার, ৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]` 
+      : `${monthLabel} - ${shareCount} Share(s)/mo (Total ${totalSharesCalculated} shares, ৳${calculatedAmount.toLocaleString('en-BD')}, ${paymentMethod}) [${catLabel}]`;
     
     setNotes(autoNote);
-  }, [targetMonth, shareCount, calculatedAmount, category, paymentMethod, isBn]);
+  }, [selectedMonths, shareCount, effectiveMonthCount, calculatedAmount, category, paymentMethod, isBn]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -208,14 +260,23 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
       const adminId = currentMember?.id || (role === 'super_admin' ? 'PBC-00001' : 'PBC-ADMIN');
       const adminSig = currentMember?.adminSignature || undefined;
 
-      const finalTargetMonth = targetMonth === 'general' ? undefined : targetMonth;
-      const monthLabel = finalTargetMonth ? `Contribution Month: ${finalTargetMonth}` : 'General Contribution';
+      const isGeneral = selectedMonths.includes('general');
+      const finalTargetMonth = isGeneral ? undefined : (selectedMonths[0] || currentMonthVal);
+      const periodText = isGeneral 
+        ? (isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly')
+        : selectedMonths.join(', ');
+      
+      const monthLabel = isGeneral 
+        ? 'General Contribution' 
+        : `Contribution Months: ${periodText}`;
 
       const fullNotes = [
         monthLabel,
         notes.trim(),
         `Admin Entry by ${adminName} (${adminId})`
       ].filter(Boolean).join(' | ');
+
+      const totalShares = shareCount * effectiveMonthCount;
 
       const depositData: Omit<Deposit, 'id' | 'status'> & { 
         status?: 'Approved' | 'Pending' | 'Rejected'; 
@@ -226,12 +287,12 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
         memberId: selectedMember.id,
         memberName: selectedMember.fullName,
         amount: calculatedAmount,
-        shareCount: shareCount,
+        shareCount: totalShares,
         shareUnitPrice: shareUnitPrice,
-        monthlyShareCommitment: selectedMember.monthlyShareCommitment || 1,
-        monthCount: 1,
-        depositMode: targetMonth === 'general' ? 'general' : 'single_month',
-        coveredPeriodText: finalTargetMonth,
+        monthlyShareCommitment: shareCount,
+        monthCount: effectiveMonthCount,
+        depositMode: isGeneral ? 'general' : (effectiveMonthCount > 1 ? 'advance_multi_month' : 'single_month'),
+        coveredPeriodText: periodText,
         category: category,
         currency: 'BDT',
         depositDate: depositDate || new Date().toISOString().split('T')[0],
@@ -274,6 +335,7 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
     setSelectedMember(null);
     setMemberSearch('');
     setShareCount(1);
+    setSelectedMonths([currentMonthVal]);
     setIsCustomAmount(false);
     setCustomAmount('');
     setReceiptImage('');
@@ -599,14 +661,25 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
               <div className="p-4 bg-gradient-to-r from-[#112244] to-[#070D1B] rounded-2xl border border-amber-500/40 flex items-center justify-between">
                 <div>
                   <span className="text-xs text-slate-300 block">
-                    {isBn ? `মোট জমার পরিমাণ (${shareCount}টি শেয়ার × ৳${shareUnitPrice.toLocaleString('en-BD')}):` : `Total Amount (${shareCount} share(s) × ৳${shareUnitPrice}):`}
+                    {effectiveMonthCount > 1 ? (
+                      isBn 
+                        ? `মোট জমার পরিমাণ (মাসিক ${shareCount}টি × ${effectiveMonthCount} মাস = মোট ${shareCount * effectiveMonthCount}টি শেয়ার):` 
+                        : `Total Amount (${shareCount} share(s)/mo × ${effectiveMonthCount} months = ${shareCount * effectiveMonthCount} shares):`
+                    ) : (
+                      isBn 
+                        ? `মোট জমার পরিমাণ (${shareCount}টি শেয়ার × ৳${shareUnitPrice.toLocaleString('en-BD')}):` 
+                        : `Total Amount (${shareCount} share(s) × ৳${shareUnitPrice.toLocaleString('en-BD')}):`
+                    )}
                   </span>
-                  <span className="text-xs text-emerald-400 font-semibold">
-                    {isBn ? 'সরাসরি মেম্বার অ্যাকাউন্টে ক্রেডিট হবে' : 'Will be directly credited'}
+                  <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {effectiveMonthCount > 1 
+                      ? (isBn ? `${effectiveMonthCount}টি মাসের হিসাব একসাথে ক্লিয়ার হবে` : `${effectiveMonthCount} months will be credited together`)
+                      : (isBn ? 'সরাসরি মেম্বার অ্যাকাউন্টে ক্রেডিট হবে' : 'Will be directly credited')}
                   </span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">
-                  ৳{(shareCount * shareUnitPrice).toLocaleString('en-BD')}
+                <div className="text-2xl sm:text-3xl font-black text-amber-400 font-mono text-right">
+                  ৳{calculatedAmount.toLocaleString('en-BD')}
                 </div>
               </div>
             </div>
@@ -628,7 +701,7 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                     const val = e.target.value === '' ? '' : Number(e.target.value);
                     setCustomAmount(val);
                     if (typeof val === 'number') {
-                      setShareCount(Math.max(1, Math.round(val / shareUnitPrice)));
+                      setShareCount(Math.max(1, Math.round(val / (shareUnitPrice * effectiveMonthCount))));
                     }
                   }}
                   className="w-full pl-10 pr-4 py-3.5 bg-[#070D1B] border-2 border-amber-500/40 rounded-2xl text-amber-300 font-mono font-black text-xl focus:outline-none focus:border-amber-400"
@@ -639,37 +712,57 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
         </div>
 
         {/* ========================================================= */}
-        {/* STEP 3: কোন মাসের কিস্তি/শেয়ার (SELECT MONTH) */}
+        {/* STEP 3: কোন মাসের কিস্তি/শেয়ার (SELECT MONTH - 1 or Multi) */}
         {/* ========================================================= */}
         <div className="bg-[#0B1528] text-white p-5 sm:p-6 rounded-3xl border border-amber-500/30 shadow-xl space-y-4">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-amber-500/20">
-            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
-              ৩
+          <div className="flex items-center justify-between pb-3 border-b border-amber-500/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 font-black text-sm">
+                ৩
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold text-white tracking-wide">
+                  {isBn ? 'কোন মাসের শেয়ার বা কিস্তি?' : '3. Contribution Month'}
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  {isBn ? 'এক মাস বা একাধিক মাস একসাথে সিলেক্ট করতে পারবেন' : 'Select 1 month or multiple months together'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-extrabold text-white tracking-wide">
-                {isBn ? 'কোন মাসের শেয়ার বা কিস্তি?' : '3. Contribution Month'}
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                {isBn ? '১ ক্লিকে চলতি বা যেকোনো মাস সিলেক্ট করুন' : 'Select target month'}
-              </p>
+
+            {/* Selected Month Count Badge */}
+            <div className="flex items-center gap-1.5">
+              {effectiveMonthCount > 1 ? (
+                <span className="px-3 py-1 bg-amber-500/20 border border-amber-400/40 text-amber-300 rounded-full text-xs font-black flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  {isBn ? `${effectiveMonthCount}টি মাস নির্বাচিত` : `${effectiveMonthCount} Months Selected`}
+                </span>
+              ) : selectedMonths.includes('general') ? (
+                <span className="px-2.5 py-0.5 bg-slate-800 text-slate-300 rounded-full text-[11px] font-bold">
+                  {isBn ? 'সাধারণ জমা' : 'General'}
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-full text-[11px] font-bold">
+                  {isBn ? '১টি মাস' : '1 Month'}
+                </span>
+              )}
             </div>
           </div>
 
-          {/* Quick Month Pills */}
+          {/* Quick Month Pills (Single Click to Pick 1 Month) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
-              { val: currentMonthVal, label: isBn ? `চলতি মাস (${currentMonthBn})` : `Current (${currentMonthVal})` },
+              { val: currentMonthVal, label: isBn ? `চলতি (${currentMonthBn})` : `Current (${currentMonthVal})` },
               { val: nextMonthVal, label: isBn ? `পরবর্তী (${nextMonthBn})` : `Next (${nextMonthVal})` },
               { val: prevMonthVal, label: isBn ? `পূর্ববর্তী (${prevMonthBn})` : `Prev (${prevMonthVal})` },
               { val: 'general', label: isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly' },
             ].map(m => {
-              const isSelected = targetMonth === m.val;
+              const isSelected = selectedMonths.length === 1 && selectedMonths[0] === m.val;
               return (
                 <button
                   key={m.val}
                   type="button"
-                  onClick={() => setTargetMonth(m.val)}
+                  onClick={() => handleSelectSingleMonth(m.val)}
                   className={`p-3 rounded-2xl border-2 transition text-center cursor-pointer text-xs font-bold ${
                     isSelected
                       ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-lg scale-[1.02]'
@@ -682,26 +775,235 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
             })}
           </div>
 
-          {/* All Months Dropdown Selector */}
-          <div className="pt-1">
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-              <span>{isBn ? 'অন্য কোনো মাস বেছে নিতে ড্রপডাউন ব্যবহার করুন:' : 'Or choose from all months:'}</span>
-              <span className="text-[11px] text-amber-400 font-bold">
-                {isBn ? 'নির্বাচিত:' : 'Selected:'} {targetMonth === 'general' ? (isBn ? 'সাধারণ জমা' : 'General') : targetMonth}
+          {/* Interactive Multi-Select Month Box */}
+          <div className="pt-1 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-semibold text-slate-300">
+                {isBn ? 'বক্স থেকে মাস সিলেক্ট বা একাধিক মাস টিক (☑️) দিন:' : 'Select month or check (☑️) multiple months:'}
               </span>
-            </label>
-            <select
-              value={targetMonth}
-              onChange={(e) => setTargetMonth(e.target.value)}
-              className="w-full px-4 py-3 bg-[#070D1B] border border-amber-500/40 rounded-xl text-white font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 cursor-pointer"
-            >
-              <option value="general">{isBn ? 'সাধারণ জমা (নন-মান্থলি)' : 'General / Non-Monthly Deposit'}</option>
-              {ALL_MONTH_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {isBn ? opt.labelBn : opt.labelEn}
-                </option>
-              ))}
-            </select>
+              {selectedMonths.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMonths([currentMonthVal])}
+                  className="text-amber-400 hover:underline text-[11px] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                  {isBn ? 'রিসেট (১ মাসে ফিরুন)' : 'Reset (Back to 1)'}
+                </button>
+              )}
+            </div>
+
+            {/* Custom Multi-Select Dropdown Container */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMonthDropdownOpen(!isMonthDropdownOpen)}
+                className={`w-full px-4 py-3 bg-[#070D1B] border-2 rounded-2xl text-left transition flex items-center justify-between cursor-pointer ${
+                  isMonthDropdownOpen 
+                    ? 'border-amber-400 ring-2 ring-amber-400/20 shadow-lg' 
+                    : 'border-amber-500/40 hover:border-amber-400'
+                }`}
+              >
+                <div className="flex items-center gap-2 overflow-hidden pr-2">
+                  <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-xs sm:text-sm font-black text-amber-300 truncate">
+                    {selectedMonthsLabel}
+                  </span>
+                  {effectiveMonthCount > 1 && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px] shrink-0">
+                      {effectiveMonthCount} {isBn ? 'মাস' : 'mo'}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
+                  <span className="text-[11px] font-semibold text-amber-400/90 hidden sm:inline">
+                    {isMonthDropdownOpen ? (isBn ? 'বন্ধ করুন' : 'Close') : (isBn ? 'ক্লিক করে মাস বেছে নিন' : 'Choose Months')}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 text-amber-400 ${isMonthDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {/* Dropdown Panel with Checkboxes */}
+              {isMonthDropdownOpen && (
+                <div className="absolute z-30 left-0 right-0 mt-2 bg-[#070D1B] border-2 border-amber-500/50 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                  {/* Search and Helper Header */}
+                  <div className="p-3 bg-[#0B1528] border-b border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-1">
+                      <Search className="w-3.5 h-3.5 text-amber-400" />
+                      <input
+                        type="text"
+                        placeholder={isBn ? 'মাস খুঁজুন (যেমন: August, September, 2026)...' : 'Search months...'}
+                        value={monthSearchQuery}
+                        onChange={(e) => setMonthSearchQuery(e.target.value)}
+                        className="bg-transparent text-white text-xs w-full focus:outline-none placeholder-slate-500 font-medium"
+                      />
+                      {monthSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setMonthSearchQuery('')}
+                          className="text-slate-400 hover:text-white text-xs"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 justify-end text-[11px]">
+                      <span className="text-slate-400 hidden sm:inline">
+                        {isBn ? 'ক্লিক করলেই মাস যোগ বা বাদ হবে' : 'Click to toggle month'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsMonthDropdownOpen(false)}
+                        className="px-2.5 py-1 bg-amber-500 text-slate-950 font-bold rounded-lg hover:bg-amber-400 transition"
+                      >
+                        {isBn ? 'সম্পন্ন' : 'Done'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* General / Non-monthly Option */}
+                  <div className="p-2 border-b border-slate-800 bg-[#0B1528]/50">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleToggleMonth('general');
+                        setIsMonthDropdownOpen(false);
+                      }}
+                      className={`w-full px-3 py-2 rounded-xl text-left text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                        selectedMonths.includes('general')
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-400/50'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                          selectedMonths.includes('general') ? 'bg-amber-400 border-amber-300 text-slate-950' : 'border-slate-600'
+                        }`}>
+                          {selectedMonths.includes('general') && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                        <span>{isBn ? 'সাধারণ জমা (কোনো নির্দিষ্ট মাস ছাড়া)' : 'General / Non-Monthly Deposit'}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">Non-Monthly</span>
+                    </button>
+                  </div>
+
+                  {/* Scrollable Month Options List */}
+                  <div className="max-h-60 overflow-y-auto p-2 space-y-1 divide-y divide-slate-800/40">
+                    {ALL_MONTH_OPTIONS
+                      .filter(opt => {
+                        if (!monthSearchQuery.trim()) return true;
+                        const q = monthSearchQuery.toLowerCase().trim();
+                        return (
+                          opt.labelEn.toLowerCase().includes(q) ||
+                          opt.labelBn.toLowerCase().includes(q) ||
+                          String(opt.year).includes(q)
+                        );
+                      })
+                      .map(opt => {
+                        const isChecked = selectedMonths.includes(opt.value);
+                        return (
+                          <div
+                            key={opt.value}
+                            onClick={() => handleToggleMonth(opt.value)}
+                            className={`p-2.5 rounded-xl flex items-center justify-between cursor-pointer transition select-none ${
+                              isChecked
+                                ? 'bg-amber-500/20 text-white border border-amber-400/60 font-black'
+                                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                                isChecked
+                                  ? 'bg-amber-400 border-amber-300 text-slate-950 shadow'
+                                  : 'border-slate-600 bg-slate-900'
+                              }`}>
+                                {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
+                              </div>
+                              <div>
+                                <span className="text-xs sm:text-sm font-bold">
+                                  {isBn ? opt.labelBn : opt.labelEn}
+                                </span>
+                                {opt.value === currentMonthVal && (
+                                  <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30">
+                                    {isBn ? 'চলতি মাস' : 'Current'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right">
+                              {isChecked ? (
+                                <span className="text-[11px] font-black text-amber-300 font-mono">
+                                  ✓ {isBn ? 'সিলেক্টেড' : 'Selected'}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500">
+                                  {opt.year}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Dropdown Footer Action */}
+                  <div className="p-3 bg-[#0B1528] border-t border-amber-500/20 flex items-center justify-between text-xs">
+                    <span className="text-slate-400">
+                      {isBn 
+                        ? `মোট নির্বাচিত: ${effectiveMonthCount}টি মাস` 
+                        : `Total Selected: ${effectiveMonthCount} month(s)`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsMonthDropdownOpen(false)}
+                      className="px-4 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl shadow cursor-pointer"
+                    >
+                      {isBn ? 'সিলেকশন ঠিক আছে' : 'Confirm Selection'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Selected Months Tags Preview */}
+            {!selectedMonths.includes('general') && selectedMonths.length > 1 && (
+              <div className="p-3 bg-[#070D1B] rounded-2xl border border-amber-500/30 space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    {isBn 
+                      ? `একসাথে ${selectedMonths.length}টি মাস পরিশোধ করা হচ্ছে:` 
+                      : `Paying for ${selectedMonths.length} months together:`}
+                  </span>
+                  <span className="text-emerald-400 font-mono font-bold">
+                    {shareCount} × {selectedMonths.length} = {shareCount * selectedMonths.length} {isBn ? 'টি শেয়ার' : 'shares'}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedMonths.map(m => (
+                    <span 
+                      key={m}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-400/15 border border-amber-400/40 text-amber-300 text-xs font-bold"
+                    >
+                      <span>📅 {m}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleMonth(m);
+                        }}
+                        className="hover:text-white hover:bg-amber-400/30 rounded p-0.5 transition cursor-pointer"
+                        title="Remove month"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
