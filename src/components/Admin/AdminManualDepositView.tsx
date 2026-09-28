@@ -29,7 +29,9 @@ import {
   Info,
   Check,
   Building,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Eye,
+  ExternalLink
 } from 'lucide-react';
 
 const MONTH_NAMES_EN = [
@@ -126,6 +128,11 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdDeposit, setCreatedDeposit] = useState<Deposit | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  // Viewing Approved Vouchers Modal & Receipt Preview for Member
+  const [viewingVouchersList, setViewingVouchersList] = useState<Deposit[] | null>(null);
+  const [previewReceiptDeposit, setPreviewReceiptDeposit] = useState<Deposit | null>(null);
+  const [previewSlipImage, setPreviewSlipImage] = useState<string | null>(null);
 
   // Month count calculation: if 'general' or empty, month count is 1
   const effectiveMonthCount = selectedMonths.includes('general') ? 1 : Math.max(1, selectedMonths.length);
@@ -546,15 +553,35 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                     const voucherSum = approvedVouchers.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
                     const profileDeposit = Number(selectedMember.totalDeposit) || 0;
                     const calculatedTotal = Math.max(voucherSum, profileDeposit);
+                    const hasVouchers = approvedVouchers.length > 0;
 
                     return (
-                      <div>
-                        <span className="text-xs font-black text-emerald-400 font-mono">
-                          ৳{calculatedTotal.toLocaleString('en-BD')}
-                        </span>
+                      <div
+                        onClick={() => {
+                          if (hasVouchers) {
+                            setViewingVouchersList(approvedVouchers);
+                          }
+                        }}
+                        className={`transition-all rounded-xl p-1 -m-1 ${
+                          hasVouchers 
+                            ? 'cursor-pointer group hover:bg-amber-500/20 active:scale-95 border border-transparent hover:border-amber-400/50' 
+                            : ''
+                        }`}
+                        title={hasVouchers ? (isBn ? 'অনুমোদিত ভাউচারগুলো দেখতে এখানে ক্লিক করুন' : 'Click to view approved vouchers') : undefined}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-black text-emerald-400 font-mono group-hover:text-emerald-300">
+                            ৳{calculatedTotal.toLocaleString('en-BD')}
+                          </span>
+                          {hasVouchers && (
+                            <Receipt className="w-3.5 h-3.5 text-amber-400 group-hover:scale-125 transition shrink-0 animate-pulse" />
+                          )}
+                        </div>
                         {voucherSum > 0 && (
-                          <span className="text-[9px] text-amber-400/90 block font-normal leading-tight">
-                            {isBn ? `(${approvedVouchers.length}টি অনুমোদিত ভাউচার)` : `(${approvedVouchers.length} approved voucher${approvedVouchers.length > 1 ? 's' : ''})`}
+                          <span className="text-[9px] text-amber-400/90 group-hover:text-amber-300 group-hover:underline block font-semibold leading-tight mt-0.5">
+                            {isBn 
+                              ? `(${approvedVouchers.length}টি অনুমোদিত ভাউচার ↗)` 
+                              : `(${approvedVouchers.length} approved voucher${approvedVouchers.length > 1 ? 's' : ''} ↗)`}
                           </span>
                         )}
                         {voucherSum === 0 && profileDeposit > 0 && (
@@ -1329,6 +1356,217 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
           isOpen={showReceiptModal}
           onClose={handleResetForNext}
         />
+      )}
+
+      {/* Preview Existing Approved Voucher Receipt Modal */}
+      {previewReceiptDeposit && (
+        <DepositReceiptModal
+          deposit={previewReceiptDeposit}
+          isOpen={Boolean(previewReceiptDeposit)}
+          onClose={() => setPreviewReceiptDeposit(null)}
+        />
+      )}
+
+      {/* Approved Vouchers List Modal for Selected Member */}
+      {viewingVouchersList && selectedMember && (
+        <div 
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto"
+          onClick={() => setViewingVouchersList(null)}
+        >
+          <div 
+            className="bg-[#0B1528] border-2 border-amber-500/40 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh] my-auto animate-in fade-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-500/20 via-[#070D1B] to-emerald-500/20 border-b border-amber-500/20 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    {isBn ? 'অনুমোদিত ভাউচার সমূহ' : 'Approved Vouchers'}
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {viewingVouchersList.length} {isBn ? 'টি' : ''}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {selectedMember.fullName} • <span className="font-mono text-amber-400 font-bold">{selectedMember.id}</span>
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setViewingVouchersList(null)}
+                className="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Member Quick Summary Bar */}
+            <div className="bg-[#070D1B] px-5 py-3 border-b border-slate-800 flex items-center justify-between text-xs flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-slate-300">
+                <span className="text-slate-400">{isBn ? 'মোট অনুমোদিত জমা:' : 'Total Approved Deposit:'}</span>
+                <span className="font-black text-emerald-400 font-mono text-sm">
+                  ৳{viewingVouchersList.reduce((sum, d) => sum + (Number(d.amount) || 0), 0).toLocaleString('en-BD')}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 text-slate-400 text-[11px]">
+                <span>{selectedMember.phone}</span>
+                {selectedMember.country && <span>• {selectedMember.country}</span>}
+              </div>
+            </div>
+
+            {/* Vouchers List */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 divide-y divide-slate-800/60 max-h-[55vh]">
+              {viewingVouchersList.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-sm">
+                  {isBn ? 'কোনো অনুমোদিত ভাউচার পাওয়া যায়নি।' : 'No approved vouchers found.'}
+                </div>
+              ) : (
+                viewingVouchersList.map((voucher, idx) => {
+                  const shares = voucher.shareCount || Math.max(1, Math.round((Number(voucher.amount) || 0) / (voucher.shareUnitPrice || 5000)));
+                  return (
+                    <div 
+                      key={voucher.id || idx} 
+                      className="pt-3 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-2xl hover:bg-[#070D1B]/80 transition border border-transparent hover:border-amber-500/20"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                            {voucher.referenceNumber || voucher.id}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="w-2.5 h-2.5" />
+                            {voucher.status}
+                          </span>
+                          {voucher.category && (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-800 text-slate-300">
+                              {voucher.category === 'Fund Raising' 
+                                ? (isBn ? 'মূলধন / তহবিল' : 'Fund Raising') 
+                                : (isBn ? 'রিয়েল এস্টেট' : 'Real Estate')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-300 flex items-center gap-2 flex-wrap pt-0.5">
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Calendar className="w-3.5 h-3.5 text-amber-400/80" />
+                            {voucher.depositDate}
+                          </span>
+                          <span>•</span>
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <CreditCard className="w-3.5 h-3.5 text-blue-400/80" />
+                            {voucher.paymentMethod}
+                          </span>
+                          {(voucher.targetMonth || voucher.coveredPeriodText) && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-300 font-medium">
+                                {voucher.targetMonth || voucher.coveredPeriodText}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        {voucher.notes && (
+                          <p className="text-[11px] text-slate-400 italic line-clamp-1">
+                            "{voucher.notes}"
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Right Amount & Actions */}
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
+                        <div className="text-left sm:text-right">
+                          <span className="text-base font-black text-emerald-400 font-mono block">
+                            ৳{Number(voucher.amount).toLocaleString('en-BD')}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block font-medium">
+                            {shares} {isBn ? 'টি শেয়ার' : 'Share(s)'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                          {voucher.receiptUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewSlipImage(voucher.receiptUrl || null)}
+                              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[11px] font-bold transition flex items-center gap-1 cursor-pointer border border-slate-700"
+                              title={isBn ? 'পেমেন্ট স্লিপ দেখুন' : 'View Payment Slip'}
+                            >
+                              <ImageIcon className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="hidden xs:inline">{isBn ? 'স্লিপ' : 'Slip'}</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setPreviewReceiptDeposit(voucher)}
+                            className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl text-[11px] font-black transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-amber-950/40 active:scale-95"
+                          >
+                            <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{isBn ? 'রসিদ দেখুন' : 'View Receipt'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-[#070D1B] border-t border-slate-800 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-400">
+                {isBn ? 'যেকোনো ভাউচারের অফিসিয়াল রসিদ দেখতে "রসিদ দেখুন"-এ ক্লিক করুন।' : 'Click "View Receipt" to inspect or print official voucher receipt.'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setViewingVouchersList(null)}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                {isBn ? 'বন্ধ করুন' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Slip Image Lightbox */}
+      {previewSlipImage && (
+        <div 
+          className="fixed inset-0 z-[110] bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setPreviewSlipImage(null)}
+        >
+          <div 
+            className="bg-[#0B1528] border-2 border-amber-500/40 rounded-2xl max-w-lg w-full overflow-hidden shadow-2xl relative"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3 bg-[#070D1B] border-b border-slate-800 flex items-center justify-between">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-amber-400" />
+                {isBn ? 'সংযুক্ত ব্যাংক / পেমেন্ট স্লিপ' : 'Attached Bank / Payment Slip'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewSlipImage(null)}
+                className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 bg-black flex items-center justify-center max-h-[70vh] overflow-auto">
+              <img 
+                src={previewSlipImage} 
+                alt="Deposit Slip" 
+                className="max-h-[65vh] w-auto object-contain rounded-lg shadow" 
+              />
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
