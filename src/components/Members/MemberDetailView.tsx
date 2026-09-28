@@ -129,14 +129,6 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
   );
 
   const handleOpenVoucher = (deposit: Deposit) => {
-    navigateWithHistory({
-      tab: 'deposits',
-      subView: 'voucher',
-      subId: deposit.id,
-      title: `Voucher #${deposit.id}`,
-      titleBn: `ভাউচার #${deposit.id}`,
-      isFocusMode: true
-    });
     setSelectedVoucher(deposit);
   };
 

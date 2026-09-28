@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
@@ -208,7 +208,8 @@ export const DepositList: React.FC = () => {
     authUser,
     triggerSecurityAlert,
     navigateWithHistory,
-    systemSettings
+    systemSettings,
+    currentNavState
   } = useApp();
 
   const labels = t[language];
@@ -269,6 +270,16 @@ export const DepositList: React.FC = () => {
   const [rejectingDeposit, setRejectingDeposit] = useState<Deposit | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
   const [isRejectingSubmitting, setIsRejectingSubmitting] = useState(false);
+
+  // Auto-open voucher modal if navigated via direct link or search with subView === 'voucher'
+  useEffect(() => {
+    if (currentNavState?.tab === 'deposits' && currentNavState?.subView === 'voucher' && currentNavState?.subId) {
+      const match = deposits.find(d => d.id === currentNavState.subId);
+      if (match) {
+        setSelectedReceipt(match);
+      }
+    }
+  }, [currentNavState, deposits]);
 
   // Form State
   const [formData, setFormData] = useState({

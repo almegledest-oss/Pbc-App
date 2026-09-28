@@ -180,7 +180,7 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-1 sm:p-4 bg-slate-950/90 backdrop-blur-md overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
