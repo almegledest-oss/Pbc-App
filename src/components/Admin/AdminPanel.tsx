@@ -51,6 +51,7 @@ import { ThemeSelectorCard } from './ThemeSelectorCard';
 import { AdminManualDepositView } from './AdminManualDepositView';
 import { AdminSupportSettingsView } from './AdminSupportSettingsView';
 import { AdminClubRulesEditor } from './AdminClubRulesEditor';
+import { WhatsAppReceiptSendModal } from '../Deposits/WhatsAppReceiptSendModal';
 
 export const AdminPanel: React.FC = () => {
   const { 
@@ -103,6 +104,7 @@ export const AdminPanel: React.FC = () => {
   const [selectedAuditDeposit, setSelectedAuditDeposit] = useState<Deposit | null>(null);
   const [voucherFilter, setVoucherFilter] = useState<'pending' | 'all_receipts'>('pending');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
+  const [whatsAppModalDeposit, setWhatsAppModalDeposit] = useState<Deposit | null>(null);
 
   // Backup & Restore States
   const [isRestoring, setIsRestoring] = useState(false);
@@ -852,6 +854,17 @@ export const AdminPanel: React.FC = () => {
                             : (language === 'bn' ? 'অনুমোদন করুন' : 'Approve')}
                         </span>
                       </button>
+
+                      {d.status?.toLowerCase() === 'approved' && (
+                        <button
+                          onClick={() => setWhatsAppModalDeposit(d)}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition border border-emerald-400/40 shadow-sm cursor-pointer active:scale-95"
+                          title={language === 'bn' ? "মেম্বারকে WhatsApp-এ মানি রিসিট পাঠান" : "Send Money Receipt via WhatsApp"}
+                        >
+                          <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                          <span className="hidden sm:inline">{language === 'bn' ? 'WhatsApp রিসিট' : 'WhatsApp'}</span>
+                        </button>
+                      )}
 
                       <button
                         onClick={async () => {
@@ -1958,9 +1971,29 @@ export const AdminPanel: React.FC = () => {
         deposit={signatureModalDeposit}
         onConfirmApprove={async (sigUrl) => {
           if (signatureModalDeposit) {
+            const approvedTarget = {
+              ...signatureModalDeposit,
+              status: 'Approved' as const,
+              approvedByAdminSignature: sigUrl,
+              approvedByAdminName: currentMember?.fullName || authUser?.displayName || 'PBC Admin',
+              approvedByAdminId: currentMember?.id || 'PBC-ADMIN'
+            };
             await approveDeposit(signatureModalDeposit.id, sigUrl);
             setSignatureModalDeposit(null);
+            // Prompt admin to immediately dispatch official Money Receipt via WhatsApp!
+            setWhatsAppModalDeposit(approvedTarget);
           }
+        }}
+      />
+
+      {/* WhatsApp Receipt Dispatch Modal */}
+      <WhatsAppReceiptSendModal
+        isOpen={!!whatsAppModalDeposit}
+        onClose={() => setWhatsAppModalDeposit(null)}
+        deposit={whatsAppModalDeposit}
+        onViewVoucher={(dep) => {
+          setWhatsAppModalDeposit(null);
+          setSelectedAuditDeposit(dep);
         }}
       />
 

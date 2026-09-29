@@ -7,6 +7,7 @@ import { DepositReceiptModal } from './DepositReceiptModal';
 import { SmartDepositCalculator, DepositMode } from './SmartDepositCalculator';
 import { AdminSignatureModal } from '../Admin/AdminSignatureModal';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
+import { WhatsAppReceiptSendModal } from './WhatsAppReceiptSendModal';
 import { compressImageToDataUrl } from '../../services/firebaseService';
 import { 
   Wallet, 
@@ -266,6 +267,7 @@ export const DepositList: React.FC = () => {
   const [selectedReceipt, setSelectedReceipt] = useState<Deposit | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string>('');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
+  const [whatsAppModalDeposit, setWhatsAppModalDeposit] = useState<Deposit | null>(null);
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
   const [rejectingDeposit, setRejectingDeposit] = useState<Deposit | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
@@ -1491,6 +1493,15 @@ export const DepositList: React.FC = () => {
                         <span>{language === 'bn' ? 'রসিদ (Receipt)' : 'View Receipt'}</span>
                       </button>
 
+                      <button
+                        onClick={() => setWhatsAppModalDeposit(d)}
+                        className="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-1 text-xs transition border border-emerald-400/40 active:scale-95 cursor-pointer shrink-0"
+                        title={language === 'bn' ? "WhatsApp এ মানি রিসিট পাঠান" : "Send Receipt via WhatsApp"}
+                      >
+                        <MessageCircle className="w-3.5 h-3.5 fill-white" />
+                        <span>WhatsApp</span>
+                      </button>
+
                       {d.receiptUrl && (
                         <button
                           onClick={() => setSelectedReceipt(d)}
@@ -1727,6 +1738,15 @@ export const DepositList: React.FC = () => {
                           >
                             <FileText className="w-4 h-4 text-emerald-400" />
                             <span>{language === 'bn' ? 'রসিদ (Receipt)' : 'Receipt'}</span>
+                          </button>
+
+                          <button
+                            onClick={() => setWhatsAppModalDeposit(d)}
+                            className="min-h-[40px] px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-1.5 text-xs transition border border-emerald-400/40 shadow-sm cursor-pointer active:scale-95"
+                            title={language === 'bn' ? "মেম্বারকে WhatsApp-এ মানি রিসিট পাঠান" : "Send Money Receipt via WhatsApp"}
+                          >
+                            <MessageCircle className="w-4 h-4 fill-white" />
+                            <span>WhatsApp</span>
                           </button>
                         </>
                       ) : (
@@ -2106,9 +2126,29 @@ export const DepositList: React.FC = () => {
         deposit={signatureModalDeposit}
         onConfirmApprove={async (sigUrl) => {
           if (signatureModalDeposit) {
+            const approvedTarget = {
+              ...signatureModalDeposit,
+              status: 'Approved' as const,
+              approvedByAdminSignature: sigUrl,
+              approvedByAdminName: currentMember?.fullName || authUser?.displayName || 'PBC Admin',
+              approvedByAdminId: currentMember?.id || 'PBC-ADMIN'
+            };
             await approveDeposit(signatureModalDeposit.id, sigUrl);
             setSignatureModalDeposit(null);
+            // Prompt admin to immediately dispatch official Money Receipt via WhatsApp!
+            setWhatsAppModalDeposit(approvedTarget);
           }
+        }}
+      />
+
+      {/* WhatsApp Receipt Dispatch Modal */}
+      <WhatsAppReceiptSendModal
+        isOpen={!!whatsAppModalDeposit}
+        onClose={() => setWhatsAppModalDeposit(null)}
+        deposit={whatsAppModalDeposit}
+        onViewVoucher={(dep) => {
+          setWhatsAppModalDeposit(null);
+          setSelectedReceipt(dep);
         }}
       />
 

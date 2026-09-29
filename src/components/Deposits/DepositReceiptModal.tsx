@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Deposit } from '../../types';
 import { useApp } from '../../context/AppContext';
-import { X, Printer, Download, Receipt, CheckCircle, Loader2, Eye, ShieldCheck, Maximize2, Minimize2, QrCode, FileText } from 'lucide-react';
+import { X, Printer, Download, Receipt, CheckCircle, Loader2, Eye, ShieldCheck, Maximize2, Minimize2, QrCode, FileText, MessageCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { captureElementToCanvas, urlToSafeDataUrl } from '../../utils/pdfUtils';
 import { PbcLogo } from '../Common/PbcLogo';
 import { OfficialSeal } from '../Common/OfficialSeal';
+import { generateDepositReceiptWhatsAppMessage, openWhatsAppWithMessage } from '../../utils/whatsappUtils';
 
 interface DepositReceiptModalProps {
   deposit: Deposit | null;
@@ -38,7 +39,7 @@ function numberToWordsBDT(num: number): { bn: string; en: string } {
 }
 
 export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposit, isOpen, onClose }) => {
-  const { language, currentMember, members } = useApp();
+  const { language, currentMember, members, systemSettings } = useApp();
   const [downloading, setDownloading] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -567,20 +568,31 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
             {isBn ? 'বন্ধ করুন' : 'Close'}
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <button
+              onClick={() => {
+                const text = generateDepositReceiptWhatsAppMessage({ deposit, member: memberObj, systemSettings });
+                openWhatsAppWithMessage(memberObj?.phone || '', text);
+              }}
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg transition active:scale-95 cursor-pointer"
+              title={isBn ? "WhatsApp-এ রসিদ পাঠান" : "Share Receipt on WhatsApp"}
+            >
+              <MessageCircle className="w-4 h-4 fill-white shrink-0" />
+              <span>{isBn ? 'WhatsApp শেয়ার' : 'WhatsApp'}</span>
+            </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 text-xs font-bold bg-[#112244] hover:bg-[#182e5c] text-amber-300 border border-amber-500/30 rounded-xl transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2.5 text-xs font-bold bg-[#112244] hover:bg-[#182e5c] text-amber-300 border border-amber-500/30 rounded-xl transition active:scale-95 cursor-pointer"
             >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>{isBn ? 'প্রিন্ট রসিদ' : 'Print Voucher'}</span>
+              <Printer className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>{isBn ? 'প্রিন্ট' : 'Print'}</span>
             </button>
             <button
               onClick={handleDownloadPDF}
               disabled={downloading}
-              className="flex items-center gap-1.5 px-4 sm:px-5 py-2.5 text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl shadow-lg transition disabled:opacity-50 active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-3.5 sm:px-4 py-2.5 text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-xl shadow-lg transition disabled:opacity-50 active:scale-95 cursor-pointer"
             >
-              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Download className="w-4 h-4 shrink-0" />}
               <span>{isBn ? 'PDF ডাউনলোড' : 'Download PDF'}</span>
             </button>
           </div>
