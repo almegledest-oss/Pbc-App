@@ -304,6 +304,7 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
         approvedByAdminName?: string; 
         approvedByAdminId?: string;
         approvedByAdminSignature?: string;
+        directRecipientEmail?: string;
       } = {
         memberId: selectedMember.id,
         memberName: selectedMember.fullName,
@@ -325,7 +326,8 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
         status: autoApprove ? 'Approved' : 'Pending',
         approvedByAdminName: autoApprove ? adminName : undefined,
         approvedByAdminId: autoApprove ? adminId : undefined,
-        approvedByAdminSignature: autoApprove ? adminSig : undefined
+        approvedByAdminSignature: autoApprove ? adminSig : undefined,
+        directRecipientEmail: memberEmail?.trim() || selectedMember.email?.trim()
       };
 
       // If admin updated or provided memberEmail, save it to the member profile

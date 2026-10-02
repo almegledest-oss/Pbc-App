@@ -59,6 +59,8 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
     (m.fullName && m.fullName.toLowerCase().trim() === depMemName)
   );
 
+  const effectiveEmail = memberObj?.email?.trim() || (deposit.receiptUrl?.includes('@') ? deposit.receiptUrl.trim() : '');
+
   const monthlyRate = deposit.monthlyShareCommitment || memberObj?.monthlyShareCommitment || 1;
   const totalShares = deposit.shareCount || Math.max(1, Math.round(deposit.amount / (deposit.shareUnitPrice || 5000)));
   const monthsCount = deposit.monthCount || (monthlyRate > 0 ? Math.max(1, Math.round(totalShares / monthlyRate)) : 1);
@@ -230,8 +232,22 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
         </div>
 
         {/* Modal Scroll Container */}
-        <div className="p-3 sm:p-6 overflow-y-auto flex-1 bg-[#040D1B]/80 flex justify-center items-start">
+        <div className="p-3 sm:p-6 overflow-y-auto flex-1 bg-[#040D1B]/80 flex flex-col items-center justify-start gap-3">
           
+          {/* Dispatch Notice Pill */}
+          {effectiveEmail && (
+            <div className="w-full max-w-xl sm:max-w-2xl px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-center justify-between text-xs text-emerald-300 shadow-md">
+              <span className="flex items-center gap-2 font-medium flex-wrap">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>{isBn ? 'স্বয়ংক্রিয় অফিসিয়াল রসিদ পাঠানো হয়েছে:' : 'Official Receipt Emailed to:'}</span>
+                <strong className="text-white font-mono bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/30">{effectiveEmail}</strong>
+              </span>
+              <span className="text-[11px] text-emerald-400/90 font-normal hidden sm:inline">
+                {isBn ? '(ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন)' : '(Check Inbox / Spam)'}
+              </span>
+            </div>
+          )}
+
           {/* Printable Deposit Receipt Voucher Document Card (Naturally Compact & Elegant Spacing) */}
           <div 
             id="deposit-receipt-voucher" 

@@ -1389,7 +1389,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // CRUD for Deposits
-  const addDeposit = async (d: Omit<Deposit, 'id' | 'status'> & { status?: 'Approved' | 'Pending' | 'Rejected'; approvedByAdminName?: string; approvedByAdminId?: string }) => {
+  const addDeposit = async (d: Omit<Deposit, 'id' | 'status'> & { 
+    status?: 'Approved' | 'Pending' | 'Rejected'; 
+    approvedByAdminName?: string; 
+    approvedByAdminId?: string;
+    directRecipientEmail?: string;
+  }) => {
     // Collision-proof ID generation: find the highest existing DEP number
     const existingNums = deposits.map(dep => {
       const match = dep.id?.match(/DEP-(\d+)/i);
@@ -1448,7 +1453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const depMemId = (d.memberId || '').toUpperCase().trim();
         const depMemName = (d.memberName || '').toLowerCase().trim();
 
-        let recipientEmail = targetMember?.email?.trim();
+        let recipientEmail = d.directRecipientEmail?.trim() || targetMember?.email?.trim();
         if (!recipientEmail || !recipientEmail.includes('@')) {
           const matchedUser = users.find(u => 
             (u.memberId && u.memberId.toUpperCase().trim() === depMemId) ||
