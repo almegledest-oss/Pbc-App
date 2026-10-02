@@ -1,6 +1,6 @@
 export default function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
   if (req.method === 'OPTIONS') {
@@ -9,7 +9,7 @@ export default function handler(req: any, res: any) {
 
   return res.status(200).json({
     status: 'ok',
-    message: 'PBC Vercel API Gateway Operational',
+    platform: 'vercel-serverless',
     timestamp: new Date().toISOString()
   });
 }
