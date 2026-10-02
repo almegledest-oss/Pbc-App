@@ -27,6 +27,16 @@ export async function sendTestEmailApi(
         config
       })
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      let parsedErr = '';
+      try {
+        parsedErr = JSON.parse(errText)?.error;
+      } catch {
+        parsedErr = `সার্ভার রেসপন্স (${res.status}): ${res.statusText || 'API Endpoint Not Found'}`;
+      }
+      return { success: false, error: parsedErr };
+    }
     return await res.json();
   } catch (err: any) {
     return {
@@ -84,6 +94,16 @@ export async function sendWelcomeEmailApi(
         config
       })
     });
+    if (!res.ok) {
+      const errText = await res.text();
+      let parsedErr = '';
+      try {
+        parsedErr = JSON.parse(errText)?.error;
+      } catch {
+        parsedErr = `সার্ভার রেসপন্স (${res.status}): ${res.statusText || 'API Endpoint Not Found'}`;
+      }
+      return { success: false, error: parsedErr };
+    }
     return await res.json();
   } catch (err: any) {
     console.warn('Welcome email dispatch notice:', err?.message || err);
@@ -159,6 +179,17 @@ export async function sendDepositReceiptEmailApi(
         config
       })
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      let parsedErr = '';
+      try {
+        parsedErr = JSON.parse(errText)?.error;
+      } catch {
+        parsedErr = `সার্ভার রেসপন্স (${res.status}): ${res.statusText || 'API Endpoint Not Found'}`;
+      }
+      return { success: false, error: parsedErr };
+    }
 
     return await res.json();
   } catch (err: any) {
