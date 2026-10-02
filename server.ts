@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import dotenv from 'dotenv';
+import nodemailer from 'nodemailer';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
@@ -9,7 +10,50 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
+
+interface SmtpOptions {
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  senderName?: string;
+  senderEmail?: string;
+}
+
+// Default SMTP Configuration provided for PBC Club
+const DEFAULT_SMTP_USER = process.env.SMTP_USER || 'fokrulislammir9897@gmail.com';
+const DEFAULT_SMTP_PASS = (process.env.SMTP_PASS || 'tqnt cqlj npjb zpal').replace(/\s+/g, '');
+const DEFAULT_SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
+const DEFAULT_SMTP_PORT = Number(process.env.SMTP_PORT || 465);
+const DEFAULT_SENDER_NAME = process.env.SENDER_NAME || 'Probashi Business Club (PBC)';
+const DEFAULT_SENDER_EMAIL = process.env.SENDER_EMAIL || DEFAULT_SMTP_USER;
+
+function createTransporter(options?: SmtpOptions) {
+  const host = options?.smtpHost || DEFAULT_SMTP_HOST;
+  const port = options?.smtpPort ? Number(options.smtpPort) : DEFAULT_SMTP_PORT;
+  const secure = options?.smtpSecure !== undefined ? Boolean(options.smtpSecure) : (port === 465);
+  const user = options?.smtpUser || DEFAULT_SMTP_USER;
+  const pass = (options?.smtpPass || DEFAULT_SMTP_PASS).replace(/\s+/g, '');
+
+  if (!user || !pass) {
+    throw new Error('SMTP user or password not configured.');
+  }
+
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user,
+      pass
+    },
+    tls: {
+      rejectUnauthorized: false
+    }
+  });
+}
 
 // Lazy initialization for GoogleGenAI SDK
 let aiClient: GoogleGenAI | null = null;
@@ -285,6 +329,397 @@ YOUR CORE OBJECTIVE:
       success: true,
       reply: 'আসসালামু আলাইকুম। অনুগ্রহ করে একটু পর আবার চেষ্টা করুন অথবা জরুরি প্রয়োজনে সরাসরি অফিসিয়াল WhatsApp-এ যোগাযোগ করুন।',
       fallback: true
+    });
+  }
+});
+
+// ----------------------------------------------------
+// 1. SMTP Test Endpoint
+// ----------------------------------------------------
+app.post('/api/email/test', async (req, res) => {
+  try {
+    const { recipientEmail, config } = req.body;
+    if (!recipientEmail || typeof recipientEmail !== 'string' || !recipientEmail.includes('@')) {
+      return res.status(400).json({ success: false, error: 'A valid recipient email is required.' });
+    }
+
+    const transporter = createTransporter(config);
+    const senderName = config?.senderName || DEFAULT_SENDER_NAME;
+    const senderEmail = config?.senderEmail || config?.smtpUser || DEFAULT_SENDER_EMAIL;
+
+    const testHtml = `
+      <div style="background-color: #070D1B; padding: 30px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+        <div style="max-width: 600px; margin: 0 auto; background-color: #0C182F; border: 2px solid #D4AF37; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+          <div style="background: linear-gradient(135deg, #091326 0%, #112244 100%); padding: 25px; text-align: center; border-bottom: 2px solid #D4AF37;">
+            <h1 style="margin: 0; color: #F59E0B; font-size: 24px; letter-spacing: 2px; text-transform: uppercase;">PROBASHI BUSINESS CLUB</h1>
+            <p style="margin: 5px 0 0 0; color: #FCD34D; font-size: 12px; font-weight: bold; letter-spacing: 1px;">TOGETHER WE RISE - SMTP TEST VERIFICATION</p>
+          </div>
+          <div style="padding: 30px;">
+            <h2 style="color: #34D399; margin-top: 0; font-size: 20px;">Email System Connected Successfully!</h2>
+            <p style="color: #CBD5E1; font-size: 14px; line-height: 1.6;">
+              অভিনন্দন! প্রবাসী বিজনেস ক্লাব (PBC) অ্যাপের অটোমেটেড ইমেইল সার্ভিস এবং SMTP কনফিগারেশন ১০০% নিখুঁতভাবে সক্রিয় হয়েছে।
+            </p>
+            <div style="background-color: #070D1B; border: 1px solid rgba(212, 175, 55, 0.4); border-radius: 12px; padding: 15px; margin: 20px 0;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #E2E8F0;">
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">Sender:</td>
+                  <td style="padding: 6px 0; font-weight: bold; color: #F59E0B;">${senderName} (${senderEmail})</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">Recipient:</td>
+                  <td style="padding: 6px 0; font-weight: bold; color: #FFFFFF;">${recipientEmail}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">Status:</td>
+                  <td style="padding: 6px 0; font-weight: bold; color: #34D399;">Active & Ready for Automated Receipts</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">Timestamp:</td>
+                  <td style="padding: 6px 0; color: #94A3B8;">${new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' })} BST</td>
+                </tr>
+              </table>
+            </div>
+            <p style="color: #94A3B8; font-size: 12px; line-height: 1.5; margin-bottom: 0;">
+              এখন থেকে নতুন মেম্বার রেজিস্ট্রেশনে Welcome Email এবং যেকোনো ডিপোজিট অনুমোদনের পর স্বয়ংক্রিয়ভাবে PDF রসিদ সহ ইমেইল পাঠানো চালু থাকবে।
+            </p>
+          </div>
+          <div style="background-color: #070D1B; padding: 15px; text-align: center; border-top: 1px solid rgba(212, 175, 55, 0.2); font-size: 11px; color: #64748B;">
+            © ${new Date().getFullYear()} Probashi Business Club (PBC). All rights reserved.
+          </div>
+        </div>
+      </div>
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"${senderName}" <${senderEmail}>`,
+      to: recipientEmail,
+      subject: `[PBC Test] SMTP Email Setup Verification Successful`,
+      html: testHtml
+    });
+
+    return res.json({
+      success: true,
+      messageId: info.messageId,
+      message: 'Test email successfully sent!'
+    });
+  } catch (error: any) {
+    console.error('SMTP Test Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to send test email. Please check your credentials.'
+    });
+  }
+});
+
+// ----------------------------------------------------
+// 2. Member Registration: Automated Welcome Email
+// ----------------------------------------------------
+app.post('/api/email/welcome', async (req, res) => {
+  try {
+    const { member, settings, config } = req.body;
+    if (!member || !member.email) {
+      return res.status(400).json({ success: false, error: 'Member email is required' });
+    }
+
+    const transporter = createTransporter(config);
+    const senderName = config?.senderName || DEFAULT_SENDER_NAME;
+    const senderEmail = config?.senderEmail || config?.smtpUser || DEFAULT_SENDER_EMAIL;
+
+    const memberName = member.fullName || 'সম্মানিত সদস্য';
+    const memberId = member.id || 'PBC-Applicant';
+    const memberPhone = member.phone || 'N/A';
+    const memberLocation = `${member.city || ''}${member.city && member.country ? ', ' : ''}${member.country || ''}` || 'Bangladesh';
+    const waLink = settings?.supportWhatsAppGroupLink || 'https://chat.whatsapp.com/PBC-Official-Club';
+
+    const welcomeHtml = `
+      <div style="background-color: #070D1B; padding: 30px 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+        <div style="max-width: 620px; margin: 0 auto; background-color: #0C182F; border: 2px solid #D4AF37; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.6);">
+          
+          <!-- Header Banner -->
+          <div style="background: linear-gradient(135deg, #070D1B 0%, #102040 100%); padding: 30px 20px; text-align: center; border-bottom: 2px solid #D4AF37;">
+            <div style="display: inline-block; width: 64px; height: 64px; border-radius: 50%; background: rgba(212,175,55,0.15); border: 2px solid #D4AF37; line-height: 64px; font-size: 28px; margin-bottom: 10px;">
+              ✈️
+            </div>
+            <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">
+              PROBASHI <span style="color: #F59E0B;">BUSINESS CLUB</span>
+            </h1>
+            <p style="margin: 6px 0 0 0; color: #FCD34D; font-size: 12px; font-weight: bold; letter-spacing: 2px;">
+              TOGETHER WE RISE - বিশ্বস্ত প্রবাসী বিনিয়োগ নেটওয়ার্ক
+            </p>
+          </div>
+
+          <!-- Body Content -->
+          <div style="padding: 30px 25px;">
+            <p style="font-size: 16px; color: #F59E0B; font-weight: bold; margin-top: 0;">
+              আসসালামু আলাইকুম, ${memberName} ভাই!
+            </p>
+            <p style="color: #CBD5E1; font-size: 14px; line-height: 1.7; margin-bottom: 20px;">
+              প্রবাসী বিজনেস ক্লাবে (PBC) আপনাকে আন্তরিক শুভেচ্ছা ও উষ্ণ স্বাগতম! বিশ্বজুড়ে ছড়িয়ে থাকা প্রবাসী ও দেশীয় উদ্যোক্তাদের সমন্বয়ে গঠিত এই সম্মানজনক পরিবারে আপনার সদস্যপদ আবেদন সফলভাবে গৃহীত হয়েছে।
+            </p>
+
+            <!-- Member Card Info Box -->
+            <div style="background-color: #070D1B; border: 1.5px solid rgba(212, 175, 55, 0.5); border-radius: 14px; padding: 20px; margin: 25px 0;">
+              <div style="border-bottom: 1px solid rgba(212,175,55,0.25); padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #F59E0B; font-weight: bold; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">সদস্য বিবরণী (Member Profile)</span>
+                <span style="background: rgba(245, 158, 11, 0.2); color: #FCD34D; font-size: 10px; padding: 3px 8px; border-radius: 6px; font-weight: bold;">APPLICATION LOGGED</span>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #E2E8F0;">
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8; width: 40%;">সদস্য আইডি (PBC ID):</td>
+                  <td style="padding: 6px 0; font-weight: 800; font-family: monospace; color: #FCD34D; font-size: 15px;">${memberId}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">পুরো নাম:</td>
+                  <td style="padding: 6px 0; font-weight: bold; color: #FFFFFF;">${memberName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">ইমেইল ঠিকানা:</td>
+                  <td style="padding: 6px 0; color: #CBD5E1;">${member.email}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">মোবাইল নম্বর:</td>
+                  <td style="padding: 6px 0; color: #CBD5E1;">${memberPhone}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">বর্তমান অবস্থান:</td>
+                  <td style="padding: 6px 0; color: #CBD5E1;">${memberLocation}</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Official Deposit Accounts -->
+            <div style="background-color: #081122; border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 14px; padding: 18px; margin: 25px 0;">
+              <h3 style="color: #60A5FA; font-size: 14px; margin-top: 0; margin-bottom: 10px; font-weight: bold;">
+                🏛️ ক্লাবের অফিসিয়াল ডিপোজিট একাউন্ট বিবরণ:
+              </h3>
+              <p style="color: #94A3B8; font-size: 12px; margin-bottom: 12px; line-height: 1.5;">
+                আপনার নিয়মিত বা অগ্রিম মাসিক শেয়ার সঞ্চয় জমা করতে নিচের যেকোনো অফিসিয়াল মাধ্যম ব্যবহার করতে পারেন:
+              </p>
+              <ul style="margin: 0; padding-left: 20px; font-size: 12.5px; color: #E2E8F0; line-height: 1.8;">
+                <li><strong>ব্যাংক:</strong> ${settings?.bankName || 'Islami Bank Bangladesh PLC'} (হিসাব: <code>${settings?.bankAccountNumber || '2050XXXXXXXXXXXXX'}</code>)</li>
+                <li><strong>বিকাশ:</strong> <code>${settings?.bkashNumber || '01700000000'}</code></li>
+                <li><strong>নগদ:</strong> <code>${settings?.nagadNumber || '01800000000'}</code></li>
+              </ul>
+            </div>
+
+            <!-- WhatsApp Action Button -->
+            <div style="text-align: center; margin: 30px 0 15px 0;">
+              <a href="${waLink}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; text-decoration: none; padding: 14px 28px; border-radius: 12px; font-weight: bold; font-size: 14px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);">
+                💬 অফিসিয়াল WhatsApp গ্রুপে যুক্ত হোন
+              </a>
+            </div>
+            <p style="text-align: center; font-size: 11.5px; color: #94A3B8; margin-top: 8px;">
+              জরুরি তথ্য, ডিপোজিট ট্র্যাকিং ও কমিউনিটি আলোচনার জন্য গ্রুপে যোগ দিন।
+            </p>
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #070D1B; padding: 20px; text-align: center; border-top: 1px solid rgba(212, 175, 55, 0.25); font-size: 11.5px; color: #64748B; line-height: 1.6;">
+            <p style="margin: 0 0 5px 0; color: #94A3B8;">
+              <strong>প্রবাসী বিজনেস ক্লাব (Probashi Business Club - PBC)</strong>
+            </p>
+            <p style="margin: 0; font-size: 10.5px;">
+              অফিসিয়াল ঠিকানা: ${settings?.clubOfficeAddress || 'লেভেল ৪, গুলশান এভিনিউ, ঢাকা, বাংলাদেশ'}
+            </p>
+            <p style="margin: 8px 0 0 0; font-size: 10px; color: #475569;">
+              এই ইমেইলটি সিস্টেম থেকে স্বয়ংক্রিয়ভাবে তৈরি হয়েছে। কোনো অনুসন্ধানের জন্য আমাদের WhatsApp সাপোর্ট গ্রুপে যোগাযোগ করুন।
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const info = await transporter.sendMail({
+      from: `"${senderName}" <${senderEmail}>`,
+      to: member.email,
+      subject: `প্রবাসী বিজনেস ক্লাবে (PBC) স্বাগতম! [সদস্য আইডি: ${memberId}]`,
+      html: welcomeHtml
+    });
+
+    return res.json({
+      success: true,
+      messageId: info.messageId,
+      message: 'Welcome email sent successfully!'
+    });
+  } catch (error: any) {
+    console.error('Welcome Email Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to send welcome email.'
+    });
+  }
+});
+
+// ----------------------------------------------------
+// 3. Deposit Approval: Automated Email with Dynamic PDF Receipt
+// ----------------------------------------------------
+app.post('/api/email/deposit-receipt', async (req, res) => {
+  try {
+    const { recipientEmail, recipientName, deposit, member, settings, pdfBase64, filename, config } = req.body;
+
+    if (!recipientEmail || !deposit) {
+      return res.status(400).json({ success: false, error: 'Recipient email and deposit data are required.' });
+    }
+
+    const transporter = createTransporter(config);
+    const senderName = config?.senderName || DEFAULT_SENDER_NAME;
+    const senderEmail = config?.senderEmail || config?.smtpUser || DEFAULT_SENDER_EMAIL;
+
+    const memberDisplayName = recipientName || deposit.memberName || member?.fullName || 'সম্মানিত সদস্য';
+    const amountFormatted = Number(deposit.amount || 0).toLocaleString('en-IN');
+    const sharePrice = deposit.shareUnitPrice || settings?.shareUnitPrice || 5000;
+    const shareCount = deposit.shareCount || Math.max(1, Math.round(deposit.amount / sharePrice));
+    const receiptNo = `RCP-${deposit.id.replace('DEP-', '')}-${(deposit.depositDate || '').replace(/-/g, '')}`;
+    const adminName = deposit.approvedByAdminName || 'Super Admin';
+    const waLink = settings?.supportWhatsAppGroupLink || 'https://chat.whatsapp.com/PBC-Official-Club';
+
+    const receiptHtml = `
+      <div style="background-color: #070D1B; padding: 30px 15px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #ffffff;">
+        <div style="max-width: 620px; margin: 0 auto; background-color: #0C182F; border: 2px solid #D4AF37; border-radius: 18px; overflow: hidden; box-shadow: 0 15px 40px rgba(0,0,0,0.6);">
+          
+          <!-- Header Banner -->
+          <div style="background: linear-gradient(135deg, #070D1B 0%, #102040 100%); padding: 30px 20px; text-align: center; border-bottom: 2px solid #D4AF37;">
+            <div style="display: inline-block; width: 64px; height: 64px; border-radius: 50%; background: rgba(52, 211, 153, 0.15); border: 2px solid #34D399; line-height: 64px; font-size: 28px; margin-bottom: 10px;">
+              ✓
+            </div>
+            <h1 style="margin: 0; color: #FFFFFF; font-size: 22px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;">
+              PROBASHI <span style="color: #F59E0B;">BUSINESS CLUB</span>
+            </h1>
+            <p style="margin: 6px 0 0 0; color: #34D399; font-size: 13px; font-weight: bold; letter-spacing: 1.5px;">
+              ★ ডিপোজিট ভাউচার সফলভাবে অনুমোদিত হয়েছে ★
+            </p>
+          </div>
+
+          <!-- Body Content -->
+          <div style="padding: 30px 25px;">
+            <p style="font-size: 16px; color: #F59E0B; font-weight: bold; margin-top: 0;">
+              আসসালামু আলাইকুম, ${memberDisplayName} ভাই!
+            </p>
+            <p style="color: #CBD5E1; font-size: 14px; line-height: 1.7; margin-bottom: 20px;">
+              আলহামদুলিল্লাহ! প্রবাসী বিজনেস ক্লাবে আপনার জমাকৃত ডিপোজিট অডিট নিরীক্ষা শেষে ক্লাবের হিসাব শাখায় সফলভাবে অনুমোদিত ও পোর্টফোলিওতে ক্রেডিট করা হয়েছে।
+            </p>
+
+            <!-- Prominent Amount Display -->
+            <div style="background: linear-gradient(135deg, #0B1933 0%, #152C59 100%); border: 2px solid #F59E0B; border-radius: 14px; padding: 22px; text-align: center; margin: 25px 0;">
+              <span style="color: #94A3B8; font-size: 11.5px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.5px; display: block; margin-bottom: 6px;">
+                TOTAL APPROVED & CREDITED AMOUNT
+              </span>
+              <span style="color: #FCD34D; font-size: 32px; font-weight: 900; letter-spacing: 1px; display: block; font-family: 'Segoe UI', Tahoma, sans-serif;">
+                ৳${amountFormatted} BDT
+              </span>
+              <span style="display: inline-block; background: rgba(52, 211, 153, 0.2); border: 1px solid rgba(52, 211, 153, 0.4); color: #34D399; font-size: 11px; font-weight: bold; padding: 3px 12px; border-radius: 20px; margin-top: 10px;">
+                +${shareCount} টি শেয়ার ইউনিট অর্জিত
+              </span>
+            </div>
+
+            <!-- Receipt Breakdown Table -->
+            <div style="background-color: #070D1B; border: 1.5px solid rgba(212, 175, 55, 0.4); border-radius: 14px; padding: 20px; margin: 25px 0;">
+              <div style="border-bottom: 1px solid rgba(212,175,55,0.25); padding-bottom: 10px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #F59E0B; font-weight: bold; font-size: 12.5px; text-transform: uppercase; letter-spacing: 1px;">লেনদেন ও রসিদ তথ্য</span>
+                <span style="font-family: monospace; color: #CBD5E1; font-size: 11px;">${receiptNo}</span>
+              </div>
+              <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #E2E8F0;">
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8; width: 42%;">সদস্যের নাম:</td>
+                  <td style="padding: 6px 0; font-weight: bold; color: #FFFFFF;">${memberDisplayName}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">সদস্য আইডি:</td>
+                  <td style="padding: 6px 0; font-weight: bold; font-family: monospace; color: #FCD34D;">${deposit.memberId || member?.id || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">পেমেন্ট মেথড:</td>
+                  <td style="padding: 6px 0; color: #FFFFFF;">${deposit.paymentMethod || 'Bank'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">TrxID / রেফারেন্স:</td>
+                  <td style="padding: 6px 0; font-family: monospace; color: #FCD34D; font-weight: bold;">${deposit.referenceNumber || 'N/A'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">জমার তারিখ:</td>
+                  <td style="padding: 6px 0; color: #CBD5E1;">${deposit.depositDate || new Date().toISOString().split('T')[0]}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 0; color: #94A3B8;">অনুমোদনকারী কর্মকর্তা:</td>
+                  <td style="padding: 6px 0; color: #34D399; font-weight: bold;">${adminName} (Audit Cleared)</td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- PDF Attachment Callout -->
+            <div style="background-color: #061A14; border: 1.5px solid #10B981; border-radius: 14px; padding: 18px; margin: 25px 0;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="width: 40px; vertical-align: top; font-size: 24px;">📎</td>
+                  <td style="vertical-align: top;">
+                    <h4 style="margin: 0 0 5px 0; color: #34D399; font-size: 13.5px; font-weight: bold;">
+                      অফিসিয়াল PDF মানি রসিদ সংযুক্ত রয়েছে!
+                    </h4>
+                    <p style="margin: 0; font-size: 12px; color: #A7F3D0; line-height: 1.5;">
+                      এই ইমেইলের সাথে ক্লাবের সিলমোহর ও অডিট স্বাক্ষরযুক্ত <strong>${filename || 'PBC_Deposit_Receipt.pdf'}</strong> ফাইলটি Attachment হিসেবে যুক্ত করা হয়েছে। আপনি ভবিষ্যতে যেকোনো প্রমাণের জন্য এটি সংরক্ষণ বা প্রিন্ট করতে পারবেন।
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- WhatsApp Action Button -->
+            <div style="text-align: center; margin: 25px 0 10px 0;">
+              <a href="${waLink}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 12px; font-weight: bold; font-size: 13.5px; box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);">
+                💬 অফিসিয়াল WhatsApp হেল্পডেস্ক
+              </a>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="background-color: #070D1B; padding: 20px; text-align: center; border-top: 1px solid rgba(212, 175, 55, 0.25); font-size: 11px; color: #64748B; line-height: 1.6;">
+            <p style="margin: 0 0 4px 0; color: #94A3B8;">
+              <strong>প্রবাসী বিজনেস ক্লাব (Probashi Business Club - PBC)</strong>
+            </p>
+            <p style="margin: 0; font-size: 10px;">
+              অফিসিয়াল ঠিকানা: ${settings?.clubOfficeAddress || 'লেভেল ৪, গুলশান এভিনিউ, ঢাকা, বাংলাদেশ'}
+            </p>
+            <p style="margin: 8px 0 0 0; font-size: 9.5px; color: #475569;">
+              এই কম্পিউটার রসিদটি PBC অ্যাপ দ্বারা জেনারেট করা হয়েছে। এটি বৈধ আর্থিক স্বীকৃতি দলিল।
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Process attachments
+    const mailAttachments: any[] = [];
+    if (pdfBase64 && typeof pdfBase64 === 'string') {
+      try {
+        const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '');
+        mailAttachments.push({
+          filename: filename || `PBC_Receipt_${deposit.id}.pdf`,
+          content: Buffer.from(cleanBase64, 'base64'),
+          contentType: 'application/pdf'
+        });
+      } catch (attErr) {
+        console.warn('PDF attachment buffer conversion error:', attErr);
+      }
+    }
+
+    const info = await transporter.sendMail({
+      from: `"${senderName}" <${senderEmail}>`,
+      to: recipientEmail,
+      subject: `[অনুমোদিত রসিদ] ৳${amountFormatted} BDT ডিপোজিট কনফার্মেশন ও অফিসিয়াল ভাউচার - PBC Club`,
+      html: receiptHtml,
+      attachments: mailAttachments
+    });
+
+    return res.json({
+      success: true,
+      messageId: info.messageId,
+      message: 'Deposit receipt email dispatched successfully with PDF attachment!'
+    });
+  } catch (error: any) {
+    console.error('Deposit Receipt Email Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error?.message || 'Failed to dispatch deposit receipt email.'
     });
   }
 });

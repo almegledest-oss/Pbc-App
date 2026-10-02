@@ -41,7 +41,8 @@ import {
   Phone,
   Building,
   ExternalLink,
-  BookOpen
+  BookOpen,
+  Mail
 } from 'lucide-react';
 import { exportBackupData, restoreBackupData, compressImageToDataUrl } from '../../services/firebaseService';
 import { PbcLogo } from '../Common/PbcLogo';
@@ -51,6 +52,7 @@ import { ThemeSelectorCard } from './ThemeSelectorCard';
 import { AdminManualDepositView } from './AdminManualDepositView';
 import { AdminSupportSettingsView } from './AdminSupportSettingsView';
 import { AdminClubRulesEditor } from './AdminClubRulesEditor';
+import { AdminEmailSettingsView } from './AdminEmailSettingsView';
 import { WhatsAppReceiptSendModal } from '../Deposits/WhatsAppReceiptSendModal';
 
 export const AdminPanel: React.FC = () => {
@@ -231,7 +233,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   const openSubView = (
-    subViewKey: 'approvals' | 'users' | 'logs' | 'broadcast' | 'settings' | 'backup' | 'manual_deposit' | 'permissions' | 'support_settings' | 'club_rules_settings',
+    subViewKey: 'approvals' | 'users' | 'logs' | 'broadcast' | 'settings' | 'backup' | 'manual_deposit' | 'permissions' | 'support_settings' | 'club_rules_settings' | 'email_settings',
     title: string,
     titleBn: string
   ) => {
@@ -628,6 +630,38 @@ export const AdminPanel: React.FC = () => {
             </div>
           )}
 
+          {/* 11. Automated Email & SMTP Settings - STRICTLY SUPER ADMIN ONLY */}
+          {role === 'super_admin' && (
+            <div
+              onClick={() => openSubView('email_settings', 'Automated Email & SMTP Settings', 'অটোমেটেড ইমেইল ও SMTP সেটিংস')}
+              className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-purple-500/40 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-13 h-13 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0 group-hover:scale-105 transition shadow-md">
+                  <Mail className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white group-hover:text-amber-300 transition truncate">
+                      {isBn ? 'অটোমেটেড ইমেইল ও SMTP সেটিংস' : 'Automated Email & SMTP'}
+                    </h3>
+                    <span className="px-2 py-0.5 text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full font-black tracking-wider shrink-0 uppercase">
+                      SUPER ADMIN ONLY
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                    {isBn 
+                      ? 'নতুন মেম্বারদের ওয়েলকাম ইমেইল ও ডিপোজিট অনুমোদনে অটোমেটিক ডাইনামিক PDF রসিদ প্রেরণের সার্ভার কনফিগারেশন' 
+                      : 'Server SMTP configuration for automated welcome emails and dynamic PDF deposit receipts'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-2 rounded-xl bg-[#070D1B] text-slate-400 group-hover:text-amber-400 group-hover:translate-x-1 transition shrink-0 border border-[#D4AF37]/20">
+                <ChevronRight className="w-5 h-5" />
+              </div>
+            </div>
+          )}
+
         </div>
 
       </div>
@@ -637,6 +671,26 @@ export const AdminPanel: React.FC = () => {
   // If a subView is active, render the dedicated Sub-View in full screen
   return (
     <div className="space-y-6 pb-12">
+      {/* Sub-View: Automated Email & SMTP Settings - SUPER ADMIN ONLY */}
+      {currentSubView === 'email_settings' && (
+        role === 'super_admin' ? (
+          <AdminEmailSettingsView onBack={() => goBack()} />
+        ) : (
+          <div className="p-8 text-center bg-[#0B1528] rounded-3xl border border-rose-500/40 text-white space-y-3">
+            <h3 className="text-base font-bold text-rose-400">নিরাপত্তা সীমাবদ্ধতা (Access Denied)</h3>
+            <p className="text-xs text-slate-300">
+              ইমেইল ও SMTP সেটিংস মডিউলটি শুধুমাত্র ক্লাবের সুপার অ্যাডমিনের জন্য সংরক্ষিত।
+            </p>
+            <button
+              onClick={() => goBack()}
+              className="px-5 py-2 bg-amber-500 text-slate-950 font-bold text-xs rounded-xl hover:bg-amber-400 transition"
+            >
+              পিছনে যান
+            </button>
+          </div>
+        )
+      )}
+
       {/* Sub-View: Support, WhatsApp & Payment Accounts Settings */}
       {currentSubView === 'support_settings' && (
         <AdminSupportSettingsView onBack={() => goBack()} />

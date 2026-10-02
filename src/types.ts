@@ -72,6 +72,17 @@ export interface SystemSettings {
   // Club Constitution & Rules Settings
   clubRules?: any[]; // ClubRuleCategory[]
   clubRulesLastUpdated?: string;
+  // Automated Email & SMTP Settings
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpSecure?: boolean;
+  smtpUser?: string;
+  smtpPass?: string;
+  senderName?: string;
+  senderEmail?: string;
+  enableWelcomeEmail?: boolean;
+  enableDepositReceiptEmail?: boolean;
+  clubOfficeAddress?: string;
 }
 
 export interface TrashedItem {

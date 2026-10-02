@@ -78,6 +78,7 @@ import {
   signInWithEmailAndPassword,
   onAuthStateChanged
 } from '../services/firebaseService';
+import { sendWelcomeEmailApi, sendDepositReceiptEmailApi } from '../services/emailService';
 
 interface AppContextType {
   role: UserRole;
@@ -309,7 +310,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clubRulesLastUpdated: '২০২৬-০৯-০৪',
       noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.',
       maintenanceMode: false,
-      maintenanceMessage: `সম্মানিত মেম্বারবৃন্দ,\nঅ্যাপটির নতুন নিরাপত্তা আপডেট ও পারফরম্যান্স উন্নয়নের কাজ চলমান রয়েছে। সাময়িকভাবে সাধারণ মেম্বারদের জন্য লগইন ও অ্যাপ ব্যবহারের সেবা স্থগিত রাখা হয়েছে।\n\nকাজ শেষ হওয়া মাত্রই অ্যাপটি পুনরায় সচল করা হবে। আপনার ধৈর্য ও সহযোগিতার জন্য ধন্যবাদ।`
+      maintenanceMessage: `সম্মানিত মেম্বারবৃন্দ,\nঅ্যাপটির নতুন নিরাপত্তা আপডেট ও পারফরম্যান্স উন্নয়নের কাজ চলমান রয়েছে। সাময়িকভাবে সাধারণ মেম্বারদের জন্য লগইন ও অ্যাপ ব্যবহারের সেবা স্থগিত রাখা হয়েছে।\n\nকাজ শেষ হওয়া মাত্রই অ্যাপটি পুনরায় সচল করা হবে। আপনার ধৈর্য ও সহযোগিতার জন্য ধন্যবাদ।`,
+      // Automated Email & SMTP Settings
+      smtpHost: 'smtp.gmail.com',
+      smtpPort: 465,
+      smtpSecure: true,
+      smtpUser: 'fokrulislammir9897@gmail.com',
+      smtpPass: 'tqnt cqlj npjb zpal',
+      senderName: 'Probashi Business Club (PBC)',
+      senderEmail: 'fokrulislammir9897@gmail.com',
+      enableWelcomeEmail: true,
+      enableDepositReceiptEmail: true
     };
   });
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
@@ -1340,6 +1351,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     await addActivityLog('Member Approved', `Admin approved member registration ${id}`);
     addNotification('Member Registration Approved', `Member ${id} is now Active.`, 'system');
+
+    // Trigger automated welcome email if enabled
+    if ((systemSettings.enableWelcomeEmail ?? true) && targetMember?.email) {
+      sendWelcomeEmailApi(targetMember, systemSettings).catch(err => {
+        console.warn('Automated welcome email dispatch notice:', err);
+      });
+    }
   };
 
   const rejectMember = async (id: string) => {
@@ -1418,6 +1436,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       await addActivityLog('Deposit Recorded', `Deposit of ৳${d.amount.toLocaleString()} logged for ${d.memberName}`);
       addNotification('New Deposit Recorded', `৳${d.amount.toLocaleString()} deposited by ${d.memberName} (${d.paymentMethod}).`, 'deposit');
+
+      // Automated Deposit PDF receipt email dispatch
+      if (systemSettings.enableDepositReceiptEmail ?? true) {
+        if (targetMember?.email || fullNewDeposit.receiptUrl?.includes('@')) {
+          sendDepositReceiptEmailApi(fullNewDeposit, targetMember, systemSettings).catch(err => {
+            console.warn('Manual approved deposit email dispatch notice:', err);
+          });
+        }
+      }
     } else {
       await addActivityLog('Deposit Voucher Submitted', `Deposit voucher ৳${d.amount.toLocaleString()} submitted by ${d.memberName} (${newId}). Pending Admin Audit.`);
       addNotification('Pending Deposit Voucher', `৳${d.amount.toLocaleString()} deposit voucher submitted by ${d.memberName}. Awaiting admin verification.`, 'deposit');
@@ -1667,6 +1694,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification('Deposit Voucher Approved', `Deposit voucher ${id} was verified and approved with official signature by ${adminName} (${adminId}).`, 'deposit');
     } catch (e) {
       console.warn('Background sync error on deposit approval:', e);
+    }
+
+    // 4. Background automated email with dynamic PDF receipt attachment
+    if (systemSettings.enableDepositReceiptEmail ?? true) {
+      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
+      const approvedDepositObj: Deposit = { ...targetDeposit, ...updateData };
+      if (targetMember?.email || targetDeposit.receiptUrl?.includes('@')) {
+        sendDepositReceiptEmailApi(approvedDepositObj, targetMember, systemSettings).catch(err => {
+          console.warn('Automated deposit receipt email dispatch notice:', err);
+        });
+      }
     }
   };
 

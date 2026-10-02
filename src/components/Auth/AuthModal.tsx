@@ -25,6 +25,7 @@ import {
   setUserProfileDoc,
   addMemberDoc
 } from '../../services/firebaseService';
+import { sendWelcomeEmailApi } from '../../services/emailService';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -311,6 +312,13 @@ export const AuthModal: React.FC = () => {
           `New member applicant ${signupFullName.trim()} (${newMemberId}) registered and is awaiting admin approval.`,
           'system'
         );
+
+        // 8. Automated Welcome Email dispatch in background
+        if (systemSettings.enableWelcomeEmail ?? true) {
+          sendWelcomeEmailApi(newMemberData, systemSettings).catch(e => {
+            console.warn('Automated welcome email dispatch notice:', e);
+          });
+        }
 
         // Set submitted applicant details and show Success Confirmation Screen
         setSubmittedApplicant({
