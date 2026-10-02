@@ -31,7 +31,8 @@ import {
   Building,
   Image as ImageIcon,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Mail
 } from 'lucide-react';
 
 const MONTH_NAMES_EN = [
@@ -63,7 +64,9 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
   const { 
     members, 
     deposits,
+    users,
     addDeposit, 
+    updateMember,
     language, 
     role, 
     currentMember, 
@@ -95,6 +98,7 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
   // 1. Member Selection
   const [memberSearch, setMemberSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [memberEmail, setMemberEmail] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   // 2. Share Count (Defaults to 1 or member's commitment)
@@ -202,6 +206,16 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
     setSelectedMember(member);
     setMemberSearch(`${member.fullName} (${member.id})`);
     setIsDropdownOpen(false);
+
+    // Auto-resolve email from member profile or matching user account
+    const depMemId = (member.id || '').toUpperCase().trim();
+    const depMemName = (member.fullName || '').toLowerCase().trim();
+    const matchedUser = users.find(u => 
+      (u.memberId && u.memberId.toUpperCase().trim() === depMemId) ||
+      (u.displayName && u.displayName.toLowerCase().trim() === depMemName)
+    );
+    const resolvedEmail = member.email?.trim() || matchedUser?.email?.trim() || '';
+    setMemberEmail(resolvedEmail);
     
     // Auto-set share count based on member's commitment if available
     const commitment = member.monthlyShareCommitment || 1;
@@ -314,9 +328,14 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
         approvedByAdminSignature: autoApprove ? adminSig : undefined
       };
 
-      await addDeposit(depositData);
+      // If admin updated or provided memberEmail, save it to the member profile
+      if (memberEmail?.trim() && memberEmail.includes('@') && memberEmail.trim() !== selectedMember.email?.trim()) {
+        updateMember(selectedMember.id, { email: memberEmail.trim() }).catch(console.warn);
+      }
 
-      const generatedDeposit: Deposit = {
+      const addedDeposit = await addDeposit(depositData);
+
+      const generatedDeposit: Deposit = addedDeposit || {
         id: `DEP-${Math.floor(9000 + Math.random() * 9000)}`,
         ...depositData,
         status: autoApprove ? 'Approved' : 'Pending'
@@ -341,6 +360,7 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
     setCreatedDeposit(null);
     setSelectedMember(null);
     setMemberSearch('');
+    setMemberEmail('');
     setShareCount(1);
     setSelectedMonths([currentMonthVal]);
     setIsCustomAmount(false);
@@ -527,6 +547,21 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                         <span>{selectedMember.country}</span>
                       </>
                     )}
+                    {memberEmail ? (
+                      <>
+                        <span>•</span>
+                        <span className="text-emerald-400 font-mono font-semibold">
+                          ✉️ {memberEmail}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span>•</span>
+                        <span className="text-amber-400 font-bold">
+                          ⚠️ {isBn ? 'ইমেইল সেট করা নেই' : 'No email set'}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -592,6 +627,34 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                       </div>
                     );
                   })()}
+                </div>
+              </div>
+
+              {/* Email Receipt Status & Input Bar */}
+              <div className="w-full pt-3 mt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-slate-300 font-bold flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                    {isBn ? 'রসিদ পাঠানোর ইমেইল:' : 'Receipt Email:'}
+                  </span>
+                  <input
+                    type="email"
+                    value={memberEmail}
+                    onChange={(e) => setMemberEmail(e.target.value)}
+                    placeholder={isBn ? "মেম্বারের ইমেইল দিন (name@gmail.com)" : "Enter email for PDF receipt"}
+                    className="px-3 py-1.5 bg-[#060C17] border border-amber-500/40 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-amber-400 w-64 shadow-inner"
+                  />
+                </div>
+                <div>
+                  {memberEmail?.includes('@') ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                      ✓ {isBn ? 'ডিপোজিটের পর মেম্বারকে অফিসিয়াল PDF রসিদ পাঠানো হবে' : 'PDF receipt will be emailed'}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30">
+                      ⚠️ {isBn ? 'ইমেইল লিখলে স্বয়ংক্রিয় রসিদ যাবে' : 'Enter email to send receipt'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

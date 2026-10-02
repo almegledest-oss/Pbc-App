@@ -100,12 +100,14 @@ export async function sendWelcomeEmailApi(
 export async function sendDepositReceiptEmailApi(
   deposit: Deposit,
   member?: Partial<Member>,
-  settings?: Partial<SystemSettings>
+  settings?: Partial<SystemSettings>,
+  customRecipientEmail?: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
-    const recipientEmail = deposit.receiptUrl && deposit.receiptUrl.includes('@')
-      ? deposit.receiptUrl
-      : member?.email;
+    const recipientEmail = customRecipientEmail?.trim() ||
+      (deposit.receiptUrl && deposit.receiptUrl.includes('@')
+        ? deposit.receiptUrl
+        : member?.email);
 
     if (!recipientEmail || !recipientEmail.includes('@')) {
       console.warn('Deposit recipient has no valid email address for receipt dispatch.');

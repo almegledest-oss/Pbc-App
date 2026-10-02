@@ -58,8 +58,13 @@ export const Sidebar: React.FC = () => {
   
   const labels = t[language];
 
+  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || 
+    (authUser?.email && (authUser.email.toLowerCase() === 'almegledest@gmail.com' || authUser.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    (currentMember?.email && (currentMember.email.toLowerCase() === 'almegledest@gmail.com' || currentMember.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    currentMember?.id === 'PBC-00000' || currentMember?.id === 'PBC-1001';
+
   // Check if user has admin/super_admin privileges
-  const isAdmin = role === 'super_admin' || role === 'admin' || accountRole === 'super_admin' || accountRole === 'admin';
+  const isAdmin = isSuperAdmin || role === 'admin' || accountRole === 'admin';
 
   // Calculate live online users count
   const nowMs = new Date().getTime();
@@ -462,6 +467,9 @@ export const Sidebar: React.FC = () => {
                 {isAdmin && (
                   <button
                     onClick={() => {
+                      if (role === 'member') {
+                        switchRoleMode(isSuperAdmin ? 'super_admin' : 'admin');
+                      }
                       navigateWithHistory('admin_panel', { fromMoreMenu: true });
                       setIsMoreOpen(false);
                     }}

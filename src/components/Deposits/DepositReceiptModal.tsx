@@ -47,10 +47,18 @@ export const DepositReceiptModal: React.FC<DepositReceiptModalProps> = ({ deposi
   if (!isOpen || !deposit) return null;
 
   const isBn = language === 'bn';
-  const receiptNumber = `RCP-${deposit.id.replace('DEP-', '')}-${deposit.depositDate.replace(/-/g, '')}`;
+  const safeDate = deposit.depositDate || new Date().toISOString().split('T')[0];
+  const receiptNumber = `RCP-${(deposit.id || 'DEP').replace('DEP-', '')}-${safeDate.replace(/-/g, '')}`;
   const amountWords = numberToWordsBDT(deposit.amount);
 
-  const memberObj = members.find(m => m.id === deposit.memberId);
+  const depMemId = (deposit.memberId || '').toUpperCase().trim();
+  const depMemName = (deposit.memberName || '').toLowerCase().trim();
+
+  const memberObj = members.find(m => 
+    (m.id && m.id.toUpperCase().trim() === depMemId) || 
+    (m.fullName && m.fullName.toLowerCase().trim() === depMemName)
+  );
+
   const monthlyRate = deposit.monthlyShareCommitment || memberObj?.monthlyShareCommitment || 1;
   const totalShares = deposit.shareCount || Math.max(1, Math.round(deposit.amount / (deposit.shareUnitPrice || 5000)));
   const monthsCount = deposit.monthCount || (monthlyRate > 0 ? Math.max(1, Math.round(totalShares / monthlyRate)) : 1);

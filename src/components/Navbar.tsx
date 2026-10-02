@@ -57,6 +57,13 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
   const langDropdownRef = useRef<HTMLDivElement>(null);
   const mobileLangDropdownRef = useRef<HTMLDivElement>(null);
 
+  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || 
+    (authUser?.email && (authUser.email.toLowerCase() === 'almegledest@gmail.com' || authUser.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    (currentMember?.email && (currentMember.email.toLowerCase() === 'almegledest@gmail.com' || currentMember.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    currentMember?.id === 'PBC-00000' || currentMember?.id === 'PBC-1001';
+
+  const hasAdminPrivileges = isSuperAdmin || role === 'admin' || accountRole === 'admin';
+
   // Close language dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent | TouchEvent) {
@@ -363,14 +370,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
           </button>
 
           {/* Role Mode Switcher Dropdown (Admin / Member Mode) - Desktop Only */}
-          {(accountRole === 'super_admin' || accountRole === 'admin' || role === 'super_admin' || role === 'admin') && (
+          {hasAdminPrivileges && (
             <div className="relative hidden md:block">
               <button
                 onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 bg-[#0B1528] hover:bg-[#112244] rounded-xl border border-[#D4AF37]/30 transition"
               >
                 <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                <span className="capitalize">{role === 'super_admin' ? 'Super Admin' : role}</span>
+                <span className="capitalize">{role === 'super_admin' ? 'Super Admin' : (role === 'admin' ? 'Admin' : 'Member View')}</span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </button>
 
@@ -381,7 +388,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
                   </div>
                   <button
                     onClick={() => {
-                      switchRoleMode('admin');
+                      switchRoleMode(isSuperAdmin ? 'super_admin' : 'admin');
                       setActiveTab('dashboard');
                       setIsRoleDropdownOpen(false);
                     }}
@@ -509,9 +516,12 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
                   <span>{labels.myProfile}</span>
                 </button>
 
-                {(role === 'super_admin' || role === 'admin') && (
+                {hasAdminPrivileges && (
                   <button
                     onClick={() => {
+                      if (role === 'member') {
+                        switchRoleMode(isSuperAdmin ? 'super_admin' : 'admin');
+                      }
                       setActiveTab('admin_panel');
                       setIsProfileMenuOpen(false);
                     }}

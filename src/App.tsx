@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { VersionProvider } from './context/VersionContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
@@ -45,10 +45,27 @@ const MainContent: React.FC = () => {
     setIsAuthModalOpen,
     updateSystemSettings,
     isFocusMode,
-    canGoBack
+    canGoBack,
+    authUser,
+    currentMember
   } = useApp();
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const { currentTheme } = useTheme();
+
+  const isSuperAdminAccount = role === 'super_admin' || accountRole === 'super_admin' || 
+    (authUser?.email && (authUser.email.toLowerCase() === 'almegledest@gmail.com' || authUser.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    (currentMember?.email && (currentMember.email.toLowerCase() === 'almegledest@gmail.com' || currentMember.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    currentMember?.id === 'PBC-00000' || currentMember?.id === 'PBC-1001';
+
+  const hasAdminPrivileges = isSuperAdminAccount || role === 'admin' || accountRole === 'admin';
+
+  // Auto-switch to admin mode if super admin or admin navigates to admin_panel
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if ((activeTab === 'admin_panel' || activeTab === 'active_now') && role === 'member' && hasAdminPrivileges) {
+      switchRoleMode(isSuperAdminAccount ? 'super_admin' : 'admin');
+    }
+  }, [isLoggedIn, activeTab, role, hasAdminPrivileges, isSuperAdminAccount, switchRoleMode]);
 
   // Requirement 1: Disable guest access completely. Redirect unauthenticated users to Login.
   if (!isLoggedIn) {
@@ -61,12 +78,12 @@ const MainContent: React.FC = () => {
   }
 
   // Maintenance mode block for logged-in non-super-admin users
-  if (systemSettings.maintenanceMode && role !== 'super_admin') {
+  if (systemSettings.maintenanceMode && !isSuperAdminAccount) {
     return <MaintenanceNoticeScreen onOpenSuperAdminLogin={() => setIsAuthModalOpen(true)} />;
   }
 
   // Member role tab restrictions - allow dashboard, my_profile, deposits, real_estate, help_desk, deposit_accounts, club_rules and directors if authorized
-  const isMemberAuthorized = role === 'member' 
+  const isMemberAuthorized = role === 'member' && !hasAdminPrivileges
     ? (
         activeTab === 'dashboard' || 
         activeTab === 'my_profile' || 

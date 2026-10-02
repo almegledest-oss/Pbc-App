@@ -116,7 +116,7 @@ interface AppContextType {
   approveMember: (id: string) => Promise<void>;
   rejectMember: (id: string) => Promise<void>;
   
-  addDeposit: (deposit: Omit<Deposit, 'id' | 'status'>) => Promise<void>;
+  addDeposit: (deposit: Omit<Deposit, 'id' | 'status'> & { status?: 'Approved' | 'Pending' | 'Rejected'; approvedByAdminName?: string; approvedByAdminId?: string; approvedByAdminSignature?: string }) => Promise<Deposit>;
   updateDeposit: (id: string, deposit: Partial<Deposit>) => Promise<void>;
   deleteDeposit: (id: string) => Promise<void>;
   approveDeposit: (id: string, signatureDataUrl?: string) => Promise<void>;
@@ -681,15 +681,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          const isPreviewingAsMember = safeStorage.getItem('pbc_role_mode_override') === 'member';
-          const finalRole = isPreviewingAsMember ? 'member' : detectedRole;
-          setRoleState(finalRole);
-          safeStorage.setItem('pbc_role', finalRole);
-          safeStorage.setItem('pbc_logged_in', 'true');
-
           const userCleanEmail = (user.email || '').toLowerCase().trim();
           const isFokrulSuperAdmin = userCleanEmail === 'fokrulislammir9897@gmail.com';
           const isAlmegledest = userCleanEmail === 'almegledest@gmail.com';
+          const isSuperAdminAccount = isFokrulSuperAdmin || isAlmegledest;
+
+          const isPreviewingAsMember = safeStorage.getItem('pbc_role_mode_override') === 'member';
+          const resolvedRole = isSuperAdminAccount ? 'super_admin' : detectedRole;
+          const finalRole = isPreviewingAsMember ? 'member' : resolvedRole;
+          setRoleState(finalRole);
+          safeStorage.setItem('pbc_role', finalRole);
+          safeStorage.setItem('pbc_logged_in', 'true');
+          safeStorage.setItem('pbc_user_email', userCleanEmail);
 
           let resolvedMember: Member;
 
@@ -977,7 +980,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Compute account's true background permission level strictly from verified credentials
   const loggedInEmail = (authUser?.email || safeStorage.getItem('pbc_user_email') || currentMember?.email || '').toLowerCase().trim();
-  const isSuperAdminEmail = loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com';
+  const isSuperAdminEmail = loggedInEmail === 'fokrulislammir9897@gmail.com' || loggedInEmail === 'almegledest@gmail.com' || currentMember?.id === 'PBC-1001' || currentMember?.id === 'PBC-00000';
   const foundUserObj = users.find(u => u.email.toLowerCase().trim() === loggedInEmail);
   const accountRole: UserRole = isSuperAdminEmail 
     ? 'super_admin' 
@@ -1395,8 +1398,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextDepNum = (existingNums.length > 0 ? Math.max(...existingNums, 9000) : 9000) + 1;
     const newId = `DEP-${nextDepNum}`;
 
-    // Default status: if submitted by role === 'member' or explicitly 'Pending', status is 'pending'
-    const depositStatus: 'Approved' | 'Pending' | 'Rejected' = (d.status?.toLowerCase() === 'pending' || role === 'member') ? 'Pending' : (d.status || 'Approved');
+    // If explicitly marked Approved or entered by Admin/Super Admin, default status is Approved
+    const isExplicitAdmin = accountRole === 'super_admin' || accountRole === 'admin' || role === 'super_admin' || role === 'admin';
+    const depositStatus: 'Approved' | 'Pending' | 'Rejected' = d.status === 'Approved'
+      ? 'Approved'
+      : (d.status === 'Pending' ? 'Pending' : (isExplicitAdmin ? 'Approved' : 'Pending'));
 
     const effectiveShareUnitPrice = d.shareUnitPrice && d.shareUnitPrice > 0 ? d.shareUnitPrice : (systemSettings.shareUnitPrice || 5000);
     const effectiveShareCount = d.shareCount && d.shareCount > 0 ? d.shareCount : Math.max(1, Math.round((Number(d.amount) || 0) / effectiveShareUnitPrice));
@@ -1439,16 +1445,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Automated Deposit PDF receipt email dispatch
       if (systemSettings.enableDepositReceiptEmail ?? true) {
-        if (targetMember?.email || fullNewDeposit.receiptUrl?.includes('@')) {
-          sendDepositReceiptEmailApi(fullNewDeposit, targetMember, systemSettings).catch(err => {
+        const depMemId = (d.memberId || '').toUpperCase().trim();
+        const depMemName = (d.memberName || '').toLowerCase().trim();
+
+        let recipientEmail = targetMember?.email?.trim();
+        if (!recipientEmail || !recipientEmail.includes('@')) {
+          const matchedUser = users.find(u => 
+            (u.memberId && u.memberId.toUpperCase().trim() === depMemId) ||
+            (u.displayName && u.displayName.toLowerCase().trim() === depMemName)
+          );
+          if (matchedUser?.email && matchedUser.email.includes('@')) {
+            recipientEmail = matchedUser.email.trim();
+          }
+        }
+
+        if ((!recipientEmail || !recipientEmail.includes('@')) && fullNewDeposit.receiptUrl?.includes('@')) {
+          recipientEmail = fullNewDeposit.receiptUrl.trim();
+        }
+
+        if (recipientEmail && recipientEmail.includes('@')) {
+          const enrichedMember: Partial<Member> = {
+            ...(targetMember || {}),
+            email: recipientEmail,
+            id: d.memberId,
+            fullName: d.memberName
+          };
+          sendDepositReceiptEmailApi(fullNewDeposit, enrichedMember, systemSettings, recipientEmail).then(res => {
+            if (res.success) {
+              addNotification(
+                'Receipt Emailed Successfully',
+                `ডিপোজিট ${newId}-এর অফিসিয়াল PDF রসিদ মেম্বারের ইমেইলে (${recipientEmail}) সফলভাবে পাঠানো হয়েছে।`,
+                'deposit'
+              );
+            }
+          }).catch(err => {
             console.warn('Manual approved deposit email dispatch notice:', err);
           });
+        } else {
+          addNotification(
+            'Email Receipt Note',
+            `মেম্বার ${d.memberName} (${d.memberId})-এর কোনো ইমেইল পাওয়া যায়নি। মেম্বার এডিটে ইমেইল যোগ করলে রসিদ পাঠানো যাবে।`,
+            'system'
+          );
         }
       }
     } else {
       await addActivityLog('Deposit Voucher Submitted', `Deposit voucher ৳${d.amount.toLocaleString()} submitted by ${d.memberName} (${newId}). Pending Admin Audit.`);
       addNotification('Pending Deposit Voucher', `৳${d.amount.toLocaleString()} deposit voucher submitted by ${d.memberName}. Awaiting admin verification.`, 'deposit');
     }
+
+    return fullNewDeposit;
   };
 
   const updateDeposit = async (id: string, data: Partial<Deposit>) => {
@@ -1698,12 +1744,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 4. Background automated email with dynamic PDF receipt attachment
     if (systemSettings.enableDepositReceiptEmail ?? true) {
-      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
+      const depMemId = (targetDeposit.memberId || '').toUpperCase().trim();
+      const depMemName = (targetDeposit.memberName || '').toLowerCase().trim();
+
+      const targetMember = members.find(m => 
+        (m.id && m.id.toUpperCase().trim() === depMemId) || 
+        (m.fullName && m.fullName.toLowerCase().trim() === depMemName)
+      );
+
+      let recipientEmail = targetMember?.email?.trim();
+      if (!recipientEmail || !recipientEmail.includes('@')) {
+        const matchedUser = users.find(u => 
+          (u.memberId && u.memberId.toUpperCase().trim() === depMemId) ||
+          (u.displayName && u.displayName.toLowerCase().trim() === depMemName)
+        );
+        if (matchedUser?.email && matchedUser.email.includes('@')) {
+          recipientEmail = matchedUser.email.trim();
+        }
+      }
+
+      if ((!recipientEmail || !recipientEmail.includes('@')) && targetDeposit.receiptUrl?.includes('@')) {
+        recipientEmail = targetDeposit.receiptUrl.trim();
+      }
+
       const approvedDepositObj: Deposit = { ...targetDeposit, ...updateData };
-      if (targetMember?.email || targetDeposit.receiptUrl?.includes('@')) {
-        sendDepositReceiptEmailApi(approvedDepositObj, targetMember, systemSettings).catch(err => {
+      const enrichedMember: Partial<Member> = {
+        ...(targetMember || {}),
+        email: recipientEmail,
+        id: targetDeposit.memberId,
+        fullName: targetDeposit.memberName
+      };
+
+      if (recipientEmail && recipientEmail.includes('@')) {
+        sendDepositReceiptEmailApi(approvedDepositObj, enrichedMember, systemSettings, recipientEmail).then(res => {
+          if (res.success) {
+            addNotification(
+              'Receipt Emailed Successfully',
+              `ডিপোজিট ভাউচার ${id}-এর অফিসিয়াল PDF রসিদ মেম্বারের ইমেইলে (${recipientEmail}) সফলভাবে পাঠানো হয়েছে।`,
+              'deposit'
+            );
+          }
+        }).catch(err => {
           console.warn('Automated deposit receipt email dispatch notice:', err);
         });
+      } else {
+        addNotification(
+          'Email Receipt Note',
+          `মেম্বার ${targetDeposit.memberName} (${targetDeposit.memberId})-এর কোনো ইমেইল পাওয়া যায়নি। মেম্বার এডিটে ইমেইল যোগ করলে রসিদ পাঠানো যাবে।`,
+          'system'
+        );
       }
     }
   };

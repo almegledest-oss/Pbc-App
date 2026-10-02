@@ -77,6 +77,7 @@ export const AdminPanel: React.FC = () => {
     setIsQuotesManagerOpen,
     language, 
     role,
+    accountRole,
     currentMember,
     authUser,
     triggerSecurityAlert,
@@ -107,6 +108,11 @@ export const AdminPanel: React.FC = () => {
   const [voucherFilter, setVoucherFilter] = useState<'pending' | 'all_receipts'>('pending');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
   const [whatsAppModalDeposit, setWhatsAppModalDeposit] = useState<Deposit | null>(null);
+
+  const isSuperAdmin = role === 'super_admin' || accountRole === 'super_admin' || 
+    (authUser?.email && (authUser.email.toLowerCase() === 'almegledest@gmail.com' || authUser.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    (currentMember?.email && (currentMember.email.toLowerCase() === 'almegledest@gmail.com' || currentMember.email.toLowerCase() === 'fokrulislammir9897@gmail.com')) ||
+    currentMember?.id === 'PBC-00000' || currentMember?.id === 'PBC-1001';
 
   // Backup & Restore States
   const [isRestoring, setIsRestoring] = useState(false);
@@ -631,7 +637,7 @@ export const AdminPanel: React.FC = () => {
           )}
 
           {/* 11. Automated Email & SMTP Settings - STRICTLY SUPER ADMIN ONLY */}
-          {role === 'super_admin' && (
+          {isSuperAdmin && (
             <div
               onClick={() => openSubView('email_settings', 'Automated Email & SMTP Settings', 'অটোমেটেড ইমেইল ও SMTP সেটিংস')}
               className="p-5 bg-[#0B1528] hover:bg-[#112244] rounded-3xl border-2 border-purple-500/40 hover:border-amber-400 shadow-xl transition-all duration-200 cursor-pointer group flex items-center justify-between gap-4"
@@ -673,7 +679,7 @@ export const AdminPanel: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Sub-View: Automated Email & SMTP Settings - SUPER ADMIN ONLY */}
       {currentSubView === 'email_settings' && (
-        role === 'super_admin' ? (
+        isSuperAdmin ? (
           <AdminEmailSettingsView onBack={() => goBack()} />
         ) : (
           <div className="p-8 text-center bg-[#0B1528] rounded-3xl border border-rose-500/40 text-white space-y-3">

@@ -78,7 +78,8 @@ export async function generateDepositReceiptPdfBase64(
   doc.line(20, 40, pageWidth - 20, 40);
 
   // Voucher Meta Banner (Receipt # & Date)
-  const receiptNo = `RCP-${deposit.id.replace('DEP-', '')}-${deposit.depositDate.replace(/-/g, '')}`;
+  const rawDate = deposit.depositDate || new Date().toISOString().split('T')[0];
+  const receiptNo = `RCP-${(deposit.id || 'DEP').replace('DEP-', '')}-${rawDate.replace(/-/g, '')}`;
   doc.setFillColor(15, 28, 54);
   doc.roundedRect(20, 44, pageWidth - 40, 14, 2, 2, 'F');
   doc.setDrawColor(212, 175, 55);
