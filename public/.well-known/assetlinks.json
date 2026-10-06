@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.probashibusinessclub.app",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7D:0F:52:AB:E0:85:41:40:E2:2F:47:69:AA:3F:8B:0C:61:52:8A:F2:D6:40:4F:17:F7:36:2A:0D:71"
+      ]
+    }
+  }
+]

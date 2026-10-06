@@ -29,6 +29,11 @@ export interface SystemSettings {
   maintenanceMessage?: string;
   activeThemeId?: string;
   adminWhatsApp?: string;
+  // Official Deposit Slip & Receipt WhatsApp Numbers (Dual Channels)
+  depositSlipWhatsApp1?: string;
+  depositSlipWhatsApp1Label?: string;
+  depositSlipWhatsApp2?: string;
+  depositSlipWhatsApp2Label?: string;
   allowMemberDepositSubmission?: boolean;
   allowMemberSelfEdit?: boolean;
   allowMemberPhotoUpload?: boolean;

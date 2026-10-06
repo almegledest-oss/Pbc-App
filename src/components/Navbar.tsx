@@ -25,6 +25,7 @@ import {
   Languages
 } from 'lucide-react';
 import { UserRole } from '../types';
+import { AppInstallButton } from './Common/AppInstallButton';
 
 interface NavbarProps {
   onOpenNotifications: () => void;
@@ -443,6 +444,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
             <Globe className="w-3.5 h-3.5 text-amber-400" />
             <span>{language === 'en' ? 'বাংলা' : 'EN'}</span>
           </button>
+
+          {/* App Install Button for Mobile / PWA */}
+          <AppInstallButton variant="nav" />
 
           {/* Notifications Bell */}
           <button

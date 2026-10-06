@@ -93,6 +93,10 @@
         "currencySymbol": { "type": "string" },
         "minDepositAmount": { "type": "number" },
         "shareUnitPrice": { "type": "number" },
+        "depositSlipWhatsApp1": { "type": "string" },
+        "depositSlipWhatsApp1Label": { "type": "string" },
+        "depositSlipWhatsApp2": { "type": "string" },
+        "depositSlipWhatsApp2Label": { "type": "string" },
         "allowNewRegistrations": { "type": "boolean" },
         "allowMemberSelfEdit": { "type": "boolean" },
         "allowMemberPhotoUpload": { "type": "boolean" }

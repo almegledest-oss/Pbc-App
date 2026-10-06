@@ -27,7 +27,10 @@ if (typeof window !== 'undefined') {
       lower.includes('database is closing') ||
       lower.includes('database is hidden') ||
       lower.includes('connection is closing') ||
-      lower.includes('idbdatabase')
+      lower.includes('idbdatabase') ||
+      lower.includes('websocket') ||
+      lower.includes('@vite/client') ||
+      lower.includes('vite:ws')
     );
   };
 

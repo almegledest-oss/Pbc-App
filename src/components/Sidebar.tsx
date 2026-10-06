@@ -4,6 +4,7 @@ import { useTheme } from '../context/ThemeContext';
 import { t } from '../utils/translations';
 import { PbcLogo } from './Common/PbcLogo';
 import { PBCFramedAvatar } from './Common/PBCFramedAvatar';
+import { AppInstallButton } from './Common/AppInstallButton';
 import { 
   LayoutDashboard, 
   Users, 
@@ -361,6 +362,9 @@ export const Sidebar: React.FC = () => {
                 <span className="text-[11px] font-bold">{language === 'bn' ? 'প্রোফাইল' : 'Profile'}</span>
               </div>
             </div>
+
+            {/* Quick App Install Button */}
+            <AppInstallButton variant="full" />
 
             {/* Section 1: Additional Views */}
             <div>

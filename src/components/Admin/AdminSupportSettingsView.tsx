@@ -28,6 +28,13 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
 
   // Form state initialized from systemSettings
   const [formData, setFormData] = useState({
+    // Official Deposit Slip WhatsApp Numbers (Dual Channels)
+    depositSlipWhatsApp1: systemSettings.depositSlipWhatsApp1 || systemSettings.adminWhatsApp || systemSettings.supportOfficialWhatsApp || '+8801700000000',
+    depositSlipWhatsApp1Label: systemSettings.depositSlipWhatsApp1Label || 'অফিসিয়াল একাউন্টস ও ডিপোজিট ডেস্ক (Admin 1)',
+    depositSlipWhatsApp2: systemSettings.depositSlipWhatsApp2 || systemSettings.supportRep2WhatsApp || '+8801800000000',
+    depositSlipWhatsApp2Label: systemSettings.depositSlipWhatsApp2Label || 'ফাইন্যান্স ও ভেরিফিকেশন ডেস্ক (Admin 2)',
+    adminWhatsApp: systemSettings.depositSlipWhatsApp1 || systemSettings.adminWhatsApp || '+8801700000000',
+
     // Support info
     supportWhatsAppGroupLink: systemSettings.supportWhatsAppGroupLink || 'https://chat.whatsapp.com/PBC-Official-Club',
     supportFacebookGroupLink: systemSettings.supportFacebookGroupLink || 'https://www.facebook.com/groups/probashibusinessclub',
@@ -122,6 +129,156 @@ export const AdminSupportSettingsView: React.FC<AdminSupportSettingsViewProps> =
             <span>{isBn ? 'ডাটাবেজে সফলভাবে আপডেট সম্পন্ন হয়েছে! সকল মেম্বার তাৎক্ষণিকভাবে নতুন তথ্য দেখতে পাবেন।' : 'Settings updated in Firestore successfully!'}</span>
           </div>
         )}
+      </div>
+
+      {/* Form Section: Official WhatsApp Numbers for Deposit Receipts & Slips (2 Numbers) */}
+      <div className="bg-gradient-to-br from-[#0B1528] via-[#070D1B] to-[#0b1c2b] text-white p-6 rounded-3xl border-2 border-emerald-500/50 shadow-2xl space-y-6">
+        <div className="border-b border-emerald-500/20 pb-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-black uppercase tracking-wider mb-2 border border-emerald-500/40">
+            <MessageCircle className="w-3.5 h-3.5 fill-current" />
+            <span>{isBn ? 'ডিপোজিট রিসিট ও স্লিপ রিসিভিং চ্যানেল' : 'Deposit Receipt WhatsApp Gateway'}</span>
+          </div>
+          <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2.5">
+            <MessageCircle className="w-6 h-6 text-emerald-400 fill-current" />
+            <span>{isBn ? 'হোয়াটসঅ্যাপে জমার স্লিপ পাঠানোর নম্বরসমূহ (২টি নম্বর)' : 'WhatsApp Numbers for Deposit Slips (2 Numbers)'}</span>
+          </h3>
+          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+            {isBn 
+              ? 'সম্মানিত সদস্যরা ব্যাংক বা বিকাশ/নগদে টাকা পাঠানোর পর যে ২টি অফিসিয়াল WhatsApp নম্বরে জমার স্লিপ/রিসিট পাঠাতে পারবে, তা এখান থেকে সেট করুন। এই নম্বর ২টি মেম্বারদের ডিপোজিট পেইজে সরাসরি শো করবে।' 
+              : 'Configure the 2 official WhatsApp numbers where members send their deposit payment slips/screenshots after transferring money.'}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          
+          {/* WhatsApp Channel 1 */}
+          <div className="p-5 bg-[#070D1B] rounded-2xl border-2 border-emerald-500/40 space-y-4 shadow-lg">
+            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2.5">
+              <span className="font-black text-emerald-400 text-sm flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-emerald-500 text-slate-950 font-black text-xs flex items-center justify-center">১</span>
+                <span>{isBn ? 'WhatsApp নম্বর ১ (Primary)' : 'WhatsApp Channel 1'}</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                {isBn ? 'সক্রিয়' : 'Active'}
+              </span>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{isBn ? 'মোবাইল নম্বর (Phone Number with country code):' : 'Phone Number:'}</span>
+              </label>
+              <input
+                type="text"
+                value={formData.depositSlipWhatsApp1}
+                onChange={e => {
+                  const val = e.target.value;
+                  setFormData({
+                    ...formData,
+                    depositSlipWhatsApp1: val,
+                    adminWhatsApp: val
+                  });
+                }}
+                placeholder="+8801700000000"
+                className="w-full px-3.5 py-2.5 bg-[#030712] border-2 border-emerald-500/40 rounded-xl text-emerald-300 font-mono font-bold text-sm focus:outline-none focus:border-emerald-400 shadow-inner"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                {isBn ? 'উদাহরণ: +8801712345678 অথবা 01712345678' : 'Format: +8801712345678 or 01712345678'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                {isBn ? 'বিভাগ / পদবী / পরিচিতি (Label / Department):' : 'Label / Department:'}
+              </label>
+              <input
+                type="text"
+                value={formData.depositSlipWhatsApp1Label}
+                onChange={e => setFormData({ ...formData, depositSlipWhatsApp1Label: e.target.value })}
+                placeholder={isBn ? 'অফিসিয়াল একাউন্টস ও ডিপোজিট ডেস্ক (Admin 1)' : 'Official Accounts Desk (Admin 1)'}
+                className="w-full px-3.5 py-2.5 bg-[#030712] border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-emerald-400"
+              />
+            </div>
+
+            <div className="pt-1">
+              <a
+                href={`https://wa.me/${formData.depositSlipWhatsApp1.replace(/\D/g, '')}?text=${encodeURIComponent('Test from PBC Admin Panel')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-bold hover:underline"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>{isBn ? 'নম্বর ১ টেস্ট করুন (Open WhatsApp Test)' : 'Test WhatsApp 1 Link'}</span>
+              </a>
+            </div>
+          </div>
+
+          {/* WhatsApp Channel 2 */}
+          <div className="p-5 bg-[#070D1B] rounded-2xl border-2 border-teal-500/40 space-y-4 shadow-lg">
+            <div className="flex items-center justify-between border-b border-teal-500/20 pb-2.5">
+              <span className="font-black text-teal-400 text-sm flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-teal-500 text-slate-950 font-black text-xs flex items-center justify-center">২</span>
+                <span>{isBn ? 'WhatsApp নম্বর ২ (Secondary)' : 'WhatsApp Channel 2'}</span>
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                {isBn ? 'সক্রিয়' : 'Active'}
+              </span>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5 text-teal-400" />
+                <span>{isBn ? 'মোবাইল নম্বর (Phone Number with country code):' : 'Phone Number:'}</span>
+              </label>
+              <input
+                type="text"
+                value={formData.depositSlipWhatsApp2}
+                onChange={e => setFormData({ ...formData, depositSlipWhatsApp2: e.target.value })}
+                placeholder="+8801800000000"
+                className="w-full px-3.5 py-2.5 bg-[#030712] border-2 border-teal-500/40 rounded-xl text-teal-300 font-mono font-bold text-sm focus:outline-none focus:border-teal-400 shadow-inner"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                {isBn ? 'উদাহরণ: +8801812345678 অথবা 01812345678' : 'Format: +8801812345678 or 01812345678'}
+              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-300 block mb-1.5">
+                {isBn ? 'বিভাগ / পদবী / পরিচিতি (Label / Department):' : 'Label / Department:'}
+              </label>
+              <input
+                type="text"
+                value={formData.depositSlipWhatsApp2Label}
+                onChange={e => setFormData({ ...formData, depositSlipWhatsApp2Label: e.target.value })}
+                placeholder={isBn ? 'ফাইন্যান্স ও ভেরিফিকেশন ডেস্ক (Admin 2)' : 'Finance Verification Desk (Admin 2)'}
+                className="w-full px-3.5 py-2.5 bg-[#030712] border border-slate-700 rounded-xl text-white text-xs sm:text-sm focus:outline-none focus:border-teal-400"
+              />
+            </div>
+
+            <div className="pt-1">
+              <a
+                href={`https://wa.me/${formData.depositSlipWhatsApp2.replace(/\D/g, '')}?text=${encodeURIComponent('Test from PBC Admin Panel')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-teal-400 hover:text-teal-300 font-bold hover:underline"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>{isBn ? 'নম্বর ২ টেস্ট করুন (Open WhatsApp Test)' : 'Test WhatsApp 2 Link'}</span>
+              </a>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Informative Note */}
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex items-start gap-3 text-xs text-emerald-300">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+          <p className="leading-relaxed">
+            {isBn 
+              ? 'এই নম্বর ২টি সেভ করার সাথে সাথে অ্যাপ্লিকেশনের ডিপোজিট পেজে "Send Slip on WhatsApp" এবং অফিসিয়াল নির্দেশনা কার্ডে উভয় নম্বরই প্রদর্শিত হবে। মেম্বাররা পছন্দের যেকোনো নম্বরে সরাসরি এক ক্লিকে রিসিট পাঠাতে পারবে।' 
+              : 'Both numbers will appear across the member Deposit ledger view and Official Guidance card. Members can choose either number to submit slips.'}
+          </p>
+        </div>
       </div>
 
       {/* Form Section 1: Mobile Financial Services (bKash, Nagad, Rocket) */}

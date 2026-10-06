@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useTheme } from '../../context/ThemeContext';
+import { SendSlipWhatsAppModal } from '../Deposits/SendSlipWhatsAppModal';
 import { 
   CreditCard, 
   Copy, 
@@ -20,6 +21,7 @@ export const DepositAccountsView: React.FC = () => {
   const isBn = language === 'bn';
 
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [isSendSlipModalOpen, setIsSendSlipModalOpen] = useState(false);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -71,30 +73,58 @@ export const DepositAccountsView: React.FC = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="shrink-0 flex items-center gap-3 flex-wrap">
+          <div className="shrink-0 flex items-center gap-2.5 flex-wrap">
             {(() => {
-              const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
-              const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
+              const phone1 = (systemSettings?.depositSlipWhatsApp1 || systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || '+8801700000000').trim();
+              const phone2 = (systemSettings?.depositSlipWhatsApp2 || systemSettings?.supportRep2WhatsApp || '+8801800000000').trim();
+              const cleanPhone1 = phone1.replace(/[^0-9]/g, '');
+              const cleanPhone2 = phone2.replace(/[^0-9]/g, '');
               const defaultMsg = encodeURIComponent(
                 `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
               );
-              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
+              const url1 = `https://wa.me/${cleanPhone1}?text=${defaultMsg}`;
+              const url2 = `https://wa.me/${cleanPhone2}?text=${defaultMsg}`;
+
               return (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-5 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm rounded-2xl shadow-xl shadow-emerald-950/40 border border-emerald-400/40 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>{isBn ? 'WhatsApp-এ স্লিপ পাঠান' : 'Send Slip via WhatsApp'}</span>
-                </a>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <a
+                    href={url1}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/40 transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                    title={`WhatsApp 1: ${phone1}`}
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current shrink-0" />
+                    <span>{isBn ? `WhatsApp ১ (${phone1})` : `WhatsApp 1 (${phone1})`}</span>
+                  </a>
+
+                  <a
+                    href={url2}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-teal-950/40 border border-teal-400/40 transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                    title={`WhatsApp 2: ${phone2}`}
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current shrink-0" />
+                    <span>{isBn ? `WhatsApp ২ (${phone2})` : `WhatsApp 2 (${phone2})`}</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsSendSlipModalOpen(true)}
+                    className="px-3 py-3 rounded-xl bg-[#070D1B] hover:bg-[#112244] text-emerald-300 hover:text-white border border-emerald-500/40 text-xs font-bold transition cursor-pointer flex items-center gap-1"
+                    title={isBn ? 'উভয় নম্বর বিস্তারিত' : 'View both numbers'}
+                  >
+                    <Info className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{isBn ? 'বিস্তারিত' : 'Details'}</span>
+                  </button>
+                </div>
               );
             })()}
 
             <button
               onClick={() => navigateWithHistory('deposits')}
-              className="px-4 py-3.5 bg-[#070D1B] hover:bg-[#112244] text-amber-300 hover:text-white font-bold text-xs sm:text-sm rounded-2xl border border-amber-500/40 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              className="px-4 py-3 bg-[#070D1B] hover:bg-[#112244] text-amber-300 hover:text-white font-bold text-xs rounded-xl border border-amber-500/40 transition duration-150 active:scale-95 cursor-pointer flex items-center justify-center gap-2"
             >
               <Wallet className="w-4 h-4" />
               <span>{isBn ? 'ডিপোজিট হিস্টোরি' : 'Deposit Ledger'}</span>
@@ -427,6 +457,12 @@ export const DepositAccountsView: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Send Slip Dual WhatsApp Modal */}
+      <SendSlipWhatsAppModal
+        isOpen={isSendSlipModalOpen}
+        onClose={() => setIsSendSlipModalOpen(false)}
+      />
 
     </div>
   );

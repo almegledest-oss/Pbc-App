@@ -8,6 +8,7 @@ import { SmartDepositCalculator, DepositMode } from './SmartDepositCalculator';
 import { AdminSignatureModal } from '../Admin/AdminSignatureModal';
 import { DeleteConfirmModal } from '../Common/DeleteConfirmModal';
 import { WhatsAppReceiptSendModal } from './WhatsAppReceiptSendModal';
+import { SendSlipWhatsAppModal } from './SendSlipWhatsAppModal';
 import { compressImageToDataUrl } from '../../services/firebaseService';
 import { 
   Wallet, 
@@ -268,6 +269,7 @@ export const DepositList: React.FC = () => {
   const [receiptPreview, setReceiptPreview] = useState<string>('');
   const [signatureModalDeposit, setSignatureModalDeposit] = useState<Deposit | null>(null);
   const [whatsAppModalDeposit, setWhatsAppModalDeposit] = useState<Deposit | null>(null);
+  const [isSendSlipModalOpen, setIsSendSlipModalOpen] = useState(false);
   const [depositToDelete, setDepositToDelete] = useState<Deposit | null>(null);
   const [rejectingDeposit, setRejectingDeposit] = useState<Deposit | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
@@ -818,28 +820,19 @@ export const DepositList: React.FC = () => {
           )}
 
           {/* Member Direct WhatsApp Action Button */}
-          {role === 'member' && (() => {
-            const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
-            const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
-            const defaultMsg = encodeURIComponent(
-              `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
-            );
-            const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
-            return (
-              <a
-                href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition shrink-0 active:scale-95 cursor-pointer"
-                title={language === 'bn' ? 'WhatsApp-এ জমার স্লিপ পাঠান' : 'Send Slip via WhatsApp'}
-              >
-                <MessageCircle className="w-4 h-4 fill-current" />
-                <span>
-                  {language === 'bn' ? 'WhatsApp-এ স্লিপ পাঠান' : 'Send Slip on WhatsApp'}
-                </span>
-              </a>
-            );
-          })()}
+          {role === 'member' && (
+            <button
+              type="button"
+              onClick={() => setIsSendSlipModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition shrink-0 active:scale-95 cursor-pointer"
+              title={language === 'bn' ? 'WhatsApp-এ জমার স্লিপ পাঠান' : 'Send Slip on WhatsApp'}
+            >
+              <MessageCircle className="w-4 h-4 fill-current" />
+              <span>
+                {language === 'bn' ? 'WhatsApp-এ স্লিপ পাঠান' : 'Send Slip on WhatsApp'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -875,22 +868,56 @@ export const DepositList: React.FC = () => {
 
           <div className="flex items-center gap-3 flex-wrap pt-1">
             {(() => {
-              const targetWhatsApp = systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || systemSettings?.supportRep1WhatsApp || '+8801700000000';
-              const cleanPhone = targetWhatsApp.replace(/[^0-9]/g, '');
+              const phone1 = (systemSettings?.depositSlipWhatsApp1 || systemSettings?.adminWhatsApp || systemSettings?.supportOfficialWhatsApp || '+8801700000000').trim();
+              const label1 = (systemSettings?.depositSlipWhatsApp1Label || (language === 'bn' ? 'অফিসিয়াল একাউন্টস (Admin 1)' : 'Accounts Desk (Admin 1)')).trim();
+              const phone2 = (systemSettings?.depositSlipWhatsApp2 || systemSettings?.supportRep2WhatsApp || '+8801800000000').trim();
+              const label2 = (systemSettings?.depositSlipWhatsApp2Label || (language === 'bn' ? 'ফাইন্যান্স ডেস্ক (Admin 2)' : 'Finance Desk (Admin 2)')).trim();
+
+              const cleanPhone1 = phone1.replace(/[^0-9]/g, '');
+              const cleanPhone2 = phone2.replace(/[^0-9]/g, '');
               const defaultMsg = encodeURIComponent(
                 `আসসালামু আলাইকুম, আমি Probashi Business Club-এর মেম্বার ${currentMember?.fullName || ''} (ID: ${currentMember?.id || ''})। আমি আমার শেয়ার/কিস্তির টাকা পাঠিয়েছি, দয়া করে আমার ডিপোজিট এন্ট্রি করে রসিদ প্রদান করবেন। স্লিপ সংযুক্ত করা হলো।`
               );
-              const whatsappUrl = `https://wa.me/${cleanPhone}?text=${defaultMsg}`;
+              const url1 = `https://wa.me/${cleanPhone1}?text=${defaultMsg}`;
+              const url2 = `https://wa.me/${cleanPhone2}?text=${defaultMsg}`;
+
               return (
-                <a
-                  href={whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-5 py-3 min-h-[46px] rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition cursor-pointer active:scale-95"
-                >
-                  <MessageCircle className="w-4 h-4 fill-current" />
-                  <span>{language === 'bn' ? 'WhatsApp-এ জমার স্লিপ পাঠান' : 'Send Payment Slip via WhatsApp'}</span>
-                </a>
+                <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
+                  {/* WhatsApp Channel 1 Button */}
+                  <a
+                    href={url1}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 min-h-[46px] rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-950/40 border border-emerald-400/50 transition cursor-pointer active:scale-95"
+                    title={`${label1}: ${phone1}`}
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current shrink-0" />
+                    <span>{language === 'bn' ? `WhatsApp ১: ${phone1}` : `WhatsApp 1: ${phone1}`}</span>
+                  </a>
+
+                  {/* WhatsApp Channel 2 Button */}
+                  <a
+                    href={url2}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-3 min-h-[46px] rounded-xl bg-gradient-to-r from-teal-600 via-emerald-600 to-teal-700 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-lg shadow-teal-950/40 border border-teal-400/50 transition cursor-pointer active:scale-95"
+                    title={`${label2}: ${phone2}`}
+                  >
+                    <MessageCircle className="w-4 h-4 fill-current shrink-0" />
+                    <span>{language === 'bn' ? `WhatsApp ২: ${phone2}` : `WhatsApp 2: ${phone2}`}</span>
+                  </a>
+
+                  {/* Detail Selector Modal Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setIsSendSlipModalOpen(true)}
+                    className="px-3.5 py-3 min-h-[46px] rounded-xl bg-[#0B1528] hover:bg-[#112244] text-emerald-300 hover:text-white font-bold text-xs border border-emerald-500/40 transition cursor-pointer active:scale-95 flex items-center gap-1.5"
+                    title={language === 'bn' ? 'উভয় নম্বর বিস্তারিত দেখুন' : 'View both numbers'}
+                  >
+                    <Info className="w-4 h-4 text-emerald-400" />
+                    <span>{language === 'bn' ? 'উভয় নম্বর বিস্তারিত' : 'View Details'}</span>
+                  </button>
+                </div>
               );
             })()}
 
@@ -2261,6 +2288,12 @@ export const DepositList: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Send Slip Dual WhatsApp Modal */}
+      <SendSlipWhatsAppModal
+        isOpen={isSendSlipModalOpen}
+        onClose={() => setIsSendSlipModalOpen(false)}
+      />
 
     </div>
   );

@@ -15,7 +15,11 @@ export function checkIsLegacyDomain(): boolean {
     host === 'localhost' ||
     host === '127.0.0.1' ||
     host.endsWith('.cloudshell.dev') ||
-    host.includes('ais-dev')
+    host.includes('ais-dev') ||
+    host.includes('ais-pre') ||
+    host.includes('run.app') ||
+    host.includes('ai.studio') ||
+    host.includes('googleusercontent.com')
   ) {
     return false;
   }

@@ -246,7 +246,11 @@ export function subscribeSystemSettings(callback: (settings: SystemSettings) => 
         currencySymbol: '৳',
         minDepositAmount: 5000,
         allowNewRegistrations: true,
-        noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.'
+        noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.',
+        depositSlipWhatsApp1: '+8801700000000',
+        depositSlipWhatsApp1Label: 'অফিসিয়াল একাউন্টস ও ডিপোজিট ডেস্ক (Admin 1)',
+        depositSlipWhatsApp2: '+8801800000000',
+        depositSlipWhatsApp2Label: 'ফাইন্যান্স ও ভেরিফিকেশন ডেস্ক (Admin 2)'
       };
       callback(defaultSettings);
     }
@@ -258,7 +262,11 @@ export function subscribeSystemSettings(callback: (settings: SystemSettings) => 
       currencySymbol: '৳',
       minDepositAmount: 5000,
       allowNewRegistrations: true,
-      noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.'
+      noticeBoardText: 'Welcome to Probashi Business Club (PBC). Please ensure all monthly contributions are logged.',
+      depositSlipWhatsApp1: '+8801700000000',
+      depositSlipWhatsApp1Label: 'অফিসিয়াল একাউন্টস ও ডিপোজিট ডেস্ক (Admin 1)',
+      depositSlipWhatsApp2: '+8801800000000',
+      depositSlipWhatsApp2Label: 'ফাইন্যান্স ও ভেরিফিকেশন ডেস্ক (Admin 2)'
     }));
   });
 }

@@ -2,6 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Global Error & WebSocket Disconnect Handler (Suppresses HMR WebSocket Disconnect in Cloud Preview) -->
+    <script>
+      (function() {
+        var isIgnorable = function(reason) {
+          if (!reason) return false;
+          var str = String(reason && (reason.message || reason.stack || reason) || '').toLowerCase();
+          return (
+            str.indexOf('websocket') !== -1 ||
+            str.indexOf('@vite/client') !== -1 ||
+            str.indexOf('vite:ws') !== -1 ||
+            (str.indexOf('failed to fetch') !== -1 && str.indexOf('vite') !== -1)
+          );
+        };
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (isIgnorable(event.reason)) {
+            event.preventDefault();
+            if (typeof event.stopImmediatePropagation === 'function') {
+              event.stopImmediatePropagation();
+            }
+          }
+        }, true);
+
+        window.addEventListener('error', function(event) {
+          var msg = event.message || (event.error && event.error.message) || '';
+          var file = event.filename || '';
+          if (isIgnorable(msg) || file.indexOf('@vite/client') !== -1) {
+            event.preventDefault();
+            if (typeof event.stopImmediatePropagation === 'function') {
+              event.stopImmediatePropagation();
+            }
+            return true;
+          }
+        }, true);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -146,7 +182,16 @@
         try {
           var h = window.location.hostname.toLowerCase();
           var isOfficial = (h === 'probashibusinessclub.com' || h === 'www.probashibusinessclub.com');
-          var isDev = (h === 'localhost' || h === '127.0.0.1' || h.indexOf('ais-dev') !== -1 || h.endsWith('.cloudshell.dev'));
+          var isDev = (
+            h === 'localhost' ||
+            h === '127.0.0.1' ||
+            h.indexOf('ais-dev') !== -1 ||
+            h.indexOf('ais-pre') !== -1 ||
+            h.indexOf('run.app') !== -1 ||
+            h.indexOf('ai.studio') !== -1 ||
+            h.indexOf('googleusercontent.com') !== -1 ||
+            h.endsWith('.cloudshell.dev')
+          );
           if (!isOfficial && !isDev) {
             // Immediately stop React or cache from showing the app
             window.__IS_LEGACY_LOCKED = true;
