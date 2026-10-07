@@ -93,6 +93,9 @@ interface AppContextType {
   setTheme: (theme: 'light' | 'dark') => void;
   viewMode: 'desktop' | 'mobile_frame';
   setViewMode: (mode: 'desktop' | 'mobile_frame') => void;
+  portalView: 'website' | 'app';
+  setPortalView: (view: 'website' | 'app') => void;
+  isStandaloneApp: boolean;
   
   // Data lists
   members: Member[];
@@ -367,6 +370,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
   });
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile_frame'>('desktop');
+  
+  const isStandaloneApp = typeof window !== 'undefined' && (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as any).standalone === true ||
+    (window as any).Capacitor !== undefined ||
+    new URLSearchParams(window.location.search).get('mode') === 'app'
+  );
+
+  const [portalView, setPortalViewState] = useState<'website' | 'app'>(() => {
+    if (typeof window === 'undefined') return 'website';
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true ||
+      (window as any).Capacitor !== undefined;
+    const urlMode = new URLSearchParams(window.location.search).get('mode');
+    if (urlMode === 'app' || isStandalone) return 'app';
+    if (urlMode === 'web' || urlMode === 'website') return 'website';
+    const saved = safeStorage.getItem('pbc_portal_view');
+    if (saved === 'app' || saved === 'website') return saved;
+    const isLoggedInCache = safeStorage.getItem('pbc_logged_in') === 'true';
+    if (isLoggedInCache) return 'app';
+    return 'website';
+  });
+
+  const setPortalView = (view: 'website' | 'app') => {
+    setPortalViewState(view);
+    safeStorage.setItem('pbc_portal_view', view);
+  };
   
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -2270,6 +2300,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         permanentlyDeleteTrashedItem,
         emptyTrashBox,
         canAccessTrashBox,
+        portalView,
+        setPortalView,
+        isStandaloneApp,
         // PBC Assistant
         isAssistantOpen,
         setIsAssistantOpen,

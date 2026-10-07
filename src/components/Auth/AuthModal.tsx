@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { t } from '../../utils/translations';
-import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check, MessageCircle, ExternalLink, ChevronDown } from 'lucide-react';
+import { Building2, KeyRound, X, AlertCircle, CheckCircle2, Lock, Mail, User, Phone, Globe, MapPin, UserPlus, LogIn, Compass, Eye, EyeOff, ShieldCheck, Clock, MessageSquare, ArrowRight, Sparkles, Copy, Check, MessageCircle, ExternalLink, ChevronDown, Smartphone } from 'lucide-react';
 import { UserRole, Member } from '../../types';
 import { PbcLogo } from '../Common/PbcLogo';
 import { MaintenanceNoticeScreen } from '../Common/MaintenanceNoticeScreen';
 import { PublicClubShowcase } from './PublicClubShowcase';
+import { AppInstallButton } from '../Common/AppInstallButton';
 import { safeStorage } from '../../utils/safeStorage';
 import { db } from '../../lib/firebase';
 import { collection, doc, getDoc, getDocs, query, where, serverTimestamp } from 'firebase/firestore';
@@ -41,7 +42,10 @@ export const AuthModal: React.FC = () => {
     members,
     users,
     systemSettings,
-    addNotification
+    addNotification,
+    portalView,
+    setPortalView,
+    isStandaloneApp
   } = useApp();
   const labels = t[language];
 
@@ -1363,6 +1367,55 @@ export const AuthModal: React.FC = () => {
   );
 
   if (!isLoggedIn) {
+    // 1. APP MODE: When launched as installed app or user explicitly chose App Portal
+    if (portalView === 'app') {
+      return (
+        <div className="min-h-screen bg-[#030712] text-white flex flex-col items-center justify-center p-4 relative overflow-x-hidden selection:bg-amber-500/30 selection:text-amber-200">
+          {/* Subtle Ambient Lighting */}
+          <div className="absolute top-10 left-1/2 -translate-x-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Top Bar inside App Login Screen */}
+          <div className="w-full max-w-md flex items-center justify-between mb-4 z-10 px-2">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-black tracking-widest text-amber-400 uppercase">
+                PBC Mobile App
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPortalView('website')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/30 text-amber-300 text-xs font-bold transition cursor-pointer active:scale-95 shadow-sm"
+              title="মূল ওয়েবসাইট দেখুন"
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <span>মূল ওয়েবসাইট</span>
+            </button>
+          </div>
+
+          {/* Centered Native App Login Card */}
+          <div className="w-full max-w-md z-10">
+            {renderAuthCard(false)}
+          </div>
+
+          {/* Switch to Website Link at bottom */}
+          <div className="mt-6 text-center z-10">
+            <button
+              type="button"
+              onClick={() => setPortalView('website')}
+              className="text-xs text-slate-400 hover:text-amber-300 transition flex items-center gap-1.5 mx-auto font-medium cursor-pointer"
+            >
+              <Globe className="w-3.5 h-3.5 text-amber-400" />
+              <span>প্রবাসী বিজনেস ক্লাবের পরিচিতি ও ওয়েবসাইট ব্রাউজ করতে এখানে চাপুন ➔</span>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. WEBSITE MODE: Default for browser visitors (Full Corporate Club Website)
     return (
       <div className="min-h-screen bg-[#030712] text-white flex flex-col font-sans w-full overflow-x-hidden relative selection:bg-amber-500/30 selection:text-amber-200">
         {/* TOP BRAND NAV BAR (Sticky, with Sitelink Anchors) */}
@@ -1384,7 +1437,15 @@ export const AuthModal: React.FC = () => {
             </div>
 
             {/* Quick Sitelink Anchors */}
-            <nav className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-300">
+            <nav className="hidden md:flex items-center gap-5 text-xs font-bold text-slate-300">
+              <button 
+                type="button" 
+                onClick={() => scrollToSection('app-benefits')} 
+                className="hover:text-amber-300 transition cursor-pointer flex items-center gap-1 text-amber-300"
+              >
+                <Smartphone className="w-3 h-3 text-amber-400" />
+                <span>অ্যাপের সুবিধা</span>
+              </button>
               <button 
                 type="button" 
                 onClick={() => scrollToSection('about')} 
@@ -1409,23 +1470,18 @@ export const AuthModal: React.FC = () => {
             </nav>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              <a
-                href={`https://wa.me/${(systemSettings.adminWhatsApp || "+8801711000000").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Assalamu Alaikum, I need assistance with PBC Portal.")}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold hover:bg-emerald-500/25 transition"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>হেল্পলাইন</span>
-              </a>
+              <AppInstallButton 
+                variant="nav" 
+              />
 
               <button
                 type="button"
-                onClick={scrollToLogin}
-                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-amber-500/20 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                onClick={() => setPortalView('app')}
+                className="px-3.5 sm:px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-amber-500/20 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+                title="মোবাইল অ্যাপ পোর্টাল খুলুন"
               >
-                <LogIn className="w-4 h-4 text-slate-950" />
-                <span>লগইন / সাইন ইন</span>
+                <Smartphone className="w-4 h-4 text-slate-950" />
+                <span>মেম্বার অ্যাপ পোর্টাল</span>
               </button>
             </div>
           </div>
@@ -1435,6 +1491,7 @@ export const AuthModal: React.FC = () => {
         <PublicClubShowcase 
           onScrollToLogin={scrollToLogin} 
           loginSectionSlot={renderAuthCard(false)} 
+          onOpenAppMode={() => setPortalView('app')}
         />
 
         {/* LOGIN / SIGN UP POPUP MODAL */}

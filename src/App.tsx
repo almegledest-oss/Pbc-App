@@ -28,6 +28,9 @@ import { DepositAccountsView } from './components/HelpDesk/DepositAccountsView';
 import { ClubRulesView } from './components/ClubRules/ClubRulesView';
 import { LegacyDomainScreen, checkIsLegacyDomain } from './components/Common/LegacyDomainRedirectModal';
 import { PbcAssistantWidget } from './components/Assistant/PbcAssistantWidget';
+import { PublicClubShowcase } from './components/Auth/PublicClubShowcase';
+import { PbcLogo } from './components/Common/PbcLogo';
+import { Smartphone, Globe } from 'lucide-react';
 
 const MainContent: React.FC = () => {
   const {
@@ -47,7 +50,9 @@ const MainContent: React.FC = () => {
     isFocusMode,
     canGoBack,
     authUser,
-    currentMember
+    currentMember,
+    portalView,
+    setPortalView
   } = useApp();
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const { currentTheme } = useTheme();
@@ -74,6 +79,67 @@ const MainContent: React.FC = () => {
         <AuthModal />
         <PbcAssistantWidget />
       </>
+    );
+  }
+
+  // When logged-in member chooses to view the Public Website:
+  if (portalView === 'website') {
+    return (
+      <div className="min-h-screen bg-[#030712] text-white flex flex-col font-sans w-full overflow-x-hidden relative selection:bg-amber-500/30 selection:text-amber-200">
+        {/* Logged-in Member Return Banner */}
+        <div className="bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 text-slate-950 px-4 py-2.5 text-xs font-black flex items-center justify-between sticky top-0 z-50 shadow-lg">
+          <div className="flex items-center gap-2">
+            <span>👋 সম্মানিত সদস্য: <strong>{currentMember?.fullName || authUser?.displayName || 'সদস্য'}</strong> ({currentMember?.id || 'PBC Member'})</span>
+            <span className="hidden sm:inline bg-black/20 text-slate-950 px-2 py-0.5 rounded text-[11px] font-bold">
+              পাবলিক ওয়েবসাইট ভিউ
+            </span>
+          </div>
+          <button
+            onClick={() => setPortalView('app')}
+            className="bg-slate-950 text-amber-300 hover:text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+            <span>আমার অ্যাপ ড্যাশবোর্ডে ফিরুন ➔</span>
+          </button>
+        </div>
+
+        {/* Website Header */}
+        <header className="sticky top-10 z-40 bg-[#070D1B]/95 backdrop-blur-md border-b border-[#D4AF37]/25 px-4 sm:px-6 py-3 transition shadow-md">
+          <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+            <div 
+              className="flex items-center gap-3 cursor-pointer" 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            >
+              <PbcLogo variant="gold" className="w-9 h-9 sm:w-10 sm:h-10" />
+              <div>
+                <h1 className="text-sm sm:text-base font-black text-white tracking-wide leading-tight">
+                  প্রবাসী বিজনেস ক্লাব
+                </h1>
+                <p className="text-[10px] sm:text-[11px] text-amber-400 font-bold tracking-widest uppercase">
+                  Probashi Business Club
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => setPortalView('app')}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-md transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <Smartphone className="w-4 h-4 text-slate-950" />
+                <span>আমার অ্যাপে ফিরুন</span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Public Showcase */}
+        <PublicClubShowcase 
+          onScrollToLogin={() => setPortalView('app')} 
+          onOpenAppMode={() => setPortalView('app')}
+        />
+      </div>
     );
   }
 

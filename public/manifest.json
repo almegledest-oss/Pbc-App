@@ -5,7 +5,7 @@
   "description": "প্রবাসী বিজনেস ক্লাব (Probashi Business Club - PBC) বিশ্বব্যাপী প্রবাসী বাংলাদেশি উদ্যোক্তাদের নির্ভরযোগ্য ব্যবসায়িক নেটওয়ার্ক, টেকসই রিয়েল এস্টেট বিনিয়োগ ও মেম্বারশিপ পোর্টাল।",
   "lang": "bn",
   "dir": "ltr",
-  "start_url": "/",
+  "start_url": "/?mode=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -49,28 +49,28 @@
       "name": "আমার ড্যাশবোর্ড",
       "short_name": "Dashboard",
       "description": "সদস্য ড্যাশবোর্ড ও ক্লাবের সর্বশেষ তথ্য",
-      "url": "/?tab=dashboard",
+      "url": "/?mode=app&tab=dashboard",
       "icons": [{ "src": "/pwa-192x192.png?v=4", "sizes": "192x192" }]
     },
     {
       "name": "আমার প্রোফাইল ও আইডি কার্ড",
       "short_name": "Profile",
       "description": "সদস্য প্রোফাইল ও ডিজিটাল মেম্বারশিপ কার্ড",
-      "url": "/?tab=profile",
+      "url": "/?mode=app&tab=profile",
       "icons": [{ "src": "/pwa-192x192.png?v=4", "sizes": "192x192" }]
     },
     {
       "name": "জমা ও লেনদেন রসিদ",
       "short_name": "Deposits",
       "description": "ডিপোজিট হিস্ট্রি ও ডিজিটাল মানি রিসিট",
-      "url": "/?tab=deposits",
+      "url": "/?mode=app&tab=deposits",
       "icons": [{ "src": "/pwa-192x192.png?v=4", "sizes": "192x192" }]
     },
     {
       "name": "পরিচালনা পর্ষদ",
       "short_name": "Directors",
       "description": "প্রবাসী বিজনেস ক্লাব বোর্ড অফ ডিরেক্টরস",
-      "url": "/?tab=directors",
+      "url": "/?mode=app&tab=directors",
       "icons": [{ "src": "/pwa-192x192.png?v=4", "sizes": "192x192" }]
     }
   ],

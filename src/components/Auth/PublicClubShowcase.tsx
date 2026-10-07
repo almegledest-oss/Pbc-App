@@ -21,17 +21,28 @@ import {
   Lock,
   PhoneCall,
   Quote,
-  LogIn
+  LogIn,
+  Smartphone,
+  Download,
+  Calculator,
+  Bell,
+  QrCode
 } from 'lucide-react';
 import { PbcLogo } from '../Common/PbcLogo';
 import { PBCFramedAvatar } from '../Common/PBCFramedAvatar';
+import { AppInstallButton } from '../Common/AppInstallButton';
 
 interface PublicClubShowcaseProps {
   onScrollToLogin: () => void;
   loginSectionSlot?: React.ReactNode;
+  onOpenAppMode?: () => void;
 }
 
-export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScrollToLogin, loginSectionSlot }) => {
+export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ 
+  onScrollToLogin, 
+  loginSectionSlot,
+  onOpenAppMode 
+}) => {
   const { boardDirectors, systemSettings } = useApp();
 
   const scrollToAbout = () => {
@@ -99,18 +110,22 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
           <button
             type="button"
-            onClick={onScrollToLogin}
+            onClick={onOpenAppMode || onScrollToLogin}
             className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.3)] transition transform hover:-translate-y-0.5 active:translate-y-0 active:scale-95 cursor-pointer flex items-center gap-2"
           >
-            <LogIn className="w-5 h-5 text-slate-950" />
-            <span>লগইন / সাইন ইন (নিচে যান)</span>
-            <ChevronDown className="w-4 h-4 text-slate-950 animate-bounce" />
+            <Smartphone className="w-5 h-5 text-slate-950" />
+            <span>মেম্বার অ্যাপ পোর্টাল / সাইন ইন</span>
           </button>
+
+          <AppInstallButton 
+            variant="compact"
+            className="px-5 py-3.5 bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/40 text-amber-300 hover:text-white text-sm font-bold rounded-xl transition cursor-pointer flex items-center gap-2 active:scale-95 shadow-md"
+          />
 
           <button
             type="button"
             onClick={scrollToAbout}
-            className="px-6 py-3.5 bg-[#070D1B] hover:bg-[#0E1A33] border border-amber-500/30 text-amber-300 hover:text-white text-sm font-bold rounded-xl transition cursor-pointer flex items-center gap-2 active:scale-95 shadow-md"
+            className="px-5 py-3.5 bg-[#070D1B]/60 hover:bg-[#0E1A33] border border-slate-700 hover:border-amber-500/30 text-slate-300 hover:text-white text-sm font-bold rounded-xl transition cursor-pointer flex items-center gap-2 active:scale-95 shadow-md"
           >
             <span>পরিচিতি ও ভিশন</span>
             <ChevronDown className="w-4 h-4 text-amber-400" />
@@ -147,6 +162,114 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({ onScroll
               <div className="text-xs font-bold text-white">ডিজিটাল স্মার্ট কার্ড</div>
               <div className="text-[11px] text-slate-400">মেম্বারদের অফিসিয়াল ভেরিফিকেশন</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SPECIAL SPOTLIGHT: PBC MOBILE APP HIGHLIGHTS */}
+      <section id="app-benefits" className="scroll-mt-24 mb-16 relative">
+        <div className="bg-gradient-to-br from-[#0B152A] via-[#070D1B] to-[#040813] border-2 border-amber-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl relative overflow-hidden">
+          {/* Decorative Glow */}
+          <div className="absolute -top-24 -right-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pb-6 border-b border-amber-500/20">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black uppercase tracking-wider mb-2">
+                  <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                  <span>PBC Official Mobile App • সব সুবিধা এক সাথে</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  ওয়েবসাইট ও মোবাইল অ্যাপের সুবিধা
+                </h2>
+                <p className="mt-1.5 text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
+                  ব্রাউজারে এটি ক্লাবের অফিসিয়াল <strong>ওয়েবসাইট</strong> হিসেবে সবার জন্য উন্মুক্ত তথ্য দেখায়। আর আপনার ফোনে <strong>PBC মোবাইল অ্যাপ ইনস্টল</strong> করলে মেম্বার হিসেবে পাবেন ক্লাবের পূর্ণাঙ্গ ডিজিটাল সেবা!
+                </p>
+              </div>
+
+              <div className="shrink-0 w-full sm:w-auto">
+                <AppInstallButton 
+                  variant="nav"
+                  className="w-full sm:w-auto justify-center px-4 py-2.5 text-xs sm:text-sm font-black"
+                />
+              </div>
+            </div>
+
+            {/* Feature Comparison Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+              <div className="bg-[#040914] border border-amber-500/30 rounded-2xl p-4.5 hover:border-amber-400 transition">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 font-bold">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-black text-white mb-1.5">ডিজিটাল স্মার্ট কার্ড</h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  অফিসিয়াল গোল্ড সিল, বারকোড ও কিউআর কোডসহ রিয়েল-টাইম মেম্বারশিপ কার্ড সরাসরি ফোনে সংরক্ষিত থাকে।
+                </p>
+                <div className="mt-3 text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">
+                  ★ শুধুমাত্র অ্যাপ ও মেম্বার পোর্টালে
+                </div>
+              </div>
+
+              <div className="bg-[#040914] border border-amber-500/30 rounded-2xl p-4.5 hover:border-amber-400 transition">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-3 font-bold">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-black text-white mb-1.5">ইনস্ট্যান্ট PDF মানি রিসিট</h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  টাকা জমা দেওয়ার পর এক ক্লিকে প্রাতিষ্ঠানিক ডিজিটাল রসিদ ডাউনলোড ও সরাসরি WhatsApp-এ এডমিনকে পাঠানোর ব্যবস্থা।
+                </p>
+                <div className="mt-3 text-[10px] font-extrabold text-emerald-400 uppercase tracking-wider">
+                  ★ অটোমেটিক PDF জেনারেটর
+                </div>
+              </div>
+
+              <div className="bg-[#040914] border border-amber-500/30 rounded-2xl p-4.5 hover:border-amber-400 transition">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3 font-bold">
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-black text-white mb-1.5">স্মার্ট ডিপোজিট ক্যালকুলেটর</h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  মোট সঞ্চয়, মাসিক কিস্তি, প্রজেক্ট শেয়ার বণ্টন এবং প্রত্যাশিত মুনাফা স্বয়ংক্রিয়ভাবে হিসাব করার ক্যালকুলেটর।
+                </p>
+                <div className="mt-3 text-[10px] font-extrabold text-amber-400 uppercase tracking-wider">
+                  ★ রিয়েল-টাইম হিসাব
+                </div>
+              </div>
+
+              <div className="bg-[#040914] border border-amber-500/30 rounded-2xl p-4.5 hover:border-amber-400 transition">
+                <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-3 font-bold">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-black text-white mb-1.5">১-ট্যাপ এক্সেস ও নোটিফিকেশন</h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  মোবাইল হোমস্ক্রিন থেকে ব্রাউজার ছাড়াই সরাসরি অ্যাপ ওপেন এবং ডিপোজিট অনুমোদন ও জরুরি নোটিশ তৎক্ষণাৎ পাওয়া।
+                </p>
+                <div className="mt-3 text-[10px] font-extrabold text-sky-400 uppercase tracking-wider">
+                  ★ সুপার ফাস্ট ও নো ব্রাউজার বার
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions Footer inside the spotlight */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-amber-500/20 bg-black/20 -mx-6 -mb-6 sm:-mx-10 sm:-mb-10 p-4 sm:px-8 sm:py-5 rounded-b-3xl">
+              <div className="text-xs text-slate-300 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>অ্যান্ড্রয়েড, আইফোন ও কম্পিউটারে ইনস্টলেশন সাপোর্ট করে</span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={onOpenAppMode || onScrollToLogin}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl transition shadow active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>মেম্বার অ্যাপে যান ➔</span>
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

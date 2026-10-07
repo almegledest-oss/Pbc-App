@@ -48,7 +48,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
     setActiveTab,
     logout,
     stats,
-    members
+    members,
+    setPortalView
   } = useApp();
   const { currentTheme, setAppTheme } = useTheme();
 
@@ -349,6 +350,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenNotifications }) => {
                 </span>
               </>
             )}
+          </button>
+
+          {/* Public Website Button */}
+          <button
+            type="button"
+            onClick={() => setPortalView('website')}
+            title={language === 'bn' ? 'অফিসিয়াল পাবলিক ওয়েবসাইট দেখুন' : 'View Public Website'}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/30 text-amber-300 text-xs font-bold transition shadow-xs active:scale-95 cursor-pointer"
+          >
+            <Globe className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">{language === 'bn' ? 'ওয়েবসাইট' : 'Website'}</span>
           </button>
 
           {/* Mobile Frame Simulator Toggle */}

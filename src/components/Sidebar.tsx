@@ -53,7 +53,8 @@ export const Sidebar: React.FC = () => {
     logout,
     activeSessions = [],
     isMoreMenuOpen: isMoreOpen,
-    setIsMoreMenuOpen: setIsMoreOpen
+    setIsMoreMenuOpen: setIsMoreOpen,
+    setPortalView
   } = useApp();
   const { currentTheme, setAppTheme } = useTheme();
   
@@ -172,6 +173,22 @@ export const Sidebar: React.FC = () => {
               </span>
             </button>
           )}
+
+          {/* Public Website Button for Desktop */}
+          <button
+            type="button"
+            onClick={() => setPortalView('website')}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-xs font-bold transition-all cursor-pointer bg-slate-900/80 hover:bg-slate-800 text-amber-300 border border-amber-500/30 hover:border-amber-400 shadow-sm mt-3 group"
+            title="পাবলিক ওয়েবসাইট ব্রাউজ করুন"
+          >
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-amber-400 group-hover:rotate-12 transition-transform" />
+              <span>{language === 'bn' ? 'পাবলিক ওয়েবসাইট' : 'Public Website'}</span>
+            </div>
+            <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 text-[10px] rounded-md font-extrabold border border-amber-500/30">
+              Web
+            </span>
+          </button>
         </nav>
 
         {/* Current Role & Mode Switcher Badge */}
@@ -697,6 +714,22 @@ export const Sidebar: React.FC = () => {
                     </button>
                   </div>
                 )}
+
+                {/* Public Website Button in Mobile More Menu */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPortalView('website');
+                    setIsMoreOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-3 bg-[#0B1528] hover:bg-[#112244] border border-[#D4AF37]/30 rounded-2xl text-xs font-bold text-amber-300 transition cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Globe className="w-4 h-4 text-amber-400" />
+                    <span>{language === 'bn' ? 'অফিসিয়াল পাবলিক ওয়েবসাইট দেখুন' : 'View Public Website'}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 opacity-70" />
+                </button>
 
                 {/* Language Switcher */}
                 <div className={`p-3 ${currentTheme.mode === 'light' ? 'bg-amber-50/70 border-amber-500/30' : 'bg-[#0B1528] border-[#D4AF37]/30'} border rounded-2xl flex items-center justify-between gap-2`}>
