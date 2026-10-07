@@ -748,19 +748,7 @@ export const AuthModal: React.FC = () => {
   };
 
   const scrollToLogin = () => {
-    const el = document.getElementById('login-section');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      const card = document.getElementById('embedded-login-card');
-      if (card) {
-        card.classList.add('ring-4', 'ring-amber-400', 'ring-offset-4', 'ring-offset-[#070D1B]');
-        setTimeout(() => {
-          card.classList.remove('ring-4', 'ring-amber-400', 'ring-offset-4', 'ring-offset-[#070D1B]');
-        }, 1800);
-      }
-    } else {
-      setIsAuthModalOpen(true);
-    }
+    setPortalView('app');
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -1487,10 +1475,9 @@ export const AuthModal: React.FC = () => {
           </div>
         </header>
 
-        {/* PUBLIC CLUB SHOWCASE (About, Board of Directors, Strategic Projects, Digital Perks, Embedded Login Card at Bottom) */}
+        {/* PUBLIC CLUB SHOWCASE (About, Board of Directors, Strategic Projects, App Highlights, Contact) */}
         <PublicClubShowcase 
           onScrollToLogin={scrollToLogin} 
-          loginSectionSlot={renderAuthCard(false)} 
           onOpenAppMode={() => setPortalView('app')}
         />
 

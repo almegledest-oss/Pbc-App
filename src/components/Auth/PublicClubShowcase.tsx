@@ -554,27 +554,6 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({
         </div>
       </section>
 
-      {/* SECTION: LOGIN & REGISTRATION AT THE BOTTOM */}
-      {loginSectionSlot && (
-        <section id="login-section" className="scroll-mt-24 mb-16">
-          <div className="text-center mb-6 max-w-md mx-auto">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold mb-2">
-              <LogIn className="w-3.5 h-3.5" />
-              <span>মেম্বার ও এডমিন পোর্টাল</span>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-black text-white">
-              মেম্বার সাইন ইন ও এক্সেস
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">
-              আপনার মেম্বার আইডি বা ইমেইল দিয়ে লগইন করুন অথবা নতুন সদস্য হিসেবে আবেদন করুন
-            </p>
-          </div>
-          <div id="embedded-login-card" className="w-full max-w-md mx-auto transition-all duration-500 rounded-3xl">
-            {loginSectionSlot}
-          </div>
-        </section>
-      )}
-
       {/* SECTION 5: CONTACT & ACTION FOOTER */}
       <section className="bg-gradient-to-b from-[#0A1226] to-[#040813] border border-amber-500/40 rounded-3xl p-6 sm:p-10 text-center shadow-2xl">
         <PbcLogo variant="gold" className="w-16 h-16 mx-auto mb-3" />
@@ -588,11 +567,11 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
-            onClick={onScrollToLogin}
+            onClick={onOpenAppMode || onScrollToLogin}
             className="px-6 py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm rounded-xl shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center gap-2 active:scale-95"
           >
-            <LogIn className="w-4 h-4" />
-            <span>লগইন ফর্মে যান (Member Sign In)</span>
+            <Smartphone className="w-4 h-4 text-slate-950" />
+            <span>মেম্বার অ্যাপ পোর্টাল / সাইন ইন</span>
           </button>
 
           <a
@@ -622,11 +601,11 @@ export const PublicClubShowcase: React.FC<PublicClubShowcaseProps> = ({
       <div className="fixed bottom-4 right-4 z-40 sm:hidden">
         <button
           type="button"
-          onClick={onScrollToLogin}
+          onClick={onOpenAppMode || onScrollToLogin}
           className="px-4 py-2.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-slate-950 font-black text-xs rounded-full shadow-[0_4px_25px_rgba(212,175,55,0.45)] border border-amber-300/40 active:scale-95 transition flex items-center gap-1.5"
         >
-          <LogIn className="w-3.5 h-3.5 text-slate-950" />
-          <span>লগইন করুন ⌄</span>
+          <Smartphone className="w-3.5 h-3.5 text-slate-950" />
+          <span>মেম্বার পোর্টাল</span>
         </button>
       </div>
 
