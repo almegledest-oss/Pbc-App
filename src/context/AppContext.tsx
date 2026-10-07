@@ -453,7 +453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRoleState('member');
     setCurrentMember(BLANK_MEMBER);
     setIsLoggedIn(false);
-    setIsAuthModalOpen(true);
+    setIsAuthModalOpen(false);
   };
   
   const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
@@ -693,7 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             safeStorage.removeItem('pbc_user_email');
             setCurrentMember(BLANK_MEMBER);
             setIsLoggedIn(false);
-            setIsAuthModalOpen(true);
+            setIsAuthModalOpen(false);
             return;
           }
 
@@ -707,7 +707,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             safeStorage.removeItem('pbc_user_email');
             setCurrentMember(BLANK_MEMBER);
             setIsLoggedIn(false);
-            setIsAuthModalOpen(true);
+            setIsAuthModalOpen(false);
             return;
           }
 
@@ -826,7 +826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } catch (e) {}
           }
 
-          // No active firebase user and no valid member session -> force login modal
+          // No active firebase user and no valid member session -> keep website clean without auto-opening popup
           safeStorage.removeItem('pbc_role');
           safeStorage.removeItem('pbc_logged_in');
           safeStorage.removeItem('pbc_current_member');
@@ -834,7 +834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           safeStorage.removeItem('pbc_user_email');
           setCurrentMember(BLANK_MEMBER);
           setIsLoggedIn(false);
-          setIsAuthModalOpen(true);
+          setIsAuthModalOpen(false);
         }
       });
     };
