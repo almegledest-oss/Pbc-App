@@ -24,9 +24,11 @@ import {
   browserSessionPersistence,
   getUserRoleAndStatus,
   setUserProfileDoc,
-  addMemberDoc
+  addMemberDoc,
+  sendUserVerificationEmail
 } from '../../services/firebaseService';
 import { sendWelcomeEmailApi } from '../../services/emailService';
+import { validateRestrictedEmail } from '../../utils/emailValidator';
 
 export const AuthModal: React.FC = () => {
   const {
@@ -73,6 +75,9 @@ export const AuthModal: React.FC = () => {
   const [resetEmailSent, setResetEmailSent] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailVerificationSent, setEmailVerificationSent] = useState(false);
+  const [resendingVerification, setResendingVerification] = useState(false);
+  const [resendVerificationSuccess, setResendVerificationSuccess] = useState(false);
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [mode, setMode] = useState<'login' | 'signup' | 'registration-success' | 'pending-review'>('login');
   
@@ -180,6 +185,21 @@ export const AuthModal: React.FC = () => {
     return null;
   }
 
+  const handleResendVerification = async () => {
+    if (!auth.currentUser) return;
+    setResendingVerification(true);
+    try {
+      await sendUserVerificationEmail(auth.currentUser);
+      setResendVerificationSuccess(true);
+      setTimeout(() => setResendVerificationSuccess(false), 4000);
+    } catch (e: any) {
+      console.warn('Resend verification error:', e);
+      setErrorMessage(e.message || 'ভেরিফিকেশন লিঙ্ক পুনরায় পাঠানো যায়নি।');
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -190,8 +210,9 @@ export const AuthModal: React.FC = () => {
 
       if (mode === 'signup') {
         const cleanEmail = signupEmail.trim().toLowerCase();
-        if (!cleanEmail || !cleanEmail.includes('@')) {
-          throw new Error('Please enter a valid email address (একটি সঠিক ইমেইল ঠিকানা দিন)।');
+        const emailValidation = validateRestrictedEmail(cleanEmail);
+        if (!emailValidation.valid) {
+          throw new Error(emailValidation.messageBn || emailValidation.message || 'একটি সঠিক ও অনুমোদিত ইমেইল ঠিকানা দিন।');
         }
         if (!signupFullName.trim()) {
           throw new Error('Please enter your full name (পুরো নাম লিখুন)।');
@@ -293,6 +314,12 @@ export const AuthModal: React.FC = () => {
           const userCred = await createUserWithEmailAndPassword(auth, cleanEmail, signupPassword);
           if (userCred?.user?.uid) {
             uid = userCred.user.uid;
+            try {
+              await sendUserVerificationEmail(userCred.user);
+              setEmailVerificationSent(true);
+            } catch (verErr) {
+              console.warn('Firebase email verification dispatch notice:', verErr);
+            }
           }
           await signOut(auth).catch(() => {});
         } catch (signupErr: any) {
@@ -892,6 +919,32 @@ export const AuthModal: React.FC = () => {
               </span>
             </div>
 
+            {/* Email Verification Status */}
+            {emailVerificationSent && (
+              <div className="p-3.5 bg-blue-500/10 border border-blue-500/40 rounded-2xl text-left space-y-1.5 shadow-md">
+                <div className="flex items-center gap-2 text-xs font-bold text-blue-300">
+                  <Mail className="w-4 h-4 text-blue-400 shrink-0" />
+                  <span>ইমেইল ভেরিফিকেশন পাঠানো হয়েছে (Verification Sent)</span>
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  আপনার জিমেইলে (<span className="text-white font-mono font-bold">{submittedApplicant.email}</span>) একটি ভেরিফিকেশন লিঙ্ক পাঠানো হয়েছে। অনুগ্রহ করে ইনবক্স অথবা স্প্যাম ফোল্ডার চেক করে কনফার্ম করুন।
+                </p>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    disabled={resendingVerification}
+                    onClick={handleResendVerification}
+                    className="text-[11px] text-amber-300 hover:text-amber-200 underline font-semibold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    <span>{resendingVerification ? 'পাঠানো হচ্ছে...' : 'ইমেইল না পেলে আবার লিঙ্ক পাঠান (Resend Link)'}</span>
+                  </button>
+                  {resendVerificationSuccess && (
+                    <span className="text-[10px] text-emerald-400 font-bold block mt-1">✓ নতুন ভেরিফিকেশন লিঙ্ক পাঠানো হয়েছে!</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex flex-col gap-2 pt-2">
               <button
@@ -1013,141 +1066,196 @@ export const AuthModal: React.FC = () => {
           <>
             {mode === 'login' ? (
               /* SIGN IN FORM */
-              <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-                <div>
-                  <label className="block text-slate-200 font-bold mb-1.5 flex items-center justify-between">
-                    <span>Email Address or Member ID / ইমেইল বা মেম্বার আইডি</span>
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      required
-                      value={loginInput}
-                      onChange={e => setLoginInput(e.target.value)}
-                      placeholder="e.g. member@pbcclub.org or PBC-1001"
-                      className="w-full pl-10 pr-3.5 py-3 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
+              <div className="space-y-4 text-xs">
+                <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1.5 flex items-center justify-between">
+                      <span>Email Address or Member ID / ইমেইল বা মেম্বার আইডি</span>
+                    </label>
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        required
+                        value={loginInput}
+                        onChange={e => setLoginInput(e.target.value)}
+                        placeholder="e.g. member@pbcclub.org or PBC-1001"
+                        className="w-full pl-10 pr-3.5 py-3 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-slate-200 font-bold">Password / পাসওয়ার্ড</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setResetEmail(loginInput);
-                        setIsForgotOpen(true);
-                      }}
-                      className="text-[#E5A93C] hover:text-amber-300 font-semibold text-[11px] transition"
-                    >
-                      Forgot Password? (পাসওয়ার্ড ভুলে গেছেন?)
-                    </button>
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="text-slate-200 font-bold">Password / পাসওয়ার্ড</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setResetEmail(loginInput);
+                          setIsForgotOpen(true);
+                        }}
+                        className="text-[#E5A93C] hover:text-amber-300 font-semibold text-[11px] transition"
+                      >
+                        Forgot Password? (পাসওয়ার্ড ভুলে গেছেন?)
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-10 py-3 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-3.5 text-slate-400 hover:text-amber-300"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      required
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-3 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3.5 text-slate-400 hover:text-amber-300"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+
+                  {/* Remember Me Option */}
+                  <div className="flex items-center justify-between pt-1">
+                    <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-medium">
+                      <input
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={e => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-amber-500/40 bg-[#0B1528] accent-amber-500 focus:ring-amber-400/20"
+                      />
+                      <span>Remember Me (আমাকে মনে রাখুন)</span>
+                    </label>
                   </div>
-                </div>
 
-                {/* Remember Me Option */}
-                <div className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer text-slate-300 font-medium">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={e => setRememberMe(e.target.checked)}
-                      className="w-4 h-4 rounded border-amber-500/40 bg-[#0B1528] accent-amber-500 focus:ring-amber-400/20"
-                    />
-                    <span>Remember Me (আমাকে মনে রাখুন)</span>
-                  </label>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base rounded-xl shadow-lg shadow-amber-500/20 transition mt-3 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.99]"
-                >
-                  {loading ? 'Verifying Credentials...' : 'Sign In (সাইন ইন করুন)'}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 hover:from-amber-400 hover:via-yellow-300 hover:to-amber-500 text-slate-950 font-black text-sm sm:text-base rounded-xl shadow-lg shadow-amber-500/20 transition mt-3 disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.99] cursor-pointer"
+                  >
+                    {loading ? 'Verifying Credentials...' : 'Sign In (সাইন ইন করুন)'}
+                  </button>
+                </form>
+              </div>
             ) : (
               /* MEMBER SELF-REGISTRATION FORM */
-              <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-3.5 text-xs">
-                <div>
-                  <label className="block text-slate-200 font-bold mb-1 flex items-center justify-between">
-                    <span>Member ID / মেম্বার আইডি *</span>
-                    <span className="text-[10px] text-amber-400 font-mono">Exactly 5 Digits</span>
-                  </label>
-                  <div className="flex items-center">
-                    <span className="inline-flex items-center px-3.5 py-2.5 bg-[#0A1120] border border-r-0 border-amber-500/30 rounded-l-xl text-amber-400 font-mono font-bold text-sm select-none">
-                      PBC-
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={5}
-                      required
-                      value={signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5)}
-                      onChange={e => {
-                        const digits = e.target.value.replace(/\D/g, '').slice(0, 5);
-                        setSignupMemberId(digits ? `PBC-${digits}` : '');
-                      }}
-                      placeholder="10001"
-                      className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-r-xl text-white font-mono font-bold tracking-wider placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
+              <div className="space-y-3.5 text-xs">
+                <form data-nosnippet="true" onSubmit={handleLoginSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1 flex items-center justify-between">
+                      <span>Member ID / মেম্বার আইডি *</span>
+                      <span className="text-[10px] text-amber-400 font-mono">Exactly 5 Digits</span>
+                    </label>
+                    <div className="flex items-center">
+                      <span className="inline-flex items-center px-3.5 py-2.5 bg-[#0A1120] border border-r-0 border-amber-500/30 rounded-l-xl text-amber-400 font-mono font-bold text-sm select-none">
+                        PBC-
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={5}
+                        required
+                        value={signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5)}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/\D/g, '').slice(0, 5);
+                          setSignupMemberId(digits ? `PBC-${digits}` : '');
+                        }}
+                        placeholder="10001"
+                        className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-r-xl text-white font-mono font-bold tracking-wider placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1 font-sans">৫ সংখ্যার আইডি নম্বর দিন (যেমন: ১০১০১)</p>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1 font-sans">৫ সংখ্যার আইডি নম্বর দিন (যেমন: ১০১০১)</p>
-                </div>
 
-                <div>
-                  <label className="block text-slate-200 font-bold mb-1">
-                    Full Name / পুরো নাম *
-                  </label>
-                  <div className="relative">
-                    <User className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="text"
-                      required
-                      value={signupFullName}
-                      onChange={e => setSignupFullName(e.target.value)}
-                      placeholder="e.g. Fokrul Islam Mir"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1">
+                      Full Name / পুরো নাম *
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        required
+                        value={signupFullName}
+                        onChange={e => setSignupFullName(e.target.value)}
+                        placeholder="e.g. Fokrul Islam Mir"
+                        className="w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-slate-200 font-bold mb-1">
-                    Email Address / ইমেইল ঠিকানা *
-                  </label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
-                    <input
-                      type="email"
-                      required
-                      value={signupEmail}
-                      onChange={e => setSignupEmail(e.target.value)}
-                      placeholder="e.g. member@pbcclub.org"
-                      className="w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
-                    />
+                  {/* EMAIL INPUT WITH STRICT DOMAIN VALIDATION */}
+                  <div>
+                    <label className="block text-slate-200 font-bold mb-1">
+                      Email Address / ইমেইল ঠিকানা *
+                    </label>
+
+                    <div className="relative">
+                      <Mail className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="email"
+                        required
+                        value={signupEmail}
+                        onChange={e => {
+                          setSignupEmail(e.target.value);
+                          if (errorMessage.includes('ইমেইল') || errorMessage.includes('email') || errorMessage.includes('ডোমেইন')) {
+                            setErrorMessage('');
+                          }
+                        }}
+                        placeholder="member@gmail.com"
+                        className={`w-full pl-10 pr-3.5 py-2.5 bg-[#0B1528] border ${
+                          (() => {
+                            if (!signupEmail.trim() || !signupEmail.includes('@')) return 'border-amber-500/30 focus:border-amber-400';
+                            const res = validateRestrictedEmail(signupEmail.trim());
+                            return res.valid ? 'border-emerald-500/60 focus:border-emerald-400' : 'border-rose-500/60 focus:border-rose-400';
+                          })()
+                        } rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition`}
+                      />
+                    </div>
+
+                    {/* Live Validation & Typo Feedback */}
+                    {signupEmail.trim() && signupEmail.includes('@') && (() => {
+                      const res = validateRestrictedEmail(signupEmail.trim());
+                      if (res.valid) {
+                        return (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span>অনুমোদিত ও বৈধ ইমেইল (@{res.domain})</span>
+                          </div>
+                        );
+                      }
+                      if (res.suggestion) {
+                        return (
+                          <div className="mt-1.5 p-2 bg-amber-500/10 border border-amber-500/40 rounded-xl flex items-center justify-between gap-2 text-xs">
+                            <div className="flex items-center gap-1.5 text-amber-300 text-[11px]">
+                              <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <span>{res.messageBn}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSignupEmail(res.suggestion!);
+                                setErrorMessage('');
+                              }}
+                              className="px-2.5 py-0.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-[10.5px] shrink-0 cursor-pointer shadow-sm transition"
+                            >
+                              ঠিক করুন
+                            </button>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-1.5 flex items-start gap-1.5 text-[11px] text-rose-400 leading-snug">
+                          <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                          <span>{res.messageBn || res.message || 'অননুমোদিত বা ভুল ডোমেইন।'}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
-                </div>
 
                 {/* Reusable Country-Code aware Phone Input */}
                 <PhoneInputWithCountry
@@ -1219,8 +1327,9 @@ export const AuthModal: React.FC = () => {
                   {loading ? 'Creating Member Account...' : 'Register Member / মেম্বার রেজিস্ট্রেশন করুন'}
                 </button>
               </form>
-            )}
-          </>
+            </div>
+          )}
+        </>
         ) : (
           /* Forgot Password View */
           <form data-nosnippet="true" onSubmit={handleForgotSubmit} className="space-y-4 text-xs">

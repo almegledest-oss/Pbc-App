@@ -23,7 +23,10 @@ import {
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
-  User
+  User,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendEmailVerification
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, auth, storage } from '../lib/firebase';
@@ -2151,6 +2154,16 @@ export async function clearActiveSessionDoc(email: string) {
 // ----------------------------------------------------------------------
 // Auth helper methods
 // ----------------------------------------------------------------------
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: 'select_account' });
+  return await signInWithPopup(auth, provider);
+}
+
+export async function sendUserVerificationEmail(user: User) {
+  return await sendEmailVerification(user);
+}
+
 export {
   auth,
   signInWithEmailAndPassword,
@@ -2160,5 +2173,8 @@ export {
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
-  browserSessionPersistence
+  browserSessionPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
+  sendEmailVerification
 };
