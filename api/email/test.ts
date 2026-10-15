@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer';
 
-const DEFAULT_SMTP_USER = process.env.SMTP_USER || 'fokrulislammir9897@gmail.com';
-const DEFAULT_SMTP_PASS = (process.env.SMTP_PASS || 'tqnt cqlj npjb zpal').replace(/\s+/g, '');
+const DEFAULT_SMTP_USER = process.env.SMTP_USER || 'pbcbusinessclub@gmail.com';
+const DEFAULT_SMTP_PASS = (process.env.SMTP_PASS || 'htwkqaxtnubmdhqd').replace(/\s+/g, '');
 const DEFAULT_SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const DEFAULT_SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const DEFAULT_SENDER_NAME = process.env.SENDER_NAME || 'Probashi Business Club (PBC)';

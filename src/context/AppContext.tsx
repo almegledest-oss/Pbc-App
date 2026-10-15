@@ -1223,6 +1223,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     const customId = m.id && m.id.trim() !== '' ? m.id.trim() : `PBC-${10000 + members.length + 1}`;
+    
+    // Defensive check: NEVER allow adding a member with an ID already assigned to another member
+    const existingById = members.find(existing => {
+      const existingDigits = (existing.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+      const incomingDigits = customId.replace(/^PBC-/, '').replace(/\D/g, '');
+      return existingDigits && incomingDigits && existingDigits === incomingDigits;
+    });
+    if (existingById) {
+      const errMsg = `আইডি কনফ্লিক্ট: মেম্বার আইডি (${customId}) ইতিমধ্যে "${existingById.fullName}"-এর নামে নিবন্ধিত আছে! ডুপ্লিকেট আইডি যুক্ত করা সম্ভব নয়।`;
+      alert(errMsg);
+      throw new Error(errMsg);
+    }
+
     const cleanEmail = (m.email || '').toLowerCase().trim();
     const finalRole: UserRole = (m.role as UserRole) || 'member';
     

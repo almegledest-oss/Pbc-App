@@ -63,12 +63,12 @@ export const AdminEmailSettingsView: React.FC<AdminEmailSettingsViewProps> = ({ 
     enableWelcomeEmail: systemSettings.enableWelcomeEmail ?? true,
     enableDepositReceiptEmail: systemSettings.enableDepositReceiptEmail ?? true,
     senderName: systemSettings.senderName || 'Probashi Business Club (PBC)',
-    senderEmail: systemSettings.senderEmail || 'fokrulislammir9897@gmail.com',
+    senderEmail: systemSettings.senderEmail || 'pbcbusinessclub@gmail.com',
     smtpHost: systemSettings.smtpHost || 'smtp.gmail.com',
     smtpPort: systemSettings.smtpPort || 465,
     smtpSecure: systemSettings.smtpSecure ?? true,
-    smtpUser: systemSettings.smtpUser || 'fokrulislammir9897@gmail.com',
-    smtpPass: systemSettings.smtpPass || 'tqnt cqlj npjb zpal'
+    smtpUser: systemSettings.smtpUser || 'pbcbusinessclub@gmail.com',
+    smtpPass: systemSettings.smtpPass || 'htwkqaxtnubmdhqd'
   });
 
   const [showPassword, setShowPassword] = useState(false);

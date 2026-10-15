@@ -207,6 +207,19 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
     const cleanIdDigits = (formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
     if (!cleanIdDigits || cleanIdDigits.length !== 5) {
       errs.id = 'Member ID must be exactly 5 digits (e.g. PBC-10001) / সদস্য আইডি অবশ্যই ঠিক ৫ ডিজিট হতে হবে।';
+    } else {
+      const targetId = `PBC-${cleanIdDigits}`;
+      const duplicate = members.find(m => {
+        const mDigits = (m.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+        if (isEditMode && memberToEdit) {
+          const editDigits = (memberToEdit.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+          return mDigits === cleanIdDigits && m.id !== memberToEdit.id && mDigits !== editDigits;
+        }
+        return mDigits === cleanIdDigits;
+      });
+      if (duplicate) {
+        errs.id = `আইডি কনফ্লিক্ট: এই আইডি (${targetId}) ইতিমধ্যে "${duplicate.fullName}"-এর নামে নিবন্ধিত আছে! ডুপ্লিকেট আইডি দেওয়া সম্ভব নয়।`;
+      }
     }
 
     if (!formData.fullName.trim()) {
@@ -429,8 +442,33 @@ export const MemberFormModal: React.FC<MemberFormModalProps> = ({
                     } rounded-r-xl text-amber-300 placeholder:text-slate-600 focus:outline-none focus:border-amber-400`}
                   />
                 </div>
-                {errors.id && (
+                {errors.id ? (
                   <p className="text-[10px] text-rose-400 mt-1 font-medium">{errors.id}</p>
+                ) : (
+                  (() => {
+                    const cleanDigits = (formData.id || '').replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5);
+                    if (cleanDigits.length < 5) return null;
+                    const conflict = members.find(m => {
+                      const mDigits = (m.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+                      if (isEditMode && memberToEdit) {
+                        const editDigits = (memberToEdit.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+                        return mDigits === cleanDigits && m.id !== memberToEdit.id && mDigits !== editDigits;
+                      }
+                      return mDigits === cleanDigits;
+                    });
+                    if (conflict) {
+                      return (
+                        <p className="text-[10px] text-rose-400 mt-1 font-semibold flex items-center gap-1">
+                          ⚠️ আইডি (PBC-{cleanDigits}) ইতিমধ্যে "{conflict.fullName}"-এর নামে ব্যবহৃত হচ্ছে!
+                        </p>
+                      );
+                    }
+                    return (
+                      <p className="text-[10px] text-emerald-400 mt-1 font-semibold flex items-center gap-1">
+                        ✓ আইডি (PBC-{cleanDigits}) বরাদ্দযোগ্য (Available)
+                      </p>
+                    );
+                  })()
                 )}
               </div>
 

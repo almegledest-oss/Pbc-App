@@ -261,25 +261,31 @@ export const AuthModal: React.FC = () => {
 
         const formattedId = `PBC-${rawMemberIdDigits}`;
 
-        // Check if Member ID already exists
-        let idAlreadyExists = members.some(m => m.id.toUpperCase() === formattedId);
-        if (!idAlreadyExists) {
+        // Check if Member ID already exists (Check both in-memory cache and Firestore directly)
+        let existingMember: Member | null = members.find(m => {
+          const mDigits = (m.id || '').replace(/^PBC-/, '').replace(/\D/g, '');
+          return mDigits === rawMemberIdDigits;
+        }) || null;
+
+        if (!existingMember) {
           try {
             const snapId = await getDoc(doc(db, 'members', formattedId));
-            if (snapId.exists()) idAlreadyExists = true;
-          } catch (e) {}
+            if (snapId.exists()) {
+              existingMember = { id: snapId.id, ...snapId.data() } as Member;
+            }
+          } catch (e) {
+            console.warn('Firestore member check notice:', e);
+          }
         }
 
-        if (idAlreadyExists) {
-          const existingById = members.find(m => m.id.toUpperCase() === formattedId);
-          if (existingById?.password && existingById.password.trim() !== '') {
-            throw new Error(`Member ID (${formattedId}) is already registered. Please Sign In.`);
-          }
+        if (existingMember) {
+          throw new Error(
+            `নিরাপত্তা সতর্কতা: মেম্বার আইডি নম্বর (${formattedId}) ইতিমধ্যে "${existingMember.fullName || 'অন্য একজন সদস্য'}"-এর নামে নিবন্ধিত রয়েছে! এই আইডি দিয়ে নতুন রেজিস্ট্রেশন করা সম্ভব নয়। অনুগ্রহ করে আপনার নির্ধারিত সঠিক আইডি দিন অথবা ক্লাবের অ্যাডমিনের সাথে যোগাযোগ করুন।`
+          );
         }
         newMemberId = formattedId;
 
         // 3. Create Member data structure
-        const existingById = members.find(m => m.id.toUpperCase() === newMemberId.toUpperCase());
         const newMemberData: Member = {
           id: newMemberId,
           fullName: signupFullName.trim(),
@@ -1165,10 +1171,38 @@ export const AuthModal: React.FC = () => {
                           setSignupMemberId(digits ? `PBC-${digits}` : '');
                         }}
                         placeholder="10001"
-                        className="w-full px-3.5 py-2.5 bg-[#0B1528] border border-amber-500/30 focus:border-amber-400 rounded-r-xl text-white font-mono font-bold tracking-wider placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition"
+                        className={`w-full px-3.5 py-2.5 bg-[#0B1528] border ${
+                          (() => {
+                            const d = signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5);
+                            if (d.length === 5 && members.some(m => (m.id || '').replace(/^PBC-/, '').replace(/\D/g, '') === d)) {
+                              return 'border-rose-500 focus:border-rose-400 text-rose-300';
+                            }
+                            return 'border-amber-500/30 focus:border-amber-400 text-white';
+                          })()
+                        } rounded-r-xl font-mono font-bold tracking-wider placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400/20 transition`}
                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-1 font-sans">৫ সংখ্যার আইডি নম্বর দিন (যেমন: ১০১০১)</p>
+                    {(() => {
+                      const cleanDigits = signupMemberId.replace(/^PBC-/, '').replace(/\D/g, '').slice(0, 5);
+                      if (cleanDigits.length < 5) {
+                        return <p className="text-[10px] text-slate-400 mt-1 font-sans">৫ সংখ্যার আইডি নম্বর দিন (যেমন: ১০১০১)</p>;
+                      }
+                      const matched = members.find(m => (m.id || '').replace(/^PBC-/, '').replace(/\D/g, '') === cleanDigits);
+                      if (matched) {
+                        return (
+                          <div className="mt-1.5 p-2 bg-rose-500/15 border border-rose-500/50 rounded-xl flex items-center gap-2 text-rose-300 text-[11px] font-semibold animate-in fade-in">
+                            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                            <span>আইডি নম্বর (PBC-{cleanDigits}) ইতিমধ্যে নিবন্ধিত! অন্য নতুন আইডি দিন।</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="mt-1.5 p-1.5 bg-emerald-500/15 border border-emerald-500/40 rounded-xl flex items-center gap-2 text-emerald-300 text-[11px] font-semibold animate-in fade-in">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>আইডি নম্বর (PBC-{cleanDigits}) নিবন্ধনের জন্য উপলব্ধ (Available)</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div>

@@ -5,9 +5,8 @@ import nodemailer from 'nodemailer';
 import { GoogleGenAI } from '@google/genai';
 
 dotenv.config();
-
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 
 app.use(express.json({ limit: '20mb' }));
 
@@ -33,8 +32,8 @@ interface SmtpOptions {
 }
 
 // Default SMTP Configuration provided for PBC Club
-const DEFAULT_SMTP_USER = process.env.SMTP_USER || 'fokrulislammir9897@gmail.com';
-const DEFAULT_SMTP_PASS = (process.env.SMTP_PASS || 'tqnt cqlj npjb zpal').replace(/\s+/g, '');
+const DEFAULT_SMTP_USER = process.env.SMTP_USER || 'pbcbusinessclub@gmail.com';
+const DEFAULT_SMTP_PASS = (process.env.SMTP_PASS || 'htwkqaxtnubmdhqd').replace(/\s+/g, '');
 const DEFAULT_SMTP_HOST = process.env.SMTP_HOST || 'smtp.gmail.com';
 const DEFAULT_SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const DEFAULT_SENDER_NAME = process.env.SENDER_NAME || 'Probashi Business Club (PBC)';
@@ -744,7 +743,7 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : { server: httpServer }
+        hmr: false
       },
       appType: 'spa',
     });
