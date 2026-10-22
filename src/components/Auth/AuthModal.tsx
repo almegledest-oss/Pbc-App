@@ -293,15 +293,15 @@ export const AuthModal: React.FC = () => {
           email: cleanEmail,
           country: signupCountry.trim() || 'Saudi Arabia',
           city: signupCity.trim() || 'Riyadh',
-          joinDate: existingById?.joinDate || new Date().toISOString().split('T')[0],
+          joinDate: new Date().toISOString().split('T')[0],
           status: 'pending', // Pending Admin Verification
-          photoUrl: existingById?.photoUrl || '',
-          totalDeposit: existingById?.totalDeposit || 0,
+          photoUrl: '',
+          totalDeposit: 0,
           qrCodeData: 'PBC-MEMBER:' + newMemberId + ':' + signupFullName.trim() + ':pending',
           barcodeData: 'PBC-BC-' + newMemberId,
           role: 'member',
           password: signupPassword,
-          notes: existingById?.notes ? existingById.notes + ' | Self-Registered' : 'Self-Registered Member (Pending Approval)'
+          notes: 'Self-Registered Member (Pending Approval)'
         };
 
         // 4. Persist Member to Firestore permanently
