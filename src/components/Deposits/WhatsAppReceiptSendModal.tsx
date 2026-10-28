@@ -44,8 +44,9 @@ export const WhatsAppReceiptSendModal: React.FC<WhatsAppReceiptSendModalProps> =
   const memberObj: Member | undefined = deposit
     ? members.find(
         (m) =>
-          m.id === deposit.memberId ||
-          (m.fullName &&
+          (deposit.memberId && m.id && m.id.trim().toLowerCase() === deposit.memberId.trim().toLowerCase()) ||
+          (!deposit.memberId &&
+            m.fullName &&
             deposit.memberName &&
             m.fullName.toLowerCase().trim() === deposit.memberName.toLowerCase().trim())
       )

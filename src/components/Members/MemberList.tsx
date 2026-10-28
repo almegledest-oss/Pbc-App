@@ -116,7 +116,8 @@ export const MemberList: React.FC = () => {
   const getMemberDepositBreakdown = (member: Member) => {
     const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
     const memberDeps = deposits.filter(
-      d => (d.memberId === member.id || (member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())) && 
+      d => ((d.memberId && member.id && d.memberId.trim().toLowerCase() === member.id.trim().toLowerCase()) || 
+            (!d.memberId && member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())) && 
       isApproved(d.status)
     );
     const voucherSum = memberDeps.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);

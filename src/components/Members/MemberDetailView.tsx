@@ -106,7 +106,8 @@ export const MemberDetailView: React.FC<MemberDetailViewProps> = ({ memberId, on
   // Filter member deposits
   const isApproved = (s?: string) => s?.toLowerCase().trim() === 'approved';
   const memberDeposits = deposits.filter(
-    d => d.memberId === member.id || (member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())
+    d => (d.memberId && member.id && d.memberId.trim().toLowerCase() === member.id.trim().toLowerCase()) ||
+         (!d.memberId && member.fullName && d.memberName && d.memberName.toLowerCase().trim() === member.fullName.toLowerCase().trim())
   );
 
   const approvedDeposits = memberDeposits.filter(d => isApproved(d.status));

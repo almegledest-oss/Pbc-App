@@ -890,8 +890,7 @@ export const AdminPanel: React.FC = () => {
                       <button
                         onClick={() => {
                           const isOwn = currentMember && (
-                            d.memberId === currentMember.id || 
-                            (d.memberName && currentMember.fullName && d.memberName.toLowerCase().trim() === currentMember.fullName.toLowerCase().trim()) ||
+                            (d.memberId && currentMember.id && d.memberId.trim().toLowerCase() === currentMember.id.trim().toLowerCase()) || 
                             (authUser?.email && d.memberEmail && d.memberEmail.toLowerCase().trim() === authUser.email.toLowerCase().trim())
                           );
                           if (isOwn) {

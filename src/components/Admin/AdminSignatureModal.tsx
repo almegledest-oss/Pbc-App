@@ -144,8 +144,7 @@ export const AdminSignatureModal: React.FC<AdminSignatureModalProps> = ({
 
   const handleSubmit = async () => {
     const isOwn = currentMember && deposit && (
-      deposit.memberId === currentMember.id || 
-      (deposit.memberName && currentMember.fullName && deposit.memberName.toLowerCase().trim() === currentMember.fullName.toLowerCase().trim()) ||
+      (deposit.memberId && currentMember.id && deposit.memberId.trim().toLowerCase() === currentMember.id.trim().toLowerCase()) || 
       (authUser?.email && deposit.memberEmail && deposit.memberEmail.toLowerCase().trim() === authUser.email.toLowerCase().trim())
     );
 

@@ -1476,7 +1476,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await addDepositDoc(newId, depositData);
 
     if (depositStatus === 'Approved') {
-      const targetMember = members.find(m => m.id === d.memberId || (m.fullName && d.memberName && m.fullName.toLowerCase().trim() === d.memberName.toLowerCase().trim()));
+      const targetMember = members.find(m => 
+        (d.memberId && m.id && m.id.trim().toLowerCase() === d.memberId.trim().toLowerCase()) ||
+        (!d.memberId && m.fullName && d.memberName && m.fullName.toLowerCase().trim() === d.memberName.toLowerCase().trim())
+      );
       if (targetMember) {
         await updateMemberDoc(targetMember.id, {
           totalDeposit: (targetMember.totalDeposit || 0) + (Number(d.amount) || 0),
@@ -1589,7 +1592,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // 2. If the deleted deposit was Approved, adjust member total deposit immediately
       if (target.status === 'Approved' || target.status?.toLowerCase() === 'approved') {
-        const mem = members.find(m => m.id === target.memberId || (m.fullName && target.memberName && m.fullName.toLowerCase().trim() === target.memberName.toLowerCase().trim()));
+        const mem = members.find(m => 
+          (target.memberId && m.id && m.id.trim().toLowerCase() === target.memberId.trim().toLowerCase()) ||
+          (!target.memberId && m.fullName && target.memberName && m.fullName.toLowerCase().trim() === target.memberName.toLowerCase().trim())
+        );
         if (mem) {
           const newTot = Math.max(0, (mem.totalDeposit || 0) - (Number(target.amount) || 0));
           setMembers(prev => prev.map(m => m.id === mem.id ? { ...m, totalDeposit: newTot } : m));
@@ -1642,16 +1648,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetMember = members.find(m => m.id === memberId);
     const memberNameTrimmed = targetMember?.fullName?.toLowerCase().trim() || '';
 
-    // Find all matching deposits
+    // Find all matching deposits strictly by memberId (only fallback to name if deposit has no memberId)
     const matchingDeposits = deposits.filter(d => 
-      d.memberId === memberId || 
-      (memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+      (d.memberId && memberId && d.memberId.trim().toLowerCase() === memberId.trim().toLowerCase()) || 
+      (!d.memberId && memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
     );
 
     // 1. Optimistic instant state clear
     setDeposits(prev => prev.filter(d => 
-      d.memberId !== memberId && 
-      !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+      (d.memberId && memberId)
+        ? d.memberId.trim().toLowerCase() !== memberId.trim().toLowerCase()
+        : !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
     ));
 
     setMembers(prev => prev.map(m => m.id === memberId ? {
@@ -1666,8 +1673,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const cachedDeps = getCachedItem<Deposit[]>('pbc_cached_deposits', []);
       if (cachedDeps && cachedDeps.length > 0) {
         setCachedItem('pbc_cached_deposits', cachedDeps.filter(d => 
-          d.memberId !== memberId && 
-          !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
+          (d.memberId && memberId)
+            ? d.memberId.trim().toLowerCase() !== memberId.trim().toLowerCase()
+            : !(memberNameTrimmed && d.memberName && d.memberName.toLowerCase().trim() === memberNameTrimmed)
         ));
       }
       const cachedMems = getCachedItem<Member[]>('pbc_cached_members', []);
@@ -1741,10 +1749,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetDeposit = deposits.find(d => d.id === id);
     if (!targetDeposit) return;
 
-    // Self-approval restriction for all admins & super admins
+    // Self-approval restriction for all admins & super admins (by unique ID or verified email)
     const isOwnDeposit = currentMember && (
-      targetDeposit.memberId === currentMember.id || 
-      (targetDeposit.memberName && currentMember.fullName && targetDeposit.memberName.toLowerCase().trim() === currentMember.fullName.toLowerCase().trim()) ||
+      (targetDeposit.memberId && currentMember.id && targetDeposit.memberId.trim().toLowerCase() === currentMember.id.trim().toLowerCase()) || 
       (authUser?.email && targetDeposit.memberEmail && targetDeposit.memberEmail.toLowerCase().trim() === authUser.email.toLowerCase().trim())
     );
 
@@ -1771,7 +1778,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Immediately update member's total deposit locally
     if (targetDeposit.status !== 'Approved') {
-      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
+      const targetMember = members.find(m => 
+        (targetDeposit.memberId && m.id && m.id.trim().toLowerCase() === targetDeposit.memberId.trim().toLowerCase()) ||
+        (!targetDeposit.memberId && m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim())
+      );
       if (targetMember) {
         const newTotal = (Number(targetMember.totalDeposit) || 0) + (Number(targetDeposit.amount) || 0);
         setMembers(prev => prev.map(m => m.id === targetMember.id ? { ...m, totalDeposit: newTotal } : m));
@@ -1870,7 +1880,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. If it was previously Approved (edge case), subtract from member total deposit
     if (targetDeposit.status === 'Approved' || targetDeposit.status?.toLowerCase() === 'approved') {
-      const targetMember = members.find(m => m.id === targetDeposit.memberId || (m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim()));
+      const targetMember = members.find(m => 
+        (targetDeposit.memberId && m.id && m.id.trim().toLowerCase() === targetDeposit.memberId.trim().toLowerCase()) ||
+        (!targetDeposit.memberId && m.fullName && targetDeposit.memberName && m.fullName.toLowerCase().trim() === targetDeposit.memberName.toLowerCase().trim())
+      );
       if (targetMember) {
         const newTotal = Math.max(0, (Number(targetMember.totalDeposit) || 0) - (Number(targetDeposit.amount) || 0));
         setMembers(prev => prev.map(m => m.id === targetMember.id ? { ...m, totalDeposit: newTotal } : m));

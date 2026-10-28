@@ -584,7 +584,8 @@ export const AdminManualDepositView: React.FC<AdminManualDepositViewProps> = ({ 
                   </span>
                   {(() => {
                     const approvedVouchers = deposits.filter(
-                      d => (d.memberId === selectedMember.id || (selectedMember.fullName && d.memberName && d.memberName.toLowerCase().trim() === selectedMember.fullName.toLowerCase().trim())) && 
+                      d => ((d.memberId && selectedMember.id && d.memberId.trim().toLowerCase() === selectedMember.id.trim().toLowerCase()) ||
+                            (!d.memberId && selectedMember.fullName && d.memberName && d.memberName.toLowerCase().trim() === selectedMember.fullName.toLowerCase().trim())) && 
                       d.status?.toLowerCase().trim() === 'approved'
                     );
                     const voucherSum = approvedVouchers.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
